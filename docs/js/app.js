@@ -2,7 +2,7 @@
 // PROYECTO TA — app.js
 // ============================================================
 
-const API_URL = 'https://script.google.com/macros/s/AKfycbyzd8HOx-LvZjT5AzrsfOGcT4vTqrGNKxmKC_zfniJFAiKEzTydgfoSe1YZU9Sjc02VGQ/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbz_k7fzXIXJJXlAKaOV4BcddLO0jORDv1Gwuwd_5XyC8rg71dCxLOcQ3yNiNkOTCq9FFg/exec';
 
 // ── Estado Global ────────────────────────────────────────────
 const state = {
