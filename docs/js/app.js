@@ -2,7 +2,7 @@
 // PROYECTO TA — app.js
 // ============================================================
 
-const API_URL = 'https://script.google.com/macros/s/AKfycbw6t4mAFalwFxt32CX89EE7SQi1Aa9Yo64x6_QID9OaxzaleMTaUZAVjMAZoEFVFFDwDA/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbyzd8HOx-LvZjT5AzrsfOGcT4vTqrGNKxmKC_zfniJFAiKEzTydgfoSe1YZU9Sjc02VGQ/exec';
 
 // ── Estado Global ────────────────────────────────────────────
 const state = {
@@ -34,12 +34,19 @@ function setLoading(btnId, spinnerId, textId, loading, text) {
 async function apiGet(params) {
   const url = new URL(API_URL);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-  const r = await fetch(url.toString());
+  const r = await fetch(url.toString(), { redirect: 'follow' });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();
 }
 
 async function apiPost(body) {
-  const r = await fetch(API_URL, { method: 'POST', body: JSON.stringify(body) });
+  const r = await fetch(API_URL, {
+    method: 'POST',
+    redirect: 'follow',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(body)
+  });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();
 }
 
