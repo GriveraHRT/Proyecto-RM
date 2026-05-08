@@ -93,6 +93,9 @@ body {
   font-family: 'Outfit', sans-serif;
   font-weight: 700;
   font-size: 18px;
+  color: var(--primary);
+}
+[data-theme="dark"] .logo-text {
   background: linear-gradient(90deg, var(--primary), #fff);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
