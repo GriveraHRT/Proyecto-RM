@@ -1,19 +1,20 @@
 // ============================================================
-// PROYECTO TA — Laboratorio Clínico Hospital de Talca
-// Backend: Google Apps Script
+// PROYECTO RM — Registros Laboratorio — Hospital de Talca
+// Backend: Google Apps Script  v3.0
 // ============================================================
 
 const EMAIL_ADDRESS = 'grivera@hospitaldetalca.cl';
 const PASSWORD_N1   = 'HRT123';
 const PASSWORD_N2   = 'HRT321';
-const USUARIO_N2    = 'admin';
+const SHEET_URL     = 'https://docs.google.com/spreadsheets/d/1HzHcRriBtPGQxTfFrZSntVeM8ujQHWnGFuyWrJo6KUQ';
 
 const SHEETS = {
   AREAS:       'Areas_Maestro',
   CENTRIFUGAS: 'Centrifugas_Maestro',
+  SALAS:       'Salas_Maestro',
   TERMO:       'Registro_Termo',
   CENT_REG:    'Registro_Centrifugas',
-  LIMPIEZA:    'Registro_Limpieza',
+  MESONES:     'Registro_Mesones',
   REVISIONES:  'Revisiones'
 };
 
@@ -29,15 +30,23 @@ function getSheet(name) {
 }
 
 function parseFecha(fechaStr) {
-  // Accepts "YYYY-MM-DD"
   const p = fechaStr.split('-');
   return { dia: parseInt(p[2]), mes: parseInt(p[1]), anio: parseInt(p[0]) };
+}
+
+function formatFechaDDMMYYYY(f) {
+  return String(f.dia).padStart(2,'0') + '/' + String(f.mes).padStart(2,'0') + '/' + f.anio;
 }
 
 function jsonResponse(obj) {
   return ContentService
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+function insertRowAtTop(sheet, values) {
+  sheet.insertRowAfter(1);
+  sheet.getRange(2, 1, 1, values.length).setValues([values]);
 }
 
 // ── Router ───────────────────────────────────────────────────
@@ -48,9 +57,12 @@ function doGet(e) {
     switch (action) {
       case 'getAreas':       return jsonResponse(getAreas());
       case 'getCentrifugas': return jsonResponse(getCentrifugas());
+      case 'getSalas':       return jsonResponse(getSalas());
       case 'getRegistros':   return jsonResponse(getRegistros(e.parameter.mes, e.parameter.anio));
       case 'getRevisiones':  return jsonResponse(getRevision(e.parameter.mes, e.parameter.anio));
+      case 'getMaestros':    return jsonResponse(getMaestros());
       case 'SETUP_INIT_TA':  return jsonResponse(setup());
+      case 'REINIT':         return jsonResponse(reinitialize());
       default:               return jsonResponse({ error: 'Acción no reconocida: ' + action });
     }
   } catch (err) {
@@ -69,7 +81,7 @@ function doPost(e) {
     switch (data.action) {
       case 'saveTermo':           return jsonResponse(saveTermo(data));
       case 'saveCentrifuga':      return jsonResponse(saveCentrifuga(data));
-      case 'saveLimpieza':        return jsonResponse(saveLimpieza(data));
+      case 'saveMesones':         return jsonResponse(saveMesones(data));
       case 'marcarListoRevision': return jsonResponse(marcarListoRevision(data));
       case 'marcarRevisado':      return jsonResponse(marcarRevisado(data));
       default:                    return jsonResponse({ error: 'Acción no reconocida: ' + data.action });
@@ -91,7 +103,22 @@ function getCentrifugas() {
   return data.slice(1).filter(r => r[0]).map(r => String(r[0]));
 }
 
+function getSalas() {
+  const data = getSheet(SHEETS.SALAS).getDataRange().getValues();
+  return data.slice(1).filter(r => r[0]).map(r => String(r[0]));
+}
+
+/** Devuelve todos los maestros en una sola llamada para optimizar carga */
+function getMaestros() {
+  return {
+    areas: getAreas(),
+    centrifugas: getCentrifugas(),
+    salas: getSalas()
+  };
+}
+
 // ── Guardar Registros ─────────────────────────────────────────
+// Termo: Responsable | Temperatura (°C) | Humedad (%) | Fecha (dd/mm/aaaa) | Día | Mes | Año | Turno | Area | Observaciones | Timestamp | Revisado_Por | Fecha_Revisión
 
 function saveTermo(data) {
   if (!data.responsable || !data.temperatura || !data.humedad || !data.fecha || !data.area) {
@@ -100,50 +127,74 @@ function saveTermo(data) {
   const f = parseFecha(data.fecha);
   const ts = new Date().toISOString();
   const ampm = data.ampm || (new Date().getHours() < 12 ? 'AM' : 'PM');
-  getSheet(SHEETS.TERMO).appendRow([
+  const turno = ampm === 'AM' ? 'Mañana' : 'Tarde';
+  insertRowAtTop(getSheet(SHEETS.TERMO), [
     data.responsable.toUpperCase().substring(0, 3),
     parseFloat(data.temperatura),
     parseFloat(data.humedad),
+    formatFechaDDMMYYYY(f),
     f.dia, f.mes, f.anio,
-    ampm,
+    turno,
     data.area,
     data.observaciones || '',
-    ts
+    ts,
+    '',  // Revisado_Por
+    ''   // Fecha_Revisión
   ]);
   return { success: true, message: 'Registro de Temperatura/Humedad guardado.' };
 }
 
+// Centrifugas: Fecha | Día | Mes | Año | Centrifuga | Responsable | Tipo_Mantencion | Observaciones | Timestamp | Revisado_Por | Fecha_Revisión
 function saveCentrifuga(data) {
-  if (!data.centrifuga || !data.responsable || !data.fecha) {
+  if (!data.responsable || !data.fecha) {
     return { success: false, error: 'Faltan campos obligatorios.' };
+  }
+  const centrifugas = data.centrifugas || (data.centrifuga ? [data.centrifuga] : []);
+  if (centrifugas.length === 0) {
+    return { success: false, error: 'Seleccione al menos una centrífuga.' };
   }
   const f = parseFecha(data.fecha);
   const ts = new Date().toISOString();
-  getSheet(SHEETS.CENT_REG).appendRow([
-    f.dia, f.mes, f.anio,
-    data.centrifuga,
-    data.responsable.toUpperCase().substring(0, 3),
-    data.tipo_mantencion || 'Diaria',
-    data.observaciones || '',
-    ts
-  ]);
-  return { success: true, message: 'Registro de Centrífuga guardado.' };
+  const sheet = getSheet(SHEETS.CENT_REG);
+  centrifugas.forEach(cent => {
+    insertRowAtTop(sheet, [
+      formatFechaDDMMYYYY(f), f.dia, f.mes, f.anio,
+      cent,
+      data.responsable.toUpperCase().substring(0, 3),
+      data.tipo_mantencion || 'Diaria',
+      data.observaciones || '',
+      ts,
+      '',  // Revisado_Por
+      ''   // Fecha_Revisión
+    ]);
+  });
+  return { success: true, message: centrifugas.length + ' registro(s) de Centrífuga guardado(s).' };
 }
 
-function saveLimpieza(data) {
-  if (!data.sala || !data.responsable || !data.fecha) {
+// Mesones: Fecha | Día | Mes | Año | Sala | Responsable | Observaciones | Timestamp | Revisado_Por | Fecha_Revisión
+function saveMesones(data) {
+  if (!data.responsable || !data.fecha) {
     return { success: false, error: 'Faltan campos obligatorios.' };
+  }
+  const salas = data.salas || (data.sala ? [data.sala] : []);
+  if (salas.length === 0) {
+    return { success: false, error: 'Seleccione al menos una sala.' };
   }
   const f = parseFecha(data.fecha);
   const ts = new Date().toISOString();
-  getSheet(SHEETS.LIMPIEZA).appendRow([
-    f.dia, f.mes, f.anio,
-    data.sala,
-    data.responsable.toUpperCase().substring(0, 3),
-    data.observaciones || '',
-    ts
-  ]);
-  return { success: true, message: 'Registro de Limpieza guardado.' };
+  const sheet = getSheet(SHEETS.MESONES);
+  salas.forEach(sala => {
+    insertRowAtTop(sheet, [
+      formatFechaDDMMYYYY(f), f.dia, f.mes, f.anio,
+      sala,
+      data.responsable.toUpperCase().substring(0, 3),
+      data.observaciones || '',
+      ts,
+      '',  // Revisado_Por
+      ''   // Fecha_Revisión
+    ]);
+  });
+  return { success: true, message: salas.length + ' registro(s) de Mesones guardado(s).' };
 }
 
 // ── Dashboard / Consultas ─────────────────────────────────────
@@ -157,27 +208,30 @@ function getRegistros(mes, anio) {
     return rows.slice(1).filter(r => parseInt(r[colMes]) === mes && parseInt(r[colAnio]) === anio);
   }
 
-  const termoRaw  = filtrar(getSheet(SHEETS.TERMO),    4, 5);
-  const centRaw   = filtrar(getSheet(SHEETS.CENT_REG), 1, 2);
-  const limpRaw   = filtrar(getSheet(SHEETS.LIMPIEZA), 1, 2);
+  const termoRaw  = filtrar(getSheet(SHEETS.TERMO),    5, 6);
+  const centRaw   = filtrar(getSheet(SHEETS.CENT_REG), 2, 3);
+  const mesoRaw   = filtrar(getSheet(SHEETS.MESONES),  2, 3);
 
   const termo = termoRaw.map(r => ({
     responsable: r[0], temperatura: r[1], humedad: r[2],
-    dia: r[3], mes: r[4], anio: r[5], ampm: r[6],
-    area: r[7], observaciones: r[8], timestamp: r[9]
+    fecha: r[3], dia: r[4], mes: r[5], anio: r[6], turno: r[7],
+    area: r[8], observaciones: r[9],
+    revisado_por: r[11] || '', fecha_revision: r[12] || ''
   }));
 
   const centrifugas = centRaw.map(r => ({
-    dia: r[0], mes: r[1], anio: r[2], centrifuga: r[3],
-    responsable: r[4], tipo_mantencion: r[5], observaciones: r[6], timestamp: r[7]
+    fecha: r[0], dia: r[1], mes: r[2], anio: r[3], centrifuga: r[4],
+    responsable: r[5], tipo_mantencion: r[6], observaciones: r[7],
+    revisado_por: r[9] || '', fecha_revision: r[10] || ''
   }));
 
-  const limpieza = limpRaw.map(r => ({
-    dia: r[0], mes: r[1], anio: r[2], sala: r[3],
-    responsable: r[4], observaciones: r[5], timestamp: r[6]
+  const mesones = mesoRaw.map(r => ({
+    fecha: r[0], dia: r[1], mes: r[2], anio: r[3], sala: r[4],
+    responsable: r[5], observaciones: r[6],
+    revisado_por: r[8] || '', fecha_revision: r[9] || ''
   }));
 
-  return { mes, anio, termo, centrifugas, limpieza };
+  return { mes, anio, termo, centrifugas, mesones };
 }
 
 function getRevision(mes, anio) {
@@ -187,7 +241,7 @@ function getRevision(mes, anio) {
       return {
         mes: rows[i][0], anio: rows[i][1], estado: rows[i][2],
         iniciales_n1: rows[i][3], timestamp_n1: rows[i][4],
-        usuario_n2: rows[i][5],  timestamp_n2: rows[i][6]
+        iniciales_n2: rows[i][5], timestamp_n2: rows[i][6]
       };
     }
   }
@@ -227,76 +281,71 @@ function marcarListoRevision(data) {
 }
 
 function marcarRevisado(data) {
-  if (data.usuario !== USUARIO_N2 || data.password !== PASSWORD_N2) {
-    return { success: false, error: 'Credenciales incorrectas.' };
+  if (data.password !== PASSWORD_N2) {
+    return { success: false, error: 'Contraseña incorrecta.' };
+  }
+  const ini = (data.iniciales || '').trim().toUpperCase();
+  if (ini.length < 2 || ini.length > 3) {
+    return { success: false, error: 'Las iniciales deben tener 2 o 3 letras.' };
   }
   const mes  = parseInt(data.mes);
   const anio = parseInt(data.anio);
   const sheet = getSheet(SHEETS.REVISIONES);
   const rows  = sheet.getDataRange().getValues();
   const ts    = new Date().toISOString();
+  const fechaRev = new Date().toLocaleDateString('es-CL');
 
+  // Actualizar hoja Revisiones
+  let found = false;
   for (let i = 1; i < rows.length; i++) {
     if (parseInt(rows[i][0]) === mes && parseInt(rows[i][1]) === anio) {
       sheet.getRange(i + 1, 3).setValue('revisado');
-      sheet.getRange(i + 1, 6, 1, 2).setValues([[data.usuario, ts]]);
-      return { success: true, message: 'Mes marcado como Revisado.' };
+      sheet.getRange(i + 1, 6, 1, 2).setValues([[ini, ts]]);
+      found = true;
+      break;
     }
   }
-  return { success: false, error: 'No se encontró registro del mes.' };
+  if (!found) {
+    sheet.appendRow([mes, anio, 'revisado', '', '', ini, ts]);
+  }
+
+  // Escribir "Revisado_Por" y "Fecha_Revisión" en todos los registros del mes
+  stampRevision(getSheet(SHEETS.TERMO), 5, 6, mes, anio, ini, fechaRev, 11, 12);
+  stampRevision(getSheet(SHEETS.CENT_REG), 2, 3, mes, anio, ini, fechaRev, 9, 10);
+  stampRevision(getSheet(SHEETS.MESONES), 2, 3, mes, anio, ini, fechaRev, 8, 9);
+
+  return { success: true, message: 'Mes marcado como Revisado. Registros actualizados.' };
+}
+
+/** Escribe las iniciales del revisor y fecha en todos los registros de un mes */
+function stampRevision(sheet, colMes, colAnio, mes, anio, iniciales, fechaRev, colRevPor, colRevFecha) {
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (parseInt(data[i][colMes]) === mes && parseInt(data[i][colAnio]) === anio) {
+      // colRevPor y colRevFecha son 0-indexed en el array, pero 1-indexed en getRange
+      sheet.getRange(i + 1, colRevPor + 1).setValue(iniciales);
+      sheet.getRange(i + 1, colRevFecha + 1).setValue(fechaRev);
+    }
+  }
 }
 
 // ── Email ─────────────────────────────────────────────────────
 
 function sendResumenEmail(mes, anio, iniciales) {
-  const registros = getRegistros(mes.toString(), anio.toString());
   const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                  'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
   const nombreMes = meses[mes - 1];
 
-  const diasEnMes = new Date(anio, mes, 0).getDate();
-  const hoy = new Date();
-  const diasHasta = (anio === hoy.getFullYear() && mes === (hoy.getMonth() + 1))
-    ? hoy.getDate() : diasEnMes;
-
-  // Calcular faltantes
-  const termoAM = new Set(), termoPM = new Set();
-  registros.termo.forEach(r => {
-    if (r.ampm === 'AM') termoAM.add(r.dia);
-    else termoPM.add(r.dia);
-  });
-  const diasCent  = new Set(registros.centrifugas.map(r => r.dia));
-  const diasLimp  = new Set(registros.limpieza.map(r => r.dia));
-
-  let faltantesStr = '';
-  const faltanTermo = [], faltanCent = [], faltanLimp = [];
-  for (let d = 1; d <= diasHasta; d++) {
-    if (!termoAM.has(d) || !termoPM.has(d)) faltanTermo.push(d);
-    if (!diasCent.has(d))  faltanCent.push(d);
-    if (!diasLimp.has(d))  faltanLimp.push(d);
-  }
-  if (faltanTermo.length) faltantesStr += `  - Temperatura/Humedad: días ${faltanTermo.join(', ')}\n`;
-  if (faltanCent.length)  faltantesStr += `  - Centrífugas: días ${faltanCent.join(', ')}\n`;
-  if (faltanLimp.length)  faltantesStr += `  - Limpieza: días ${faltanLimp.join(', ')}\n`;
-
-  const subject = `[Proyecto TA] Registros ${nombreMes} ${anio} — Listos para Revisión`;
-  const body = `Estimado/a,
-
-Los registros del mes de ${nombreMes} ${anio} han sido marcados como LISTOS PARA REVISIÓN por: ${iniciales}.
-
-RESUMEN:
-  • Temperatura/Humedad : ${registros.termo.length} registros
-  • Centrífugas         : ${registros.centrifugas.length} registros
-  • Limpieza de Mesones : ${registros.limpieza.length} registros
-
-${faltantesStr ? 'REGISTROS FALTANTES DETECTADOS:\n' + faltantesStr : 'Sin registros faltantes detectados.'}
-
-Por favor, acceda al Dashboard del Proyecto TA para realizar la revisión formal.
-
---
-Sistema Proyecto TA
-Laboratorio Clínico — Hospital de Talca
-`;
+  const subject = '[Registros Lab] ' + nombreMes + ' ' + anio + ' — Listos para Revisión';
+  const body = 'Estimado/a,\n\n' +
+    'El usuario ' + iniciales + ' ha marcado los datos de ' + nombreMes + ' ' + anio +
+    ' como listos para revisar.\n\n' +
+    'Puede revisar los datos en el siguiente enlace:\n' +
+    SHEET_URL + '\n\n' +
+    'Una vez revisados, puede confirmar la revisión del mes desde el aplicativo.\n\n' +
+    '---\n' +
+    'Este mensaje fue enviado automáticamente a través del aplicativo Registros Mensuales.\n' +
+    'Laboratorio Clínico — Hospital de Talca\n';
 
   MailApp.sendEmail({ to: EMAIL_ADDRESS, subject: subject, body: body });
 }
@@ -306,22 +355,32 @@ Laboratorio Clínico — Hospital de Talca
 function initializeSpreadsheet() {
   const ss = getSpreadsheet();
   const defs = [
-    { name: SHEETS.AREAS,      headers: ['Area'] },
-    { name: SHEETS.CENTRIFUGAS,headers: ['Centrifuga'] },
-    { name: SHEETS.TERMO,      headers: ['Responsable','Temperatura','Humedad','Día','Mes','Año','AM_PM','Area','Observaciones','Timestamp'] },
-    { name: SHEETS.CENT_REG,   headers: ['Día','Mes','Año','Centrifuga','Responsable','Tipo_Mantencion','Observaciones','Timestamp'] },
-    { name: SHEETS.LIMPIEZA,   headers: ['Día','Mes','Año','Sala','Responsable','Observaciones','Timestamp'] },
-    { name: SHEETS.REVISIONES, headers: ['Mes','Año','Estado','Iniciales_N1','Timestamp_N1','Usuario_N2','Timestamp_N2'] }
+    { name: SHEETS.AREAS,       headers: ['Area'] },
+    { name: SHEETS.CENTRIFUGAS, headers: ['Centrifuga'] },
+    { name: SHEETS.SALAS,       headers: ['Sala'] },
+    { name: SHEETS.TERMO,       headers: ['Responsable','Temperatura (°C)','Humedad (%)','Fecha (dd/mm/aaaa)','Día','Mes','Año','Turno','Area','Observaciones','Timestamp','Revisado Por','Fecha Revisión'],
+      hideCols: [5,6,7,11] },
+    { name: SHEETS.CENT_REG,    headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Centrifuga','Responsable','Tipo Mantención','Observaciones','Timestamp','Revisado Por','Fecha Revisión'],
+      hideCols: [2,3,4,9] },
+    { name: SHEETS.MESONES,     headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Sala','Responsable','Observaciones','Timestamp','Revisado Por','Fecha Revisión'],
+      hideCols: [2,3,4,8] },
+    { name: SHEETS.REVISIONES,  headers: ['Mes','Año','Estado','Iniciales_N1','Timestamp_N1','Iniciales_N2','Timestamp_N2'] }
   ];
 
   defs.forEach(def => {
     let sheet = ss.getSheetByName(def.name);
     if (!sheet) sheet = ss.insertSheet(def.name);
     else sheet.clearContents();
+    if (sheet.getMaxColumns() > 1) sheet.showColumns(1, sheet.getMaxColumns());
+    // Ensure enough columns
+    const needed = def.headers.length;
+    const current = sheet.getMaxColumns();
+    if (current < needed) sheet.insertColumnsAfter(current, needed - current);
     sheet.appendRow(def.headers);
     sheet.getRange(1, 1, 1, def.headers.length)
-      .setBackground('#0A1628').setFontColor('#FFFFFF').setFontWeight('bold');
+      .setBackground('#0F172A').setFontColor('#FFFFFF').setFontWeight('bold');
     sheet.setFrozenRows(1);
+    if (def.hideCols) def.hideCols.forEach(col => sheet.hideColumns(col));
   });
 
   // Maestros iniciales
@@ -329,27 +388,34 @@ function initializeSpreadsheet() {
   ['Microbiología', 'Hematología', 'Química'].forEach(a => areasSheet.appendRow([a]));
 
   const centSheet = ss.getSheetByName(SHEETS.CENTRIFUGAS);
-  ['Centrífuga 1','Centrífuga 2','Centrífuga 3','Centrífuga 4','Centrífuga 5']
+  ['Centrífuga 1','Centrífuga 2','Centrífuga 3','Centrífuga 4','Centrífuga 5','Centrífuga 18']
     .forEach(c => centSheet.appendRow([c]));
 
-  // Eliminar hoja por defecto si existe
+  const salasSheet = ss.getSheetByName(SHEETS.SALAS);
+  ['Microbiología', 'Hematología', 'Química'].forEach(s => salasSheet.appendRow([s]));
+
+  // Eliminar hojas por defecto
   ['Hoja 1','Sheet1','Hoja1'].forEach(n => {
     const s = ss.getSheetByName(n);
     if (s && ss.getSheets().length > 1) ss.deleteSheet(s);
   });
 
+  // Eliminar hoja antigua si existe
+  const oldLimp = ss.getSheetByName('Registro_Limpieza');
+  if (oldLimp && ss.getSheets().length > 1) ss.deleteSheet(oldLimp);
+
   return 'Spreadsheet inicializado correctamente ✓';
 }
-
-// ── Setup: crea el Spreadsheet y guarda el ID ─────────────────
-// Ejecutar UNA VEZ desde el editor o via clasp run
 
 function setup() {
   const ss = SpreadsheetApp.create('Proyecto RM');
   const id = ss.getId();
   PropertiesService.getScriptProperties().setProperty('SPREADSHEET_ID', id);
-  Logger.log('Spreadsheet creado: https://docs.google.com/spreadsheets/d/' + id);
   initializeSpreadsheet();
-  Logger.log('Setup completo ✓  ID=' + id);
   return { spreadsheetId: id, url: 'https://docs.google.com/spreadsheets/d/' + id };
+}
+
+function reinitialize() {
+  initializeSpreadsheet();
+  return { success: true, message: 'Estructura re-inicializada.' };
 }

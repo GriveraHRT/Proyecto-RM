@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#070F1C" />
-  <meta name="description" content="Proyecto TA — Sistema de registros del Laboratorio Clínico, Hospital de Talca." />
-  <title>Proyecto TA — Lab Clínico HRT</title>
+  <meta name="theme-color" content="#F0F4F8" />
+  <meta name="description" content="Registros Mensuales — Laboratorio Clínico, Hospital de Talca." />
+  <title>Registros Mensuales — Lab Clínico HRT</title>
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
@@ -13,27 +13,99 @@
 <!-- ══ HEADER ══════════════════════════════════════════════ -->
 <header id="app-header">
   <div class="header-logo">
-    <div class="logo-icon">🔬</div>
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9 2v6.5a2.5 2.5 0 0 1-5 0V2m5 0H4m2.5 0v6.5M20 10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2m0 0V8m16 2V8M4 8h16M7 22h10M12 14v8m-4-4h8" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
     <div>
-      <div class="logo-text">Proyecto TA</div>
+      <div class="logo-text">Registros Mensuales</div>
       <div class="logo-subtitle">Lab. Clínico — HRT</div>
     </div>
   </div>
-  <div id="header-clock">
-    <div>
-      <span class="clock-time" id="clock-time">--:--</span>
-      <span id="header-ampm-badge" class="ampm-AM">AM</span>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Cambiar tema">☀️</button>
+    <div id="header-clock">
+      <div>
+        <span class="clock-time" id="clock-time">--:--</span>
+        <span id="header-ampm-badge" class="ampm-AM">AM</span>
+      </div>
+      <div id="clock-date" style="font-size:11px;margin-top:2px;">-- --- ----</div>
     </div>
-    <div id="clock-date" style="font-size:11px;margin-top:2px;">-- --- ----</div>
   </div>
 </header>
 
 <!-- ══ MAIN CONTENT ════════════════════════════════════════ -->
 <main id="app-content">
 
+  <!-- ── SECCIÓN: DASHBOARD ──────────────────────────────── -->
+  <section id="section-dashboard" class="section active">
+    <p class="section-title">📊 Dashboard</p>
+    <p class="section-subtitle">Resumen de registros</p>
+
+    <!-- Month Picker -->
+    <div class="month-picker">
+      <button class="month-nav-btn" onclick="cambiarMes(-1)">◀</button>
+      <select id="dash-mes" class="form-control" onchange="loadDashboard()" style="background:transparent;border:none;padding:0;font-size:16px;font-weight:700;"></select>
+      <select id="dash-anio" class="form-control" onchange="loadDashboard()" style="background:transparent;border:none;padding:0;font-size:15px;width:70px;"></select>
+      <button class="month-nav-btn" onclick="cambiarMes(1)">▶</button>
+      <button class="month-nav-btn" onclick="loadDashboard()" title="Recargar">🔄</button>
+    </div>
+
+    <!-- Tabs Diario/Mensual -->
+    <div class="dash-tabs">
+      <button class="dash-tab active" id="tab-diario" onclick="switchDashTab('diario')">📅 Hoy</button>
+      <button class="dash-tab" id="tab-mensual" onclick="switchDashTab('mensual')">📆 Mensual</button>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-number" id="stat-termo">-</div>
+        <div class="stat-label">🌡️ Temp</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="stat-cent">-</div>
+        <div class="stat-label">⚙️ Centríf.</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="stat-limp">-</div>
+        <div class="stat-label">🧽 Mesones</div>
+      </div>
+    </div>
+
+    <!-- Dashboard content -->
+    <div id="dash-daily-view"></div>
+    <div id="dash-monthly-view" style="display:none;"></div>
+
+    <!-- Alertas faltantes -->
+    <div id="dash-alerts-container"></div>
+
+    <!-- Estado de revisión -->
+    <div class="card card-sm" style="margin-bottom:16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+        <div>
+          <div style="font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:4px;">Estado del Mes</div>
+          <span class="revision-badge" id="revision-badge">⏳ Pendiente</span>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-warning btn-sm" onclick="openModalRevision()">✅ Listo para Revisión</button>
+          <button class="btn btn-success btn-sm" onclick="openModalRevisado()">🏆 Marcar Revisado</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Spinner carga -->
+    <div id="dash-loading" style="text-align:center;padding:40px;display:none;">
+      <div class="spinner visible" style="margin:0 auto;width:32px;height:32px;border-width:3px;"></div>
+      <div style="color:var(--text-dim);margin-top:12px;font-size:13px;">Cargando datos…</div>
+    </div>
+
+    <!-- Tablas por módulo -->
+    <div id="dash-tables"></div>
+  </section>
+
   <!-- ── SECCIÓN: TEMPERATURA & HUMEDAD ─────────────────── -->
-  <section id="section-termo" class="section active">
-    <p class="section-title">🌡️ Temp / Humedad</p>
+  <section id="section-termo" class="section">
+    <p class="section-title">🌡️ Temperatura / Humedad</p>
     <p class="section-subtitle">Registro de temperatura y humedad ambiental</p>
 
     <div id="area-prefill-indicator" style="display:none;">
@@ -82,11 +154,12 @@
         </div>
 
         <div id="alert-rangos" class="alert-banner alert-danger">
-          <strong>⚠️ Valor fuera de rango</strong>
-          Avisar a <strong>TM Coordinador/Jefatura (día hábil)</strong> o
-          <strong>Jefe de Turno (día inhábil)</strong>.<br />
-          Registrar acciones tomadas en Observaciones.
-          <em>(HRF para valores de Humedad fuera de rango)</em>
+          <div class="alert-title">⚠️ Valor fuera de rango</div>
+          <div class="alert-body">
+            Avisar a <strong>TM Coordinador/Jefatura</strong> (día hábil)
+            o <strong>Jefe de Turno</strong> (día inhábil).<br/>
+            Registrar acciones en Observaciones. <em>(HRF para Humedad fuera de rango)</em>
+          </div>
         </div>
 
         <div class="form-group">
@@ -140,10 +213,13 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label" for="cent-nombre">Centrífuga</label>
-          <select id="cent-nombre" class="form-control" required>
-            <option value="">Cargando…</option>
-          </select>
+          <label class="form-label">Centrífugas</label>
+          <button type="button" class="chip-group-btn" id="btn-grupo-preanalisis" onclick="toggleGrupoPreanalisis()">
+            🏷️ Centrífugas de Preanálisis
+          </button>
+          <div class="chip-grid" id="cent-chips" style="margin-top:8px;">
+            <!-- Populated by JS -->
+          </div>
         </div>
 
         <div class="form-group">
@@ -168,10 +244,10 @@
     </div>
   </section>
 
-  <!-- ── SECCIÓN: LIMPIEZA DE MESONES ───────────────────── -->
-  <section id="section-limpieza" class="section">
-    <p class="section-title">🧹 Limpieza</p>
-    <p class="section-subtitle">Registro de limpieza de mesones</p>
+  <!-- ── SECCIÓN: MESONES ──────────────────────────────── -->
+  <section id="section-mesones" class="section">
+    <p class="section-title">🧽 Mesones</p>
+    <p class="section-subtitle">Registro de limpieza y desinfección de mesones</p>
 
     <div class="note-box">
       <div class="note-box-title">📌 Nota técnica</div>
@@ -180,109 +256,57 @@
     </div>
 
     <div class="card">
-      <form id="form-limpieza" autocomplete="off">
+      <form id="form-mesones" autocomplete="off">
 
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label" for="limp-fecha">Fecha</label>
-            <input type="date" id="limp-fecha" class="form-control" required />
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="limp-sala">Sala / Área</label>
-            <select id="limp-sala" class="form-control" required>
-              <option value="">Cargando…</option>
-            </select>
+        <div class="form-group">
+          <label class="form-label" for="meson-fecha">Fecha</label>
+          <input type="date" id="meson-fecha" class="form-control" required />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Salas</label>
+          <div class="chip-grid" id="meson-chips">
+            <!-- Populated by JS -->
           </div>
         </div>
 
         <div class="form-group">
-          <label class="form-label" for="limp-resp">Responsable (iniciales)</label>
-          <input type="text" id="limp-resp" class="form-control"
+          <label class="form-label" for="meson-resp">Responsable (iniciales)</label>
+          <input type="text" id="meson-resp" class="form-control"
             placeholder="ABC" maxlength="3"
             style="text-transform:uppercase; letter-spacing:3px; font-weight:700; font-size:18px;"
             required />
         </div>
 
         <div class="form-group">
-          <label class="form-label" for="limp-obs">Observaciones</label>
-          <textarea id="limp-obs" class="form-control" rows="3"
+          <label class="form-label" for="meson-obs">Observaciones</label>
+          <textarea id="meson-obs" class="form-control" rows="3"
             placeholder="Opcional…" style="resize:none;"></textarea>
         </div>
 
-        <button type="submit" class="btn btn-primary" id="btn-limp-submit">
-          <div class="spinner" id="spinner-limp"></div>
-          <span id="btn-limp-text">💾 Guardar Registro</span>
+        <button type="submit" class="btn btn-primary" id="btn-meson-submit">
+          <div class="spinner" id="spinner-meson"></div>
+          <span id="btn-meson-text">💾 Guardar Registro</span>
         </button>
       </form>
     </div>
   </section>
 
-  <!-- ── SECCIÓN: DASHBOARD ──────────────────────────────── -->
-  <section id="section-dashboard" class="section">
-    <p class="section-title">📊 Dashboard</p>
-    <p class="section-subtitle">Resumen mensual de registros</p>
-
-    <!-- Month Picker -->
-    <div class="month-picker">
-      <button class="month-nav-btn" onclick="cambiarMes(-1)">◀</button>
-      <select id="dash-mes" class="form-control" onchange="loadDashboard()" style="background:transparent;border:none;padding:0;font-size:16px;font-weight:700;"></select>
-      <select id="dash-anio" class="form-control" onchange="loadDashboard()" style="background:transparent;border:none;padding:0;font-size:15px;width:70px;"></select>
-      <button class="month-nav-btn" onclick="cambiarMes(1)">▶</button>
-      <button class="month-nav-btn" onclick="loadDashboard()" title="Recargar">🔄</button>
-    </div>
-
-    <!-- Stats -->
-    <div class="stats-row">
-      <div class="stat-card">
-        <div class="stat-number" id="stat-termo">-</div>
-        <div class="stat-label">🌡️ Temp</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-number" id="stat-cent">-</div>
-        <div class="stat-label">⚙️ Centríf.</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-number" id="stat-limp">-</div>
-        <div class="stat-label">🧹 Limpieza</div>
-      </div>
-    </div>
-
-    <!-- Alertas faltantes -->
-    <div id="dash-alerts-container"></div>
-
-    <!-- Estado de revisión -->
-    <div class="card card-sm" style="margin-bottom:16px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
-        <div>
-          <div style="font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:4px;">Estado del Mes</div>
-          <span class="revision-badge" id="revision-badge">⏳ Pendiente</span>
-        </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="btn btn-warning btn-sm" onclick="openModalRevision()">✅ Listo para Revisión</button>
-          <button class="btn btn-success btn-sm" onclick="openModalRevisado()">🏆 Marcar Revisado</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Spinner carga -->
-    <div id="dash-loading" style="text-align:center;padding:40px;display:none;">
-      <div class="spinner visible" style="margin:0 auto;width:32px;height:32px;border-width:3px;"></div>
-      <div style="color:var(--text-dim);margin-top:12px;font-size:13px;">Cargando datos…</div>
-    </div>
-
-    <!-- Tablas por módulo -->
-    <div id="dash-tables"></div>
-  </section>
-
   <!-- ── SECCIÓN: ADMIN / QR ─────────────────────────────── -->
   <section id="section-admin" class="section">
     <p class="section-title">🔑 Admin</p>
-    <p class="section-subtitle">Generador de QR para acceso directo por área</p>
+    <p class="section-subtitle">Generador de QR para acceso directo</p>
 
     <div class="card">
+      <div class="qr-tabs">
+        <button class="qr-tab active" onclick="switchQrTab('areas')">🌡️ Áreas</button>
+        <button class="qr-tab" onclick="switchQrTab('salas')">🧽 Salas</button>
+        <button class="qr-tab" onclick="switchQrTab('centrifugas')">⚙️ Centrífugas</button>
+      </div>
+
       <div class="form-group">
-        <label class="form-label" for="admin-area">Selecciona Área</label>
-        <select id="admin-area" class="form-control" onchange="generateQR()">
+        <label class="form-label" id="qr-select-label">Selecciona Área</label>
+        <select id="admin-select" class="form-control" onchange="generateQR()">
           <option value="">— Seleccionar —</option>
         </select>
       </div>
@@ -297,8 +321,8 @@
 
       <div class="note-box" style="margin-top:16px;margin-bottom:0;">
         <div class="note-box-title">💡 Instrucciones</div>
-        Selecciona el área, descarga o imprime el QR y pégalo físicamente en el sector del laboratorio.
-        Al escanear, el formulario de temperatura se abrirá con el área pre-seleccionada.
+        Selecciona el ítem, descarga o imprime el QR y pégalo físicamente en el sector del laboratorio.
+        Al escanear, el formulario correspondiente se abrirá con el ítem pre-seleccionado.
       </div>
     </div>
   </section>
@@ -307,7 +331,11 @@
 
 <!-- ══ BOTTOM NAVIGATION ════════════════════════════════════ -->
 <nav id="bottom-nav">
-  <button class="nav-item active" data-section="termo" onclick="navigateTo('termo')">
+  <button class="nav-item active" data-section="dashboard" onclick="navigateTo('dashboard')">
+    <span class="nav-icon">📊</span>
+    <span class="nav-label">Dashboard</span>
+  </button>
+  <button class="nav-item" data-section="termo" onclick="navigateTo('termo')">
     <span class="nav-icon">🌡️</span>
     <span class="nav-label">Temp/Hum</span>
   </button>
@@ -315,13 +343,9 @@
     <span class="nav-icon">⚙️</span>
     <span class="nav-label">Centrífugas</span>
   </button>
-  <button class="nav-item" data-section="limpieza" onclick="navigateTo('limpieza')">
-    <span class="nav-icon">🧹</span>
-    <span class="nav-label">Limpieza</span>
-  </button>
-  <button class="nav-item" data-section="dashboard" onclick="navigateTo('dashboard')">
-    <span class="nav-icon">📊</span>
-    <span class="nav-label">Dashboard</span>
+  <button class="nav-item" data-section="mesones" onclick="navigateTo('mesones')">
+    <span class="nav-icon">🧽</span>
+    <span class="nav-label">Mesones</span>
   </button>
   <button class="nav-item" data-section="admin" onclick="navigateTo('admin')">
     <span class="nav-icon">🔑</span>
@@ -336,6 +360,16 @@
   <div class="modal-card" id="modal-revision" style="display:none;" onclick="event.stopPropagation()">
     <button class="modal-close" onclick="closeModal()">✕</button>
     <div class="modal-title">✅ Listo para Revisión</div>
+    <div class="form-row" style="margin-bottom:12px;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Mes</label>
+        <select id="modal-mes1" class="form-control"></select>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Año</label>
+        <select id="modal-anio1" class="form-control"></select>
+      </div>
+    </div>
     <div class="form-group">
       <label class="form-label">Contraseña (Nivel 1)</label>
       <input type="password" id="modal-pwd1" class="form-control" placeholder="••••••" />
@@ -356,10 +390,22 @@
   <!-- Modal Nivel 2: Revisado -->
   <div class="modal-card" id="modal-revisado" style="display:none;" onclick="event.stopPropagation()">
     <button class="modal-close" onclick="closeModal()">✕</button>
-    <div class="modal-title">🏆 Marcar como Revisado</div>
+    <div class="modal-title">🏆 Confirmar Registros Como Revisados</div>
+    <div class="form-row" style="margin-bottom:12px;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Mes</label>
+        <select id="modal-mes2" class="form-control"></select>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Año</label>
+        <select id="modal-anio2" class="form-control"></select>
+      </div>
+    </div>
     <div class="form-group">
-      <label class="form-label">Usuario (Nivel 2)</label>
-      <input type="text" id="modal-usr2" class="form-control" placeholder="admin" />
+      <label class="form-label">Iniciales del Revisor (2–3 letras)</label>
+      <input type="text" id="modal-ini2" class="form-control"
+        placeholder="ABC" maxlength="3"
+        style="text-transform:uppercase;letter-spacing:3px;font-weight:700;font-size:18px;" />
     </div>
     <div class="form-group">
       <label class="form-label">Contraseña (Nivel 2)</label>
@@ -379,6 +425,7 @@
 
 <!-- ══ SCRIPTS ══════════════════════════════════════════════ -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="js/app.js"></script>
+<script src="js/app-core.js"></script>
+<script src="js/app-dash.js"></script>
 </body>
 </html>
