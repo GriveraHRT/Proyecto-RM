@@ -793,6 +793,33 @@ body {
   color: #fff;
 }
 
+/* ── Day Chips (Monthly Grid) ──────────────────────────────── */
+.missing-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.day-chip {
+  width: 28px; height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+}
+.day-chip.chip-ok {
+  background: rgba(16,185,129,0.15);
+  border-color: rgba(16,185,129,0.4);
+  color: var(--success);
+}
+.day-chip.chip-missing {
+  background: rgba(239,68,68,0.10);
+  border-color: rgba(239,68,68,0.3);
+  color: var(--danger);
+}
 /* ── Alert text fix ────────────────────────────────────────── */
 .alert-banner p { margin: 0; }
 .alert-banner .alert-title {
