@@ -84,26 +84,38 @@ body {
 .header-logo {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  z-index: 1;
 }
 .logo-icon {
   /* Styled at bottom of file */
 }
 .logo-text {
   font-family: 'Outfit', sans-serif;
-  font-weight: 700;
-  font-size: 18px;
-  color: var(--primary);
+  font-weight: 800;
+  font-size: 19px;
+  letter-spacing: -0.3px;
+  background: linear-gradient(to right, var(--primary), var(--secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  line-height: 1.1;
 }
 [data-theme="dark"] .logo-text {
-  background: linear-gradient(90deg, var(--primary), #fff);
+  background: linear-gradient(to right, #ffffff, #93c5fd);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 .logo-subtitle {
-  font-size: 10px;
+  font-size: 11px;
+  font-weight: 500;
   color: var(--text-dim);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-top: 2px;
   line-height: 1;
+}
+[data-theme="dark"] .logo-subtitle {
+  color: #60a5fa;
 }
 #header-clock {
   text-align: right;
@@ -852,15 +864,43 @@ body {
 
 /* ── Logo SVG ──────────────────────────────────────────────── */
 .logo-icon {
-  width: 36px; height: 36px;
-  background: linear-gradient(135deg, var(--primary), var(--secondary));
-  border-radius: 10px;
+  width: 42px; height: 42px;
+  background: linear-gradient(135deg, rgba(0,102,255,0.1), rgba(0,102,255,0.02));
+  border: 1px solid rgba(0,102,255,0.2);
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  position: relative;
+  box-shadow: 0 0 15px rgba(0,102,255,0.1);
+}
+.logo-icon::after {
+  content: ''; position: absolute; inset: -1px; border-radius: 13px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.8) 0%, transparent 50%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  padding: 1px;
 }
 .logo-icon svg {
-  width: 22px; height: 22px;
-  fill: #fff;
+  width: 24px; height: 24px;
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+[data-theme="dark"] .logo-icon {
+  background: linear-gradient(135deg, rgba(0,212,255,0.2), rgba(0,102,255,0.05));
+  border-color: rgba(0,212,255,0.3);
+  box-shadow: 0 0 20px rgba(0,212,255,0.2);
+}
+[data-theme="dark"] .logo-icon::after {
+  background: linear-gradient(135deg, rgba(255,255,255,0.4) 0%, transparent 50%);
+}
+[data-theme="dark"] .logo-icon svg {
+  stroke: url(#grad-p1);
+  filter: drop-shadow(0 2px 4px rgba(0,212,255,0.4));
 }
