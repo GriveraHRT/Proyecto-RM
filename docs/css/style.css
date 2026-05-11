@@ -271,10 +271,16 @@ body {
   animation: fadeUp 0.25s ease;
 }
 .alert-banner.visible { display: block; }
-.alert-danger  { background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.4); color: #FCA5A5; }
-.alert-warning { background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.4); color: #FCD34D; }
-.alert-info    { background: rgba(0,212,255,0.10);  border: 1px solid rgba(0,212,255,0.35); color: var(--primary); }
-.alert-success { background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.4); color: #6EE7B7; }
+.alert-danger  { background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.4); color: #B91C1C; }
+.alert-warning { background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.4); color: #B45309; }
+.alert-info    { background: rgba(0,212,255,0.10);  border: 1px solid rgba(0,212,255,0.35); color: #0369A1; }
+.alert-success { background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.4); color: #047857; }
+
+[data-theme="dark"] .alert-danger  { color: #FCA5A5; }
+[data-theme="dark"] .alert-warning { color: #FCD34D; }
+[data-theme="dark"] .alert-info    { color: var(--primary); }
+[data-theme="dark"] .alert-success { color: #6EE7B7; }
+
 .alert-banner strong { display: block; margin-bottom: 4px; font-size: 13px; }
 
 /* ── Info Box (instrucciones) ──────────────────────────────── */
@@ -284,7 +290,7 @@ body {
   border-radius: var(--radius-sm);
   padding: 14px 16px;
   font-size: 13px;
-  color: #93C5FD;
+  color: #1D4ED8;
   line-height: 1.6;
   margin-bottom: 16px;
   display: none;
@@ -293,9 +299,12 @@ body {
 .info-box-title {
   font-weight: 700;
   font-size: 13px;
-  color: #60A5FA;
+  color: #2563EB;
   margin-bottom: 6px;
 }
+
+[data-theme="dark"] .info-box { color: #93C5FD; }
+[data-theme="dark"] .info-box-title { color: #60A5FA; }
 
 /* ── Note Box (nota técnica fija) ──────────────────────────── */
 .note-box {
@@ -304,18 +313,21 @@ body {
   border-radius: var(--radius-sm);
   padding: 14px 16px;
   font-size: 13px;
-  color: #C4B5FD;
+  color: #6D28D9;
   line-height: 1.6;
   margin-bottom: 16px;
 }
 .note-box-title {
   font-weight: 700;
   font-size: 12px;
-  color: #A78BFA;
+  color: #7C3AED;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 5px;
 }
+
+[data-theme="dark"] .note-box { color: #C4B5FD; }
+[data-theme="dark"] .note-box-title { color: #A78BFA; }
 
 /* ── Submit Button ─────────────────────────────────────────── */
 .btn {
