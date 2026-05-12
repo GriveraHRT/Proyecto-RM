@@ -281,7 +281,7 @@ body {
 [data-theme="dark"] .alert-info    { color: var(--primary); }
 [data-theme="dark"] .alert-success { color: #6EE7B7; }
 
-.alert-banner strong { display: block; margin-bottom: 4px; font-size: 13px; }
+/* alert-title handles its own display; body strong stays inline */
 
 /* ── Info Box (instrucciones) ──────────────────────────────── */
 .info-box {
@@ -857,6 +857,42 @@ body {
 .alert-banner .alert-body {
   font-size: 13px;
   line-height: 1.5;
+}
+
+/* ── Out-of-Range Popup ────────────────────────────────────── */
+.oor-detail-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.oor-detail-list li {
+  padding: 4px 0;
+  font-size: 13px;
+}
+.oor-detail-list li::before {
+  content: '⚠️';
+  margin-right: 6px;
+}
+.modal-body-text {
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+
+/* ── Dynamic Acción Correctiva Field ───────────────────────── */
+#accion-correctiva-group {
+  animation: fadeUp 0.25s ease;
+}
+#accion-correctiva-group .form-label {
+  color: var(--danger);
+}
+#accion-correctiva-group .form-control {
+  border-color: rgba(239,68,68,0.4);
+}
+#accion-correctiva-group .form-control:focus {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px rgba(239,68,68,0.12);
 }
 
 /* ── Toast Light Mode ──────────────────────────────────────── */

@@ -1,20 +1,20 @@
 // ============================================================
 // PROYECTO RM — Registros Laboratorio — Hospital de Talca
-// Backend: Google Apps Script  v3.0
+// Backend: Google Apps Script  v4.0
 // ============================================================
 
-const EMAIL_ADDRESS = 'grivera@hospitaldetalca.cl';
-const PASSWORD_N1   = 'HRT123';
-const PASSWORD_N2   = 'HRT321';
-const SHEET_URL     = 'https://docs.google.com/spreadsheets/d/1HzHcRriBtPGQxTfFrZSntVeM8ujQHWnGFuyWrJo6KUQ';
+const EMAIL_ADDRESS  = 'grivera@hospitaldetalca.cl';
+const PASSWORD_REVISION = 'HRT123';
+const SHEET_URL      = 'https://docs.google.com/spreadsheets/d/1HzHcRriBtPGQxTfFrZSntVeM8ujQHWnGFuyWrJo6KUQ';
 
 const SHEETS = {
-  AREAS:       'Areas_Maestro',
-  CENTRIFUGAS: 'Centrifugas_Maestro',
-  SALAS:       'Salas_Maestro',
-  TERMO:       'Registro_Termo',
-  CENT_REG:    'Registro_Centrifugas',
-  MESONES:     'Registro_Mesones',
+  TERMO:       'Reg. Temp./Humedad',
+  CENT_REG:    'Reg. Centrífugas',
+  MESONES:     'Reg. Mesones',
+  AREAS:       'Maestro Areas',
+  CENTRIFUGAS: 'Maestro Centrifugas',
+  SALAS:       'Maestro Salas',
+  ACCIONES:    'Maestro Acciones',
   REVISIONES:  'Revisiones'
 };
 
@@ -46,7 +46,9 @@ function jsonResponse(obj) {
 
 function insertRowAtTop(sheet, values) {
   sheet.insertRowAfter(1);
-  sheet.getRange(2, 1, 1, values.length).setValues([values]);
+  const range = sheet.getRange(2, 1, 1, values.length);
+  range.setValues([values]);
+  range.setBackground(null).setFontColor(null).setFontWeight("normal");
 }
 
 // ── Router ───────────────────────────────────────────────────
@@ -58,6 +60,7 @@ function doGet(e) {
       case 'getAreas':       return jsonResponse(getAreas());
       case 'getCentrifugas': return jsonResponse(getCentrifugas());
       case 'getSalas':       return jsonResponse(getSalas());
+      case 'getAcciones':    return jsonResponse(getAcciones());
       case 'getRegistros':   return jsonResponse(getRegistros(e.parameter.mes, e.parameter.anio));
       case 'getRevisiones':  return jsonResponse(getRevision(e.parameter.mes, e.parameter.anio));
       case 'getMaestros':    return jsonResponse(getMaestros());
@@ -82,7 +85,6 @@ function doPost(e) {
       case 'saveTermo':           return jsonResponse(saveTermo(data));
       case 'saveCentrifuga':      return jsonResponse(saveCentrifuga(data));
       case 'saveMesones':         return jsonResponse(saveMesones(data));
-      case 'marcarListoRevision': return jsonResponse(marcarListoRevision(data));
       case 'marcarRevisado':      return jsonResponse(marcarRevisado(data));
       default:                    return jsonResponse({ error: 'Acción no reconocida: ' + data.action });
     }
@@ -108,17 +110,23 @@ function getSalas() {
   return data.slice(1).filter(r => r[0]).map(r => String(r[0]));
 }
 
+function getAcciones() {
+  const data = getSheet(SHEETS.ACCIONES).getDataRange().getValues();
+  return data.slice(1).filter(r => r[0]).map(r => String(r[0]));
+}
+
 /** Devuelve todos los maestros en una sola llamada para optimizar carga */
 function getMaestros() {
   return {
     areas: getAreas(),
     centrifugas: getCentrifugas(),
-    salas: getSalas()
+    salas: getSalas(),
+    acciones: getAcciones()
   };
 }
 
 // ── Guardar Registros ─────────────────────────────────────────
-// Termo: Responsable | Temperatura (°C) | Humedad (%) | Fecha (dd/mm/aaaa) | Día | Mes | Año | Turno | Area | Observaciones | Timestamp | Revisado_Por | Fecha_Revisión
+// Termo: Responsable | Temperatura (°C) | Humedad (%) | Fecha (dd/mm/aaaa) | Día | Mes | Año | Turno | Area | Acción Correctiva | Observaciones | Timestamp | Revisado_Por | Fecha_Revisión
 
 function saveTermo(data) {
   if (!data.responsable || !data.temperatura || !data.humedad || !data.fecha || !data.area) {
@@ -128,19 +136,49 @@ function saveTermo(data) {
   const ts = new Date().toISOString();
   const ampm = data.ampm || (new Date().getHours() < 12 ? 'AM' : 'PM');
   const turno = ampm === 'AM' ? 'Mañana' : 'Tarde';
+  const accion = data.accion_correctiva || '';
+
+  // Check if out of range
+  const temp = parseFloat(data.temperatura);
+  const hum = parseFloat(data.humedad);
+  const tempOOR = temp < 18 || temp > 24;
+  const humOOR = hum < 20 || hum > 70;
+
   insertRowAtTop(getSheet(SHEETS.TERMO), [
     data.responsable.toUpperCase().substring(0, 3),
-    parseFloat(data.temperatura),
-    parseFloat(data.humedad),
+    temp,
+    hum,
     formatFechaDDMMYYYY(f),
     f.dia, f.mes, f.anio,
     turno,
     data.area,
+    accion,
     data.observaciones || '',
     ts,
     '',  // Revisado_Por
     ''   // Fecha_Revisión
   ]);
+
+  // Send alert email if out of range
+  if (tempOOR || humOOR) {
+    try {
+      sendAlertaFueraDeRango({
+        area: data.area,
+        turno: turno,
+        temperatura: temp,
+        humedad: hum,
+        tempOOR: tempOOR,
+        humOOR: humOOR,
+        responsable: data.responsable.toUpperCase().substring(0, 3),
+        accion_correctiva: accion,
+        fecha: formatFechaDDMMYYYY(f)
+      });
+    } catch (emailErr) {
+      // Don't fail the save if email fails
+      Logger.log('Error enviando alerta: ' + emailErr.toString());
+    }
+  }
+
   return { success: true, message: 'Registro de Temperatura/Humedad guardado.' };
 }
 
@@ -212,11 +250,12 @@ function getRegistros(mes, anio) {
   const centRaw   = filtrar(getSheet(SHEETS.CENT_REG), 2, 3);
   const mesoRaw   = filtrar(getSheet(SHEETS.MESONES),  2, 3);
 
+  // Updated: column 9 is now Acción Correctiva, column 10 is Observaciones
   const termo = termoRaw.map(r => ({
     responsable: r[0], temperatura: r[1], humedad: r[2],
     fecha: r[3], dia: r[4], mes: r[5], anio: r[6], turno: r[7],
-    area: r[8], observaciones: r[9],
-    revisado_por: r[11] || '', fecha_revision: r[12] || ''
+    area: r[8], accion_correctiva: r[9] || '', observaciones: r[10],
+    revisado_por: r[12] || '', fecha_revision: r[13] || ''
   }));
 
   const centrifugas = centRaw.map(r => ({
@@ -240,8 +279,7 @@ function getRevision(mes, anio) {
     if (parseInt(rows[i][0]) === parseInt(mes) && parseInt(rows[i][1]) === parseInt(anio)) {
       return {
         mes: rows[i][0], anio: rows[i][1], estado: rows[i][2],
-        iniciales_n1: rows[i][3], timestamp_n1: rows[i][4],
-        iniciales_n2: rows[i][5], timestamp_n2: rows[i][6]
+        timestamp: rows[i][3]
       };
     }
   }
@@ -250,43 +288,9 @@ function getRevision(mes, anio) {
 
 // ── Revisiones ────────────────────────────────────────────────
 
-function marcarListoRevision(data) {
-  if (data.password !== PASSWORD_N1) {
-    return { success: false, error: 'Contraseña incorrecta.' };
-  }
-  const ini = (data.iniciales || '').trim().toUpperCase();
-  if (ini.length < 2 || ini.length > 3) {
-    return { success: false, error: 'Las iniciales deben tener 2 o 3 letras.' };
-  }
-  const mes  = parseInt(data.mes);
-  const anio = parseInt(data.anio);
-  const sheet = getSheet(SHEETS.REVISIONES);
-  const rows  = sheet.getDataRange().getValues();
-  const ts    = new Date().toISOString();
-  let found   = false;
-
-  for (let i = 1; i < rows.length; i++) {
-    if (parseInt(rows[i][0]) === mes && parseInt(rows[i][1]) === anio) {
-      sheet.getRange(i + 1, 3, 1, 3).setValues([['listo_revision', ini, ts]]);
-      found = true;
-      break;
-    }
-  }
-  if (!found) {
-    sheet.appendRow([mes, anio, 'listo_revision', ini, ts, '', '']);
-  }
-
-  sendResumenEmail(mes, anio, ini);
-  return { success: true, message: 'Mes marcado como listo. Correo enviado.' };
-}
-
 function marcarRevisado(data) {
-  if (data.password !== PASSWORD_N2) {
+  if (data.password !== PASSWORD_REVISION) {
     return { success: false, error: 'Contraseña incorrecta.' };
-  }
-  const ini = (data.iniciales || '').trim().toUpperCase();
-  if (ini.length < 2 || ini.length > 3) {
-    return { success: false, error: 'Las iniciales deben tener 2 o 3 letras.' };
   }
   const mes  = parseInt(data.mes);
   const anio = parseInt(data.anio);
@@ -299,20 +303,20 @@ function marcarRevisado(data) {
   let found = false;
   for (let i = 1; i < rows.length; i++) {
     if (parseInt(rows[i][0]) === mes && parseInt(rows[i][1]) === anio) {
-      sheet.getRange(i + 1, 3).setValue('revisado');
-      sheet.getRange(i + 1, 6, 1, 2).setValues([[ini, ts]]);
+      sheet.getRange(i + 1, 3, 1, 2).setValues([['revisado', ts]]);
       found = true;
       break;
     }
   }
   if (!found) {
-    sheet.appendRow([mes, anio, 'revisado', '', '', ini, ts]);
+    sheet.appendRow([mes, anio, 'revisado', ts]);
   }
 
   // Escribir "Revisado_Por" y "Fecha_Revisión" en todos los registros del mes
-  stampRevision(getSheet(SHEETS.TERMO), 5, 6, mes, anio, ini, fechaRev, 11, 12);
-  stampRevision(getSheet(SHEETS.CENT_REG), 2, 3, mes, anio, ini, fechaRev, 9, 10);
-  stampRevision(getSheet(SHEETS.MESONES), 2, 3, mes, anio, ini, fechaRev, 8, 9);
+  // Termo: col 12 = Revisado_Por, col 13 = Fecha_Revisión (0-indexed)
+  stampRevision(getSheet(SHEETS.TERMO), 5, 6, mes, anio, 'REV', fechaRev, 12, 13);
+  stampRevision(getSheet(SHEETS.CENT_REG), 2, 3, mes, anio, 'REV', fechaRev, 9, 10);
+  stampRevision(getSheet(SHEETS.MESONES), 2, 3, mes, anio, 'REV', fechaRev, 8, 9);
 
   return { success: true, message: 'Mes marcado como Revisado. Registros actualizados.' };
 }
@@ -329,25 +333,166 @@ function stampRevision(sheet, colMes, colAnio, mes, anio, iniciales, fechaRev, c
   }
 }
 
-// ── Email ─────────────────────────────────────────────────────
+// ── Email — Alerta Fuera de Rango ─────────────────────────────
 
-function sendResumenEmail(mes, anio, iniciales) {
-  const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
-                 'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-  const nombreMes = meses[mes - 1];
+function sendAlertaFueraDeRango(info) {
+  const detalles = [];
+  if (info.tempOOR) {
+    detalles.push('• Temperatura: ' + info.temperatura + ' °C (rango aceptable: 18–24 °C)');
+  }
+  if (info.humOOR) {
+    detalles.push('• Humedad: ' + info.humedad + '% (rango aceptable: 20–70%)');
+  }
 
-  const subject = '[Registros Lab] ' + nombreMes + ' ' + anio + ' — Listos para Revisión';
+  const subject = '⚠️ [Registros Lab] Alerta: Valor fuera de rango — ' + info.area;
   const body = 'Estimado/a,\n\n' +
-    'El usuario ' + iniciales + ' ha marcado los datos de ' + nombreMes + ' ' + anio +
-    ' como listos para revisar.\n\n' +
-    'Puede revisar los datos en el siguiente enlace:\n' +
-    SHEET_URL + '\n\n' +
-    'Una vez revisados, puede confirmar la revisión del mes desde el aplicativo.\n\n' +
+    'Se ha registrado un valor fuera de rango en el sistema de Registros Mensuales.\n\n' +
+    '📍 Área: ' + info.area + '\n' +
+    '📅 Fecha: ' + info.fecha + '\n' +
+    '🕐 Turno: ' + info.turno + '\n' +
+    '👤 Responsable: ' + info.responsable + '\n\n' +
+    'Detalles del valor fuera de rango:\n' +
+    detalles.join('\n') + '\n\n' +
+    '🔧 Acción correctiva: ' + (info.accion_correctiva || 'No especificada') + '\n\n' +
+    'Por favor, revisar y tomar las medidas necesarias.\n\n' +
+    'Puede revisar los registros en:\n' + SHEET_URL + '\n\n' +
     '---\n' +
-    'Este mensaje fue enviado automáticamente a través del aplicativo Registros Mensuales.\n' +
-    'Laboratorio Clínico — Hospital de Talca\n';
+    'Este mensaje fue enviado automáticamente.\n' +
+    'Registros Mensuales — Laboratorio Clínico — Hospital de Talca\n';
 
   MailApp.sendEmail({ to: EMAIL_ADDRESS, subject: subject, body: body });
+}
+
+// ── Email — Recordatorio Mes Anterior (Trigger Mensual) ──────
+
+function triggerRecordatorioMesAnterior() {
+  const hoy = new Date();
+  // Solo ejecutar el día 1 del mes
+  if (hoy.getDate() !== 1) return;
+
+  let mesAnterior = hoy.getMonth(); // getMonth() es 0-indexed, así que Month actual - 1
+  let anioAnterior = hoy.getFullYear();
+  if (mesAnterior === 0) {
+    mesAnterior = 12;
+    anioAnterior--;
+  }
+
+  const rev = getRevision(mesAnterior, anioAnterior);
+  if (rev.estado === 'revisado') return; // Ya fue revisado
+
+  const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                 'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const nombreMes = meses[mesAnterior - 1];
+
+  const subject = '📋 [Registros Lab] Recordatorio: Revisar registros de ' + nombreMes + ' ' + anioAnterior;
+  const body = 'Estimado/a,\n\n' +
+    'Le recordamos que los registros de ' + nombreMes + ' ' + anioAnterior +
+    ' aún no han sido marcados como revisados.\n\n' +
+    'Por favor, ingrese al aplicativo y confirme la revisión del mes anterior.\n\n' +
+    'Enlace a los datos:\n' + SHEET_URL + '\n\n' +
+    '---\n' +
+    'Este mensaje fue enviado automáticamente.\n' +
+    'Registros Mensuales — Laboratorio Clínico — Hospital de Talca\n';
+
+  MailApp.sendEmail({ to: EMAIL_ADDRESS, subject: subject, body: body });
+}
+
+// ── Email — Datos No Rellenados (Trigger Diario) ──────────────
+
+function triggerDatosNoRellenados() {
+  const hoy = new Date();
+  const dia = hoy.getDate();
+  const mes = hoy.getMonth() + 1;
+  const anio = hoy.getFullYear();
+
+  const areas = getAreas();
+  const centrifugas = getCentrifugas();
+  const salas = getSalas();
+
+  const reg = getRegistros(mes, anio);
+
+  // Temperatura/Humedad faltantes
+  const termoFaltantes = [];
+  areas.forEach(area => {
+    ['Mañana', 'Tarde'].forEach(turno => {
+      const existe = reg.termo.some(r => parseInt(r.dia) === dia && r.area === area && r.turno === turno);
+      if (!existe) termoFaltantes.push(area + ' (' + turno + ')');
+    });
+  });
+
+  // Centrífugas faltantes (solo mantenimiento Diario)
+  const centFaltantes = [];
+  centrifugas.forEach(c => {
+    const existe = reg.centrifugas.some(r => parseInt(r.dia) === dia && r.centrifuga === c && r.tipo_mantencion === 'Diaria');
+    if (!existe) centFaltantes.push(c);
+  });
+
+  // Mesones faltantes
+  const mesonFaltantes = [];
+  salas.forEach(s => {
+    const existe = reg.mesones.some(r => parseInt(r.dia) === dia && r.sala === s);
+    if (!existe) mesonFaltantes.push(s);
+  });
+
+  // Si todo está completo, no enviar correo
+  if (termoFaltantes.length === 0 && centFaltantes.length === 0 && mesonFaltantes.length === 0) return;
+
+  const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                 'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+  let detalle = '';
+  if (termoFaltantes.length > 0) {
+    detalle += '\n🌡️ Temperatura/Humedad:\n' + termoFaltantes.map(f => '  • ' + f).join('\n');
+  }
+  if (centFaltantes.length > 0) {
+    detalle += '\n⚙️ Centrífugas (Diaria):\n' + centFaltantes.map(f => '  • ' + f).join('\n');
+  }
+  if (mesonFaltantes.length > 0) {
+    detalle += '\n🧽 Mesones:\n' + mesonFaltantes.map(f => '  • ' + f).join('\n');
+  }
+
+  const subject = '📝 [Registros Lab] Datos pendientes del día ' + dia + ' de ' + meses[mes - 1];
+  const body = 'Estimado/a,\n\n' +
+    'Los siguientes registros del día ' + dia + ' de ' + meses[mes - 1] + ' ' + anio +
+    ' no han sido completados:\n' +
+    detalle + '\n\n' +
+    'Por favor, complete los registros pendientes a la brevedad.\n\n' +
+    'Enlace al aplicativo:\n' + SHEET_URL + '\n\n' +
+    '---\n' +
+    'Este mensaje fue enviado automáticamente.\n' +
+    'Registros Mensuales — Laboratorio Clínico — Hospital de Talca\n';
+
+  MailApp.sendEmail({ to: EMAIL_ADDRESS, subject: subject, body: body });
+}
+
+// ── Setup de Triggers (ejecutar una vez) ──────────────────────
+
+function setupTriggers() {
+  // Eliminar triggers anteriores de estas funciones
+  const existingTriggers = ScriptApp.getProjectTriggers();
+  existingTriggers.forEach(t => {
+    const fn = t.getHandlerFunction();
+    if (fn === 'triggerRecordatorioMesAnterior' || fn === 'triggerDatosNoRellenados') {
+      ScriptApp.deleteTrigger(t);
+    }
+  });
+
+  // Trigger diario a las 08:00 para recordatorio de mes anterior (solo actúa el día 1)
+  ScriptApp.newTrigger('triggerRecordatorioMesAnterior')
+    .timeBased()
+    .atHour(8)
+    .everyDays(1)
+    .create();
+
+  // Trigger diario a las 20:00 para datos no rellenados del día
+  ScriptApp.newTrigger('triggerDatosNoRellenados')
+    .timeBased()
+    .atHour(20)
+    .everyDays(1)
+    .create();
+
+  Logger.log('Triggers configurados correctamente.');
+  return 'Triggers configurados: triggerRecordatorioMesAnterior (08:00), triggerDatosNoRellenados (20:00)';
 }
 
 // ── Inicialización del Spreadsheet ───────────────────────────
@@ -355,16 +500,17 @@ function sendResumenEmail(mes, anio, iniciales) {
 function initializeSpreadsheet() {
   const ss = getSpreadsheet();
   const defs = [
-    { name: SHEETS.AREAS,       headers: ['Area'] },
-    { name: SHEETS.CENTRIFUGAS, headers: ['Centrifuga'] },
-    { name: SHEETS.SALAS,       headers: ['Sala'] },
-    { name: SHEETS.TERMO,       headers: ['Responsable','Temperatura (°C)','Humedad (%)','Fecha (dd/mm/aaaa)','Día','Mes','Año','Turno','Area','Observaciones','Timestamp','Revisado Por','Fecha Revisión'],
-      hideCols: [5,6,7,11] },
+    { name: SHEETS.TERMO,       headers: ['Responsable','Temperatura (°C)','Humedad (%)','Fecha (dd/mm/aaaa)','Día','Mes','Año','Turno','Area','Acción Correctiva','Observaciones','Timestamp','Revisado Por','Fecha Revisión'],
+      hideCols: [5,6,7,12] },
     { name: SHEETS.CENT_REG,    headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Centrifuga','Responsable','Tipo Mantención','Observaciones','Timestamp','Revisado Por','Fecha Revisión'],
       hideCols: [2,3,4,9] },
     { name: SHEETS.MESONES,     headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Sala','Responsable','Observaciones','Timestamp','Revisado Por','Fecha Revisión'],
       hideCols: [2,3,4,8] },
-    { name: SHEETS.REVISIONES,  headers: ['Mes','Año','Estado','Iniciales_N1','Timestamp_N1','Iniciales_N2','Timestamp_N2'] }
+    { name: SHEETS.AREAS,       headers: ['Area'] },
+    { name: SHEETS.CENTRIFUGAS, headers: ['Centrifuga'] },
+    { name: SHEETS.SALAS,       headers: ['Sala'] },
+    { name: SHEETS.ACCIONES,    headers: ['Acción'] },
+    { name: SHEETS.REVISIONES,  headers: ['Mes','Año','Estado','Timestamp'] }
   ];
 
   defs.forEach(def => {
@@ -393,6 +539,9 @@ function initializeSpreadsheet() {
 
   const salasSheet = ss.getSheetByName(SHEETS.SALAS);
   ['Microbiología', 'Hematología', 'Química'].forEach(s => salasSheet.appendRow([s]));
+
+  const accionesSheet = ss.getSheetByName(SHEETS.ACCIONES);
+  ['En observación'].forEach(a => accionesSheet.appendRow([a]));
 
   // Eliminar hojas por defecto
   ['Hoja 1','Sheet1','Hoja1'].forEach(n => {

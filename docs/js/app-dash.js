@@ -1,5 +1,34 @@
 // Forms
-document.getElementById('form-termo').addEventListener('submit',async e=>{e.preventDefault();setLoading('btn-termo-submit','spinner-termo','btn-termo-text',true);try{const r=await apiPost({action:'saveTermo',fecha:document.getElementById('termo-fecha').value,ampm:state.ampm,area:document.getElementById('termo-area').value,temperatura:document.getElementById('termo-temp').value,humedad:document.getElementById('termo-hum').value,responsable:document.getElementById('termo-resp').value,observaciones:document.getElementById('termo-obs').value});if(r.success){showToast('✅ '+r.message);e.target.reset();document.getElementById('termo-fecha').value=today();resetRangos();autoSetAmPm();checkUrlParams()}else showToast('❌ '+r.error,'error')}catch(err){showToast('❌ Error de conexión','error')}setLoading('btn-termo-submit','spinner-termo','btn-termo-text',false)});
+document.getElementById('form-termo').addEventListener('submit',async e=>{
+  e.preventDefault();
+  // Check out-of-range and validate acción correctiva
+  const issues=isOutOfRange();
+  if(issues){
+    const accion=document.getElementById('termo-accion').value;
+    if(!accion){
+      showOutOfRangePopup(issues);
+      return;
+    }
+  }
+  setLoading('btn-termo-submit','spinner-termo','btn-termo-text',true);
+  try{
+    const payload={
+      action:'saveTermo',
+      fecha:document.getElementById('termo-fecha').value,
+      ampm:state.ampm,
+      area:document.getElementById('termo-area').value,
+      temperatura:document.getElementById('termo-temp').value,
+      humedad:document.getElementById('termo-hum').value,
+      responsable:document.getElementById('termo-resp').value,
+      observaciones:document.getElementById('termo-obs').value,
+      accion_correctiva:document.getElementById('termo-accion').value||''
+    };
+    const r=await apiPost(payload);
+    if(r.success){showToast('✅ '+r.message);e.target.reset();document.getElementById('termo-fecha').value=today();resetRangos();autoSetAmPm();checkUrlParams()}
+    else showToast('❌ '+r.error,'error');
+  }catch(err){showToast('❌ Error de conexión','error')}
+  setLoading('btn-termo-submit','spinner-termo','btn-termo-text',false);
+});
 
 document.getElementById('form-centrifugas').addEventListener('submit',async e=>{e.preventDefault();const sel=getSelectedChips('cent-chips');if(!sel.length){showToast('Seleccione al menos una centrífuga','error');return}setLoading('btn-cent-submit','spinner-cent','btn-cent-text',true);try{const r=await apiPost({action:'saveCentrifuga',fecha:document.getElementById('cent-fecha').value,centrifugas:sel,responsable:document.getElementById('cent-resp').value,tipo_mantencion:document.getElementById('cent-tipo').value,observaciones:document.getElementById('cent-obs').value});if(r.success){showToast('✅ '+r.message);e.target.reset();document.getElementById('cent-fecha').value=today();document.getElementById('cent-tipo').value='Diaria';updateInfoCentrifuga();document.querySelectorAll('#cent-chips .chip-item').forEach(c=>c.classList.remove('selected'));document.getElementById('btn-grupo-preanalisis').classList.remove('active')}else showToast('❌ '+r.error,'error')}catch(err){showToast('❌ Error de conexión','error')}setLoading('btn-cent-submit','spinner-cent','btn-cent-text',false)});
 
@@ -39,20 +68,48 @@ html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-
 m.salas.forEach(s=>{const dias=new Set(reg.mesones.filter(r=>r.sala===s).map(r=>parseInt(r.dia)));let miss=0;let chips='';for(let d=1;d<=dh;d++){const ok=dias.has(d);if(!ok)miss++;chips+=`<span class="day-chip ${ok?'chip-ok':'chip-missing'}">${d}</span>`}html+=`<div style="font-size:12px;font-weight:600;margin:8px 0 4px;">${s} ${miss?'('+miss+' faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`});html+='</div>';
 document.getElementById('dash-monthly-view').innerHTML=html}
 
-function renderRevisionBadge(rev){const b=document.getElementById('revision-badge');if(rev.estado==='revisado'){b.className='revision-badge badge-revisado';b.textContent='✅ Revisado ('+( rev.iniciales_n2||'')+')'}else if(rev.estado==='listo_revision'){b.className='revision-badge badge-listo';b.textContent='⏳ Listo para Revisión ('+( rev.iniciales_n1||'')+')'}else{b.className='revision-badge badge-pendiente';b.textContent='⏳ Pendiente'}}
+function renderRevisionBadge(rev){
+  const b=document.getElementById('revision-badge');
+  if(rev.estado==='revisado'){
+    b.className='revision-badge badge-revisado';
+    b.textContent='✅ Revisado';
+  }else{
+    b.className='revision-badge badge-pendiente';
+    b.textContent='⏳ Pendiente';
+  }
+}
 
-function renderTables(reg){const c=document.getElementById('dash-tables');c.innerHTML=renderTableCard('🌡️ Temperatura & Humedad',reg.termo,['Día','Turno','Área','Temp°','Hum%','Resp','Obs'],r=>[r.dia,r.turno,r.area,r.temperatura,r.humedad,r.responsable,r.observaciones])+renderTableCard('⚙️ Centrífugas',reg.centrifugas,['Día','Centrífuga','Resp','Tipo','Obs'],r=>[r.dia,r.centrifuga,r.responsable,r.tipo_mantencion,r.observaciones])+renderTableCard('🧽 Mesones',reg.mesones,['Día','Sala','Resp','Obs'],r=>[r.dia,r.sala,r.responsable,r.observaciones])}
+function renderTables(reg){const c=document.getElementById('dash-tables');c.innerHTML=renderTableCard('🌡️ Temperatura & Humedad',reg.termo,['Día','Turno','Área','Temp°','Hum%','Resp','Acción','Obs'],r=>[r.dia,r.turno,r.area,r.temperatura,r.humedad,r.responsable,r.accion_correctiva||'',r.observaciones])+renderTableCard('⚙️ Centrífugas',reg.centrifugas,['Día','Centrífuga','Resp','Tipo','Obs'],r=>[r.dia,r.centrifuga,r.responsable,r.tipo_mantencion,r.observaciones])+renderTableCard('🧽 Mesones',reg.mesones,['Día','Sala','Resp','Obs'],r=>[r.dia,r.sala,r.responsable,r.observaciones])}
 function renderTableCard(title,rows,headers,mapper){if(!rows.length)return`<div class="card card-sm" style="margin-bottom:16px;"><strong>${title}</strong><div style="color:var(--text-dim);font-size:13px;margin-top:8px;">Sin registros en este período.</div></div>`;const thead=`<tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr>`;const tbody=rows.map(r=>`<tr>${mapper(r).map(v=>`<td>${v??''}</td>`).join('')}</tr>`).join('');return`<div class="card" style="margin-bottom:16px;padding:16px 12px;"><strong style="font-family:'Outfit';font-size:15px;">${title}</strong><span style="color:var(--text-dim);font-size:12px;margin-left:8px;">${rows.length} registros</span><div class="records-table-wrap" style="margin-top:12px;"><table class="records-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table></div></div>`}
 
 // Modals
-function initModalSelectors(){const ms=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];const opts=ms.map((m,i)=>`<option value="${i+1}"${i+1===state.dashMes?' selected':''}>${m}</option>`).join('');['modal-mes1','modal-mes2'].forEach(id=>document.getElementById(id).innerHTML=opts);const y=new Date().getFullYear();const yO=[y-1,y,y+1].map(a=>`<option value="${a}"${a===state.dashAnio?' selected':''}>${a}</option>`).join('');['modal-anio1','modal-anio2'].forEach(id=>document.getElementById(id).innerHTML=yO)}
-function openModalRevision(){initModalSelectors();document.getElementById('modal-revision').style.display='block';document.getElementById('modal-revisado').style.display='none';document.getElementById('modal-overlay').classList.add('active');document.getElementById('modal-error1').classList.remove('visible')}
-function openModalRevisado(){initModalSelectors();document.getElementById('modal-revisado').style.display='block';document.getElementById('modal-revision').style.display='none';document.getElementById('modal-overlay').classList.add('active');document.getElementById('modal-error2').classList.remove('visible')}
+function initModalSelectors(){
+  const ms=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const opts=ms.map((m,i)=>`<option value="${i+1}"${i+1===state.dashMes?' selected':''}>${m}</option>`).join('');
+  document.getElementById('modal-mes2').innerHTML=opts;
+  const y=new Date().getFullYear();
+  const yO=[y-1,y,y+1].map(a=>`<option value="${a}"${a===state.dashAnio?' selected':''}>${a}</option>`).join('');
+  document.getElementById('modal-anio2').innerHTML=yO;
+}
+function openModalRevisado(){initModalSelectors();document.querySelectorAll('.modal-card').forEach(m=>m.style.display='none');document.getElementById('modal-revisado').style.display='block';document.getElementById('modal-overlay').classList.add('active');document.getElementById('modal-error2').classList.remove('visible')}
 function closeModal(e){if(e&&e.target!==document.getElementById('modal-overlay'))return;document.getElementById('modal-overlay').classList.remove('active')}
 
-async function submitRevision(){const pwd=document.getElementById('modal-pwd1').value;const ini=document.getElementById('modal-ini').value.trim().toUpperCase();const mes=document.getElementById('modal-mes1').value;const anio=document.getElementById('modal-anio1').value;const err=document.getElementById('modal-error1');err.classList.remove('visible');document.getElementById('spinner-rev1').classList.add('visible');document.getElementById('btn-rev1-text').style.display='none';try{const r=await apiPost({action:'marcarListoRevision',password:pwd,iniciales:ini,mes,anio});if(r.success){showToast('✅ '+r.message);closeModal({target:document.getElementById('modal-overlay')});loadDashboard()}else{err.textContent=r.error;err.classList.add('visible')}}catch(e){err.textContent='Error de conexión.';err.classList.add('visible')}document.getElementById('spinner-rev1').classList.remove('visible');document.getElementById('btn-rev1-text').style.display=''}
-
-async function submitRevisado(){const pwd=document.getElementById('modal-pwd2').value;const ini=document.getElementById('modal-ini2').value.trim().toUpperCase();const mes=document.getElementById('modal-mes2').value;const anio=document.getElementById('modal-anio2').value;const err=document.getElementById('modal-error2');err.classList.remove('visible');document.getElementById('spinner-rev2').classList.add('visible');document.getElementById('btn-rev2-text').style.display='none';try{const r=await apiPost({action:'marcarRevisado',password:pwd,iniciales:ini,mes,anio});if(r.success){showToast('✅ '+r.message);closeModal({target:document.getElementById('modal-overlay')});loadDashboard()}else{err.textContent=r.error;err.classList.add('visible')}}catch(e){err.textContent='Error de conexión.';err.classList.add('visible')}document.getElementById('spinner-rev2').classList.remove('visible');document.getElementById('btn-rev2-text').style.display=''}
+async function submitRevisado(){
+  const pwd=document.getElementById('modal-pwd2').value;
+  const mes=document.getElementById('modal-mes2').value;
+  const anio=document.getElementById('modal-anio2').value;
+  const err=document.getElementById('modal-error2');
+  err.classList.remove('visible');
+  document.getElementById('spinner-rev2').classList.add('visible');
+  document.getElementById('btn-rev2-text').style.display='none';
+  try{
+    const r=await apiPost({action:'marcarRevisado',password:pwd,mes,anio});
+    if(r.success){showToast('✅ '+r.message);closeModal({target:document.getElementById('modal-overlay')});loadDashboard()}
+    else{err.textContent=r.error;err.classList.add('visible')}
+  }catch(e){err.textContent='Error de conexión.';err.classList.add('visible')}
+  document.getElementById('spinner-rev2').classList.remove('visible');
+  document.getElementById('btn-rev2-text').style.display='';
+}
 
 // QR
 function switchQrTab(tab){state.qrTab=tab;document.querySelectorAll('.qr-tab').forEach((t,i)=>t.classList.toggle('active',['areas','salas','centrifugas'][i]===tab));const lbl=document.getElementById('qr-select-label');const sel=document.getElementById('admin-select');if(tab==='areas'){lbl.textContent='Selecciona Área';populateSelect('admin-select',state.areas,'— Seleccionar —')}else if(tab==='salas'){lbl.textContent='Selecciona Sala';populateSelect('admin-select',state.salas,'— Seleccionar —')}else{lbl.textContent='Selecciona Centrífuga';const items=[...state.centrifugas,'🏷️ Grupo Preanálisis'];populateSelect('admin-select',items,'— Seleccionar —')}document.getElementById('qr-canvas-wrap').classList.remove('visible');document.getElementById('qr-url-text').style.display='none';document.getElementById('btn-print-qr').style.display='none'}

@@ -1,6 +1,6 @@
 const API_URL='https://script.google.com/macros/s/AKfycbxuqcui0-hjJ721uMWZk3w-4l2fVCaBWQgdMJqVMb5Pno339Jqetq4r62p3-1gGBUvFOg/exec';
 const PREANALISIS=[1,2,3,4,5,18];
-const state={areas:[],centrifugas:[],salas:[],ampm:'AM',qrInstance:null,qrTab:'areas',dashMes:new Date().getMonth()+1,dashAnio:new Date().getFullYear(),dashTab:'diario',dashData:null,dashMaestros:null};
+const state={areas:[],centrifugas:[],salas:[],acciones:[],ampm:'AM',qrInstance:null,qrTab:'areas',dashMes:new Date().getMonth()+1,dashAnio:new Date().getFullYear(),dashTab:'diario',dashData:null,dashMaestros:null};
 
 function today(){return new Date().toISOString().split('T')[0]}
 function showToast(m,t='success'){const el=document.getElementById('toast');el.textContent=m;el.className=`show toast-${t}`;setTimeout(()=>{el.className=''},3200)}
@@ -23,16 +23,81 @@ function navigateTo(s){document.querySelectorAll('.section').forEach(el=>el.clas
 function setAmPm(v){state.ampm=v;document.getElementById('btn-am').className='ampm-btn'+(v==='AM'?' selected-AM':'');document.getElementById('btn-pm').className='ampm-btn'+(v==='PM'?' selected-PM':'')}
 function autoSetAmPm(){setAmPm(new Date().getHours()<12?'AM':'PM')}
 
-// Range check
-function checkRangos(){const t=parseFloat(document.getElementById('termo-temp').value),h=parseFloat(document.getElementById('termo-hum').value),a=document.getElementById('alert-rangos'),ti=document.getElementById('temp-range-info'),hi=document.getElementById('hum-range-info');let out=false;if(!isNaN(t)){const ok=t>=18&&t<=24;ti.className='range-info '+(ok?'range-ok':'range-err');ti.textContent=ok?`✓ ${t} °C — dentro de rango`:`✗ ${t} °C — fuera de rango (18–24 °C)`;if(!ok)out=true}if(!isNaN(h)){const ok=h>=20&&h<=70;hi.className='range-info '+(ok?'range-ok':'range-err');hi.textContent=ok?`✓ ${h}% — dentro de rango`:`✗ ${h}% — fuera de rango (20–70%)`;if(!ok)out=true}a.classList.toggle('visible',out)}
-function resetRangos(){document.getElementById('temp-range-info').className='range-info';document.getElementById('temp-range-info').textContent='Rango aceptable: 18–24 °C';document.getElementById('hum-range-info').className='range-info';document.getElementById('hum-range-info').textContent='Rango aceptable: 20–70 %';document.getElementById('alert-rangos').classList.remove('visible')}
+// Range check — also toggles the Acción Correctiva field
+function checkRangos(){
+  const t=parseFloat(document.getElementById('termo-temp').value);
+  const h=parseFloat(document.getElementById('termo-hum').value);
+  const a=document.getElementById('alert-rangos');
+  const ti=document.getElementById('temp-range-info');
+  const hi=document.getElementById('hum-range-info');
+  const acGroup=document.getElementById('accion-correctiva-group');
+  const acSelect=document.getElementById('termo-accion');
+  let out=false;
+  if(!isNaN(t)){const ok=t>=18&&t<=24;ti.className='range-info '+(ok?'range-ok':'range-err');ti.textContent=ok?`✓ ${t} °C — dentro de rango`:`✗ ${t} °C — fuera de rango (18–24 °C)`;if(!ok)out=true}
+  if(!isNaN(h)){const ok=h>=20&&h<=70;hi.className='range-info '+(ok?'range-ok':'range-err');hi.textContent=ok?`✓ ${h}% — dentro de rango`:`✗ ${h}% — fuera de rango (20–70%)`;if(!ok)out=true}
+  a.classList.toggle('visible',out);
+  // Show/hide acción correctiva field
+  if(out){
+    acGroup.style.display='';
+    acSelect.required=true;
+  }else{
+    acGroup.style.display='none';
+    acSelect.required=false;
+    acSelect.value='';
+  }
+}
+function resetRangos(){
+  document.getElementById('temp-range-info').className='range-info';
+  document.getElementById('temp-range-info').textContent='Rango aceptable: 18–24 °C';
+  document.getElementById('hum-range-info').className='range-info';
+  document.getElementById('hum-range-info').textContent='Rango aceptable: 20–70 %';
+  document.getElementById('alert-rangos').classList.remove('visible');
+  document.getElementById('accion-correctiva-group').style.display='none';
+  document.getElementById('termo-accion').required=false;
+  document.getElementById('termo-accion').value='';
+}
+
+// Check if current values are out of range (returns object or false)
+function isOutOfRange(){
+  const t=parseFloat(document.getElementById('termo-temp').value);
+  const h=parseFloat(document.getElementById('termo-hum').value);
+  const issues=[];
+  if(!isNaN(t)&&(t<18||t>24))issues.push(`Temperatura: ${t} °C (rango: 18–24 °C)`);
+  if(!isNaN(h)&&(h<20||h>70))issues.push(`Humedad: ${h}% (rango: 20–70%)`);
+  return issues.length?issues:false;
+}
+
+// Show out-of-range popup modal
+function showOutOfRangePopup(issues){
+  const list=document.getElementById('oor-detail');
+  list.innerHTML=issues.map(i=>`<li>${i}</li>`).join('');
+  document.querySelectorAll('.modal-card').forEach(m=>m.style.display='none');
+  document.getElementById('modal-out-of-range').style.display='block';
+  document.getElementById('modal-overlay').classList.add('active');
+}
 
 // Centrifuga info
 const CENT_INFO={Diaria:{title:'🔁 Mantención Diaria',body:'Realizar <strong>limpieza de superficie interior y exterior</strong> de la centrífuga con paño húmedo.'},Semanal:{title:'📅 Mantención Semanal',body:'<strong>Lavar capachos</strong> con solución jabonosa. <strong>Desinfectar rotor, capachos y superficies</strong> con alcohol 70% o Cloro 0.5%.'},Anual:{title:'🔧 Mantención Anual / Según Necesidad',body:'<strong>Desenchufar la centrífuga</strong> antes de intervenir. <strong>Engrasar capachos</strong>. Realizar mantención <strong>preventiva y/o reparativa</strong> completa.'}};
 function updateInfoCentrifuga(){const t=document.getElementById('cent-tipo').value,i=CENT_INFO[t]||CENT_INFO.Diaria;document.getElementById('info-cent-title').textContent=i.title;document.getElementById('info-cent-body').innerHTML=i.body;document.getElementById('info-centrifuga').classList.add('visible')}
 
 // Load masters
-async function loadMaestros(){try{const[areas,cents,salas]=await Promise.all([apiGet({action:'getAreas'}),apiGet({action:'getCentrifugas'}),apiGet({action:'getSalas'})]);state.areas=areas;state.centrifugas=cents;state.salas=salas;populateSelect('termo-area',areas,'Seleccionar área…');populateSelect('admin-select',areas,'— Seleccionar —');populateChips('cent-chips',cents);populateChips('meson-chips',salas);state.dashMaestros={areas,centrifugas:cents,salas}}catch(e){showToast('Error cargando maestros.','error')}}
+async function loadMaestros(){try{const[areas,cents,salas]=await Promise.all([apiGet({action:'getAreas'}),apiGet({action:'getCentrifugas'}),apiGet({action:'getSalas'})]);state.areas=areas;state.centrifugas=cents;state.salas=salas;populateSelect('termo-area',areas,'Seleccionar área…');populateSelect('admin-select',areas,'— Seleccionar —');populateChips('cent-chips',cents);populateChips('meson-chips',salas);state.dashMaestros={areas,centrifugas:cents,salas};loadAcciones()}catch(e){showToast('Error cargando maestros.','error')}}
+
+// Load acciones correctivas from master
+async function loadAcciones(){
+  try{
+    const acciones=await apiGet({action:'getAcciones'});
+    state.acciones=acciones;
+    const sel=document.getElementById('termo-accion');
+    sel.innerHTML='<option value="">Seleccionar acción…</option>'+acciones.map(a=>`<option value="${a}">${a}</option>`).join('');
+  }catch(e){
+    // Fallback if master doesn't exist yet
+    state.acciones=['En observación'];
+    const sel=document.getElementById('termo-accion');
+    sel.innerHTML='<option value="">Seleccionar acción…</option><option value="En observación">En observación</option>';
+  }
+}
+
 function populateSelect(id,items,ph){const s=document.getElementById(id);s.innerHTML=`<option value="">${ph}</option>`+items.map(i=>`<option value="${i}">${i}</option>`).join('')}
 function populateChips(id,items){const c=document.getElementById(id);c.innerHTML=items.map(i=>`<div class="chip-item" data-value="${i}" onclick="toggleChip(this)">${i}</div>`).join('')}
 function toggleChip(el){el.classList.toggle('selected')}
