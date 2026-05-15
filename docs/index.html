@@ -74,7 +74,7 @@
     <div class="stats-row">
       <div class="stat-card">
         <div class="stat-number" id="stat-termo">-</div>
-        <div class="stat-label">🌡️ Temp</div>
+        <div class="stat-label">🌡️ Ambiental</div>
       </div>
       <div class="stat-card">
         <div class="stat-number" id="stat-cent">-</div>
@@ -83,6 +83,20 @@
       <div class="stat-card">
         <div class="stat-number" id="stat-limp">-</div>
         <div class="stat-label">🧽 Mesones</div>
+      </div>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-number" id="stat-refri">-</div>
+        <div class="stat-label">🧊 Refri.</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="stat-limp-refri">-</div>
+        <div class="stat-label">🧹 Limp.R.</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number" id="stat-conduct">-</div>
+        <div class="stat-label">💧 Conduct.</div>
       </div>
     </div>
 
@@ -308,19 +322,223 @@
     </div>
   </section>
 
+  <!-- ── SECCIÓN: TEMP REFRIGERADORES ──────────────────── -->
+  <section id="section-refri-temp" class="section">
+    <p class="section-title">🧊 Temp. Refrigeradores</p>
+    <p class="section-subtitle">Registro de temperatura de refrigeradores y congeladores</p>
+
+    <div class="card">
+      <form id="form-refri-temp" autocomplete="off">
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="refri-fecha">Fecha</label>
+            <input type="date" id="refri-fecha" class="form-control" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Turno</label>
+            <div class="ampm-selector">
+              <button type="button" class="ampm-btn" id="btn-refri-am" onclick="setAmPmRefri('AM')">☀️ AM</button>
+              <button type="button" class="ampm-btn" id="btn-refri-pm" onclick="setAmPmRefri('PM')">🌙 PM</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="refri-equipo">Refrigerador / Congelador</label>
+          <select id="refri-equipo" class="form-control" required onchange="checkRangoRefri()">
+            <option value="">Cargando equipos…</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="refri-temp-input">Temperatura (°C)</label>
+          <input type="number" id="refri-temp-input" class="form-control"
+            placeholder="5" step="0.1" min="-100" max="50" required
+            oninput="checkRangoRefri()" />
+          <div id="refri-range-info" class="range-info">Seleccione un equipo para ver el rango</div>
+        </div>
+
+        <div id="alert-refri-rangos" class="alert-banner alert-danger">
+          <div class="alert-title">⚠️ Temperatura fuera de rango</div>
+          <div class="alert-body">
+            Nota: Avisar al <strong>Encargado de Turno</strong> o <strong>Encargado de Refrigeradores</strong> que las temperaturas se encuentran fuera de rango.
+          </div>
+        </div>
+
+        <div id="refri-accion-group" class="form-group" style="display:none;">
+          <label class="form-label" for="refri-accion">Acción Correctiva *</label>
+          <select id="refri-accion" class="form-control">
+            <option value="">Seleccionar acción…</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="refri-resp">Responsable (iniciales)</label>
+          <input type="text" id="refri-resp" class="form-control"
+            placeholder="ABC" maxlength="3"
+            style="text-transform:uppercase; letter-spacing:3px; font-weight:700; font-size:18px;"
+            required />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="refri-obs">Observaciones</label>
+          <textarea id="refri-obs" class="form-control" rows="3"
+            placeholder="Opcional…" style="resize:none;"></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="btn-refri-submit">
+          <div class="spinner" id="spinner-refri"></div>
+          <span id="btn-refri-text">💾 Guardar Registro</span>
+        </button>
+      </form>
+    </div>
+  </section>
+
+  <!-- ── SECCIÓN: LIMPIEZA REFRIGERADORES ────────────────── -->
+  <section id="section-limp-refri" class="section">
+    <p class="section-title">🧹 Limpieza Refrigeradores</p>
+    <p class="section-subtitle">Registro de limpieza y mantención de refrigeradores/congeladores</p>
+
+    <div class="card">
+      <form id="form-limp-refri" autocomplete="off">
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="limp-refri-fecha">Fecha</label>
+            <input type="date" id="limp-refri-fecha" class="form-control" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="limp-refri-tipo">Tipo de Mantención</label>
+            <select id="limp-refri-tipo" class="form-control" required onchange="updateInfoLimpRefri()">
+              <option value="Semanal (externa)" selected>📅 Semanal (externa)</option>
+              <option value="Semestral (interna)">🔧 Semestral (interna)</option>
+              <option value="Descongelación manual">❄️ Descongelación manual</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="info-limp-refri" class="info-box visible">
+          <div class="info-box-title" id="info-limp-refri-title">📋 Instrucciones</div>
+          <div id="info-limp-refri-body"></div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Equipos</label>
+          <div class="chip-grid" id="limp-refri-chips">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="limp-refri-resp">Responsable (iniciales)</label>
+          <input type="text" id="limp-refri-resp" class="form-control"
+            placeholder="ABC" maxlength="3"
+            style="text-transform:uppercase; letter-spacing:3px; font-weight:700; font-size:18px;"
+            required />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="limp-refri-obs">Observaciones</label>
+          <textarea id="limp-refri-obs" class="form-control" rows="3"
+            placeholder="Opcional…" style="resize:none;"></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="btn-limp-refri-submit">
+          <div class="spinner" id="spinner-limp-refri"></div>
+          <span id="btn-limp-refri-text">💾 Guardar Registro</span>
+        </button>
+      </form>
+    </div>
+  </section>
+
+  <!-- ── SECCIÓN: CONDUCTIVIDAD DEL AGUA ─────────────────── -->
+  <section id="section-conductividad" class="section">
+    <p class="section-title">💧 Conductividad del Agua</p>
+    <p class="section-subtitle">Registro diario de conductividad del agua</p>
+
+    <div class="note-box">
+      <div class="note-box-title">📌 Información importante</div>
+      Valores de conductividad que sobrepasen los <strong>0.8 µS/cm</strong> deben reportarse a <strong>Asistencia técnica Vigaflow 977070600</strong>.
+    </div>
+
+    <div class="card">
+      <form id="form-conductividad" autocomplete="off">
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="conduct-fecha">Fecha</label>
+            <input type="date" id="conduct-fecha" class="form-control" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Turno</label>
+            <div class="ampm-selector">
+              <button type="button" class="ampm-btn" id="btn-conduct-am" onclick="setAmPmConduct('AM')">☀️ AM</button>
+              <button type="button" class="ampm-btn" id="btn-conduct-pm" onclick="setAmPmConduct('PM')">🌙 PM</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="conduct-valor">Conductividad (µS/cm)</label>
+          <input type="number" id="conduct-valor" class="form-control"
+            placeholder="0.5" step="0.01" min="0" max="10" required
+            oninput="checkRangoConductividad()" />
+          <div id="conduct-range-info" class="range-info">Rango permitido: 0–0.8 µS/cm</div>
+        </div>
+
+        <div id="alert-conduct-rangos" class="alert-banner alert-danger">
+          <div class="alert-title">⚠️ Conductividad fuera de rango</div>
+          <div class="alert-body">
+            Valores de conductividad que sobrepasen los <strong>0.8 µS/cm</strong> deben reportarse a <strong>Asistencia técnica Vigaflow 977070600</strong>.
+          </div>
+        </div>
+
+        <div id="alert-conduct-warning" class="alert-banner alert-warning">
+          <div class="alert-title">⚡ Advertencia de conductividad</div>
+          <div class="alert-body">
+            El valor supera los <strong>0.5 µS/cm</strong>. Se enviará una notificación al encargado.
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="conduct-resp">Responsable (iniciales)</label>
+          <input type="text" id="conduct-resp" class="form-control"
+            placeholder="ABC" maxlength="3"
+            style="text-transform:uppercase; letter-spacing:3px; font-weight:700; font-size:18px;"
+            required />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="conduct-obs">Observaciones</label>
+          <textarea id="conduct-obs" class="form-control" rows="3"
+            placeholder="Opcional…" style="resize:none;"></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="btn-conduct-submit">
+          <div class="spinner" id="spinner-conduct"></div>
+          <span id="btn-conduct-text">💾 Guardar Registro</span>
+        </button>
+      </form>
+    </div>
+  </section>
+
   <!-- ── SECCIÓN: ADMIN / QR ─────────────────────────────── -->
   <section id="section-admin" class="section">
     <p class="section-title">🔑 Admin</p>
     <p class="section-subtitle">Generador de QR para acceso directo</p>
 
     <div class="card">
-      <div class="qr-tabs">
+      <div class="qr-tabs" style="flex-wrap:wrap;">
         <button class="qr-tab active" onclick="switchQrTab('areas')">🌡️ Áreas</button>
         <button class="qr-tab" onclick="switchQrTab('salas')">🧽 Salas</button>
-        <button class="qr-tab" onclick="switchQrTab('centrifugas')">⚙️ Centrífugas</button>
+        <button class="qr-tab" onclick="switchQrTab('centrifugas')">⚙️ Centríf.</button>
+        <button class="qr-tab" onclick="switchQrTab('refrigeradores')">🧊 Refri.</button>
+        <button class="qr-tab" onclick="switchQrTab('refri-limpieza')">🧹 Limp.R.</button>
+        <button class="qr-tab" onclick="switchQrTab('conductividad')">💧 Conduct.</button>
       </div>
 
-      <div class="form-group">
+      <div class="form-group" id="qr-select-group">
         <label class="form-label" id="qr-select-label">Selecciona Área</label>
         <select id="admin-select" class="form-control" onchange="generateQR()">
           <option value="">— Seleccionar —</option>
@@ -349,19 +567,31 @@
 <nav id="bottom-nav">
   <button class="nav-item active" data-section="dashboard" onclick="navigateTo('dashboard')">
     <span class="nav-icon">🏠</span>
-    <span class="nav-label">Dashboard</span>
+    <span class="nav-label">Inicio</span>
   </button>
   <button class="nav-item" data-section="termo" onclick="navigateTo('termo')">
     <span class="nav-icon">🌡️</span>
-    <span class="nav-label">Temp/Hum</span>
+    <span class="nav-label">Ambiental</span>
   </button>
   <button class="nav-item" data-section="centrifugas" onclick="navigateTo('centrifugas')">
     <span class="nav-icon">⚙️</span>
-    <span class="nav-label">Centrífugas</span>
+    <span class="nav-label">Centríf.</span>
   </button>
   <button class="nav-item" data-section="mesones" onclick="navigateTo('mesones')">
     <span class="nav-icon">🧽</span>
     <span class="nav-label">Mesones</span>
+  </button>
+  <button class="nav-item" data-section="refri-temp" onclick="navigateTo('refri-temp')">
+    <span class="nav-icon">🧊</span>
+    <span class="nav-label">Refri.</span>
+  </button>
+  <button class="nav-item" data-section="limp-refri" onclick="navigateTo('limp-refri')">
+    <span class="nav-icon">🧹</span>
+    <span class="nav-label">Limp.R.</span>
+  </button>
+  <button class="nav-item" data-section="conductividad" onclick="navigateTo('conductividad')">
+    <span class="nav-icon">💧</span>
+    <span class="nav-label">Conduct.</span>
   </button>
   <button class="nav-item" data-section="admin" onclick="navigateTo('admin')">
     <span class="nav-icon">🔑</span>
