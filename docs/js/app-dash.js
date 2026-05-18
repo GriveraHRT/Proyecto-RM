@@ -102,7 +102,7 @@ function renderRevisionBadge(rev){
   else{b.className='revision-badge badge-pendiente';b.textContent='⏳ Pendiente'}
 }
 
-function renderTables(reg){const c=document.getElementById('dash-tables');c.innerHTML=renderTableCard('🌡️ Temp. Ambiental',reg.termo,['Día','Turno','Área','Temp°','Hum%','Resp','Acción','Obs'],r=>[r.dia,r.turno,r.area,r.temperatura,r.humedad,r.responsable,r.accion_correctiva||'',r.observaciones])+renderTableCard('⚙️ Centrífugas',reg.centrifugas,['Día','Centrífuga','Resp','Tipo','Obs'],r=>[r.dia,r.centrifuga,r.responsable,r.tipo_mantencion,r.observaciones])+renderTableCard('🧽 Mesones',reg.mesones,['Día','Sala','Resp','Obs'],r=>[r.dia,r.sala,r.responsable,r.observaciones])+renderTableCard('🧊 Temp. Refri.',reg.refriTemp||[],['Día','Turno','Equipo','Temp°','Resp','Obs'],r=>[r.dia,r.turno,r.equipo,r.temperatura,r.responsable,r.observaciones])+renderTableCard('🧹 Limp. Refri.',reg.limpiezaRefri||[],['Día','Tipo','Equipo','Resp','Obs'],r=>[r.dia,r.tipo_mantencion,r.equipo,r.responsable,r.observaciones])+renderTableCard('💧 Conductividad',reg.conductividad||[],['Día','Turno','µS/cm','Resp','Obs'],r=>[r.dia,r.turno,r.conductividad,r.responsable,r.observaciones])}
+function renderTables(reg){const c=document.getElementById('dash-tables');c.innerHTML=renderTableCard('🌡️ Temp. Ambiental',reg.termo,['Día','Turno','Área','Temp°','Hum%','Resp','Acción','Obs'],r=>[r.dia,r.turno,r.area,r.temperatura,r.humedad,r.responsable,r.accion_correctiva||'',r.observaciones])+renderTableCard('⚙️ Centrífugas',reg.centrifugas,['Día','Centrífuga','Resp','Tipo','Obs'],r=>[r.dia,r.centrifuga,r.responsable,r.tipo_mantencion,r.observaciones])+renderTableCard('🧽 Mesones',reg.mesones,['Día','Sala','Resp','Obs'],r=>[r.dia,r.sala,r.responsable,r.observaciones])+renderTableCard('🧊 Temp. Refrigeradores',reg.refriTemp||[],['Día','Turno','Equipo','Temp°','Resp','Obs'],r=>[r.dia,r.turno,r.equipo,r.temperatura,r.responsable,r.observaciones])+renderTableCard('🧹 Limpieza Refrigeradores',reg.limpiezaRefri||[],['Día','Tipo','Equipo','Resp','Obs'],r=>[r.dia,r.tipo_mantencion,r.equipo,r.responsable,r.observaciones])+renderTableCard('💧 Conductividad',reg.conductividad||[],['Día','Turno','µS/cm','Resp','Obs'],r=>[r.dia,r.turno,r.conductividad,r.responsable,r.observaciones])}
 function renderTableCard(title,rows,headers,mapper){if(!rows.length)return`<div class="card card-sm" style="margin-bottom:16px;"><strong>${title}</strong><div style="color:var(--text-dim);font-size:13px;margin-top:8px;">Sin registros en este período.</div></div>`;const thead=`<tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr>`;const tbody=rows.map(r=>`<tr>${mapper(r).map(v=>`<td>${v??''}</td>`).join('')}</tr>`).join('');return`<div class="card" style="margin-bottom:16px;padding:16px 12px;"><strong style="font-family:'Outfit';font-size:15px;">${title}</strong><span style="color:var(--text-dim);font-size:12px;margin-left:8px;">${rows.length} registros</span><div class="records-table-wrap" style="margin-top:12px;"><table class="records-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table></div></div>`}
 
 // Modals
@@ -143,6 +143,7 @@ function switchQrTab(tab){
   const selGroup=document.getElementById('qr-select-group');
   // Reset QR display
   document.getElementById('qr-canvas-wrap').classList.remove('visible');
+  document.getElementById('qr-label-text').style.display='none';
   document.getElementById('qr-url-text').style.display='none';
   document.getElementById('btn-print-qr').style.display='none';
   if(tab==='conductividad'){
@@ -166,13 +167,13 @@ function generateQR(){
     url=`${base}?modulo=conductividad`;
     val='Conductividad del Agua';
   } else {
-    val=document.getElementById('admin-select').value;
-    if(!val)return;
-    if(state.qrTab==='areas')url=`${base}?area=${encodeURIComponent(val)}`;
-    else if(state.qrTab==='salas')url=`${base}?sala=${encodeURIComponent(val)}`;
-    else if(state.qrTab==='centrifugas'){if(val.includes('Preanálisis'))url=`${base}?grupo=preanalisis`;else url=`${base}?centrifuga=${encodeURIComponent(val)}`}
-    else if(state.qrTab==='refrigeradores')url=`${base}?refri=${encodeURIComponent(val)}`;
-    else if(state.qrTab==='refri-limpieza')url=`${base}?limprefri=${encodeURIComponent(val)}`;
+    const rawVal=document.getElementById('admin-select').value;
+    if(!rawVal)return;
+    if(state.qrTab==='areas'){url=`${base}?area=${encodeURIComponent(rawVal)}`; val=`Temperatura Ambiental - ${rawVal}`;}
+    else if(state.qrTab==='salas'){url=`${base}?sala=${encodeURIComponent(rawVal)}`; val=`Limpieza Mesones - ${rawVal}`;}
+    else if(state.qrTab==='centrifugas'){if(rawVal.includes('Preanálisis'))url=`${base}?grupo=preanalisis`;else url=`${base}?centrifuga=${encodeURIComponent(rawVal)}`; val=`Mantención Centrífugas - ${rawVal}`;}
+    else if(state.qrTab==='refrigeradores'){url=`${base}?refri=${encodeURIComponent(rawVal)}`; val=`Temperatura Refrigeradores - ${rawVal}`;}
+    else if(state.qrTab==='refri-limpieza'){url=`${base}?limprefri=${encodeURIComponent(rawVal)}`; val=`Limpieza Refrigeradores - ${rawVal}`;}
   }
   const wrap=document.getElementById('qr-canvas-wrap');
   const canvas=document.getElementById('qr-canvas');
@@ -180,12 +181,14 @@ function generateQR(){
   if(state.qrInstance)try{state.qrInstance.clear()}catch(e){}
   state.qrInstance=new QRCode(canvas,{text:url,width:220,height:220,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H});
   wrap.classList.add('visible');
+  document.getElementById('qr-label-text').textContent=val;
+  document.getElementById('qr-label-text').style.display='block';
   document.getElementById('qr-url-text').textContent=url;
   document.getElementById('qr-url-text').style.display='block';
   document.getElementById('btn-print-qr').style.display='inline-flex';
 }
 
-function printQR(){const val=document.getElementById('admin-select').value;const img=document.querySelector('#qr-canvas img');if(!img)return;const w=window.open('','_blank');w.document.write(`<!DOCTYPE html><html><head><title>QR - ${val}</title><style>body{font-family:sans-serif;text-align:center;padding:40px;}h2{margin-bottom:16px;}p{color:#555;font-size:13px;margin-top:12px;}</style></head><body><h2>Registros Mensuales</h2><h3>${val}</h3><img src="${img.src}" style="width:200px;height:200px;"/><p>Escanear para registrar</p><script>window.onload=()=>{window.print();}<\/script></body></html>`);w.document.close()}
+function printQR(){const val=document.getElementById('qr-label-text').textContent;const img=document.querySelector('#qr-canvas img');if(!img)return;const w=window.open('','_blank');w.document.write(`<!DOCTYPE html><html><head><title>QR - ${val}</title><style>body{font-family:sans-serif;text-align:center;padding:40px;}h2{margin-bottom:16px;}p{color:#555;font-size:13px;margin-top:12px;}</style></head><body><h2>Registros Mensuales</h2><h3>${val}</h3><img src="${img.src}" style="width:200px;height:200px;"/><p>Escanear para registrar</p><script>window.onload=()=>{window.print();}<\/script></body></html>`);w.document.close()}
 
 // Init
 async function init(){
