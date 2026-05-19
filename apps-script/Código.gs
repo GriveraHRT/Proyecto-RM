@@ -968,3 +968,28 @@ function reinitialize() {
   initializeSpreadsheet();
   return { success: true, message: 'Estructura re-inicializada.' };
 }
+
+function resetRegistros() {
+  const registroSheets = [
+    SHEETS.TERMO, SHEETS.CENT_REG, SHEETS.MESONES,
+    SHEETS.REFRI_REG, SHEETS.LIMP_REFRI, SHEETS.CONDUCT_REG,
+    SHEETS.REVISIONES
+  ];
+  const results = [];
+  registroSheets.forEach(function(name) {
+    const sheet = getSheet(name);
+    if (!sheet) { results.push(name + ': no encontrada'); return; }
+    const lastRow = sheet.getLastRow();
+    if (lastRow > 1) {
+      sheet.deleteRows(2, lastRow - 1);
+    }
+    results.push(name + ': limpiada (' + (lastRow - 1) + ' filas eliminadas)');
+  });
+  // Update Revisiones headers to new format
+  const revSheet = getSheet(SHEETS.REVISIONES);
+  if (revSheet) {
+    revSheet.getRange(1, 1, 1, 5).setValues([['Mes','Año','Registros','Revisor','Timestamp']]);
+    revSheet.getRange(1, 1, 1, 5).setBackground('#0F172A').setFontColor('#FFFFFF').setFontWeight('bold');
+  }
+  return { success: true, message: 'Registros limpiados', details: results };
+}
