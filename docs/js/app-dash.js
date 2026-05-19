@@ -6,17 +6,17 @@ document.getElementById('form-termo').addEventListener('submit',async e=>{
   setLoading('btn-termo-submit','spinner-termo','btn-termo-text',true);
   try{
     const r=await apiPost({action:'saveTermo',fecha:document.getElementById('termo-fecha').value,ampm:state.ampm,area:document.getElementById('termo-area').value,temperatura:document.getElementById('termo-temp').value,humedad:document.getElementById('termo-hum').value,responsable:document.getElementById('termo-resp').value,observaciones:document.getElementById('termo-obs').value,accion_correctiva:document.getElementById('termo-accion').value||''});
-    if(r.success){showToast('✅ '+r.message);e.target.reset();document.getElementById('termo-fecha').value=today();resetRangos();autoSetAmPm();checkUrlParams()}
+    if(r.success){showToast('✅ '+r.message);e.target.reset();document.getElementById('termo-fecha').value=today();resetRangos();autoSetAmPm();checkUrlParams();prefetchDashboard()}
     else showToast('❌ '+r.error,'error');
   }catch(err){showToast('❌ Error de conexión','error')}
   setLoading('btn-termo-submit','spinner-termo','btn-termo-text',false);
 });
 
 // Forms — Centrífugas
-document.getElementById('form-centrifugas').addEventListener('submit',async e=>{e.preventDefault();const sel=getSelectedChips('cent-chips');if(!sel.length){showToast('Seleccione al menos una centrífuga','error');return}setLoading('btn-cent-submit','spinner-cent','btn-cent-text',true);try{const r=await apiPost({action:'saveCentrifuga',fecha:document.getElementById('cent-fecha').value,centrifugas:sel,responsable:document.getElementById('cent-resp').value,tipo_mantencion:document.getElementById('cent-tipo').value,observaciones:document.getElementById('cent-obs').value});if(r.success){showToast('✅ '+r.message);e.target.reset();document.getElementById('cent-fecha').value=today();document.getElementById('cent-tipo').value='Diaria';updateInfoCentrifuga();document.querySelectorAll('#cent-chips .chip-item').forEach(c=>c.classList.remove('selected'));document.getElementById('btn-grupo-preanalisis').classList.remove('active')}else showToast('❌ '+r.error,'error')}catch(err){showToast('❌ Error de conexión','error')}setLoading('btn-cent-submit','spinner-cent','btn-cent-text',false)});
+document.getElementById('form-centrifugas').addEventListener('submit',async e=>{e.preventDefault();const sel=getSelectedChips('cent-chips');if(!sel.length){showToast('Seleccione al menos una centrífuga','error');return}setLoading('btn-cent-submit','spinner-cent','btn-cent-text',true);try{const r=await apiPost({action:'saveCentrifuga',fecha:document.getElementById('cent-fecha').value,centrifugas:sel,responsable:document.getElementById('cent-resp').value,tipo_mantencion:document.getElementById('cent-tipo').value,observaciones:document.getElementById('cent-obs').value});if(r.success){showToast('✅ '+r.message);e.target.reset();document.getElementById('cent-fecha').value=today();document.getElementById('cent-tipo').value='Diaria';updateInfoCentrifuga();document.querySelectorAll('#cent-chips .chip-item').forEach(c=>c.classList.remove('selected'));document.getElementById('btn-grupo-preanalisis').classList.remove('active');prefetchDashboard()}else showToast('❌ '+r.error,'error')}catch(err){showToast('❌ Error de conexión','error')}setLoading('btn-cent-submit','spinner-cent','btn-cent-text',false)});
 
 // Forms — Mesones
-document.getElementById('form-mesones').addEventListener('submit',async e=>{e.preventDefault();const sel=getSelectedChips('meson-chips');if(!sel.length){showToast('Seleccione al menos una sala','error');return}setLoading('btn-meson-submit','spinner-meson','btn-meson-text',true);try{const r=await apiPost({action:'saveMesones',fecha:document.getElementById('meson-fecha').value,salas:sel,responsable:document.getElementById('meson-resp').value,observaciones:document.getElementById('meson-obs').value});if(r.success){showToast('✅ '+r.message);e.target.reset();document.getElementById('meson-fecha').value=today();document.querySelectorAll('#meson-chips .chip-item').forEach(c=>c.classList.remove('selected'))}else showToast('❌ '+r.error,'error')}catch(err){showToast('❌ Error de conexión','error')}setLoading('btn-meson-submit','spinner-meson','btn-meson-text',false)});
+document.getElementById('form-mesones').addEventListener('submit',async e=>{e.preventDefault();const sel=getSelectedChips('meson-chips');if(!sel.length){showToast('Seleccione al menos una sala','error');return}setLoading('btn-meson-submit','spinner-meson','btn-meson-text',true);try{const r=await apiPost({action:'saveMesones',fecha:document.getElementById('meson-fecha').value,salas:sel,responsable:document.getElementById('meson-resp').value,observaciones:document.getElementById('meson-obs').value});if(r.success){showToast('✅ '+r.message);e.target.reset();document.getElementById('meson-fecha').value=today();document.querySelectorAll('#meson-chips .chip-item').forEach(c=>c.classList.remove('selected'));prefetchDashboard()}else showToast('❌ '+r.error,'error')}catch(err){showToast('❌ Error de conexión','error')}setLoading('btn-meson-submit','spinner-meson','btn-meson-text',false)});
 
 // Forms — Temp Refrigeradores
 document.getElementById('form-refri-temp').addEventListener('submit',async e=>{
@@ -26,14 +26,14 @@ document.getElementById('form-refri-temp').addEventListener('submit',async e=>{
   setLoading('btn-refri-submit','spinner-refri','btn-refri-text',true);
   try{
     const r=await apiPost({action:'saveRefriTemp',fecha:document.getElementById('refri-fecha').value,ampm:state.ampmRefri,equipo:document.getElementById('refri-equipo').value,temperatura:document.getElementById('refri-temp-input').value,responsable:document.getElementById('refri-resp').value,observaciones:document.getElementById('refri-obs').value,accion_correctiva:document.getElementById('refri-accion').value||''});
-    if(r.success){showToast('✅ '+r.message);e.target.reset();document.getElementById('refri-fecha').value=today();resetRangoRefri();autoSetAmPm()}
+    if(r.success){showToast('✅ '+r.message);e.target.reset();document.getElementById('refri-fecha').value=today();resetRangoRefri();autoSetAmPm();prefetchDashboard()}
     else showToast('❌ '+r.error,'error');
   }catch(err){showToast('❌ Error de conexión','error')}
   setLoading('btn-refri-submit','spinner-refri','btn-refri-text',false);
 });
 
 // Forms — Limpieza Refrigeradores
-document.getElementById('form-limp-refri').addEventListener('submit',async e=>{e.preventDefault();const sel=getSelectedChips('limp-refri-chips');if(!sel.length){showToast('Seleccione al menos un equipo','error');return}setLoading('btn-limp-refri-submit','spinner-limp-refri','btn-limp-refri-text',true);try{const r=await apiPost({action:'saveLimpiezaRefri',fecha:document.getElementById('limp-refri-fecha').value,equipos:sel,responsable:document.getElementById('limp-refri-resp').value,tipo_mantencion:document.getElementById('limp-refri-tipo').value,observaciones:document.getElementById('limp-refri-obs').value});if(r.success){showToast('✅ '+r.message);e.target.reset();document.getElementById('limp-refri-fecha').value=today();document.getElementById('limp-refri-tipo').value='Semanal (externa)';updateInfoLimpRefri();document.querySelectorAll('#limp-refri-chips .chip-item').forEach(c=>c.classList.remove('selected'))}else showToast('❌ '+r.error,'error')}catch(err){showToast('❌ Error de conexión','error')}setLoading('btn-limp-refri-submit','spinner-limp-refri','btn-limp-refri-text',false)});
+document.getElementById('form-limp-refri').addEventListener('submit',async e=>{e.preventDefault();const sel=getSelectedChips('limp-refri-chips');if(!sel.length){showToast('Seleccione al menos un equipo','error');return}setLoading('btn-limp-refri-submit','spinner-limp-refri','btn-limp-refri-text',true);try{const r=await apiPost({action:'saveLimpiezaRefri',fecha:document.getElementById('limp-refri-fecha').value,equipos:sel,responsable:document.getElementById('limp-refri-resp').value,tipo_mantencion:document.getElementById('limp-refri-tipo').value,observaciones:document.getElementById('limp-refri-obs').value});if(r.success){showToast('✅ '+r.message);e.target.reset();document.getElementById('limp-refri-fecha').value=today();document.getElementById('limp-refri-tipo').value='Semanal (externa)';updateInfoLimpRefri();document.querySelectorAll('#limp-refri-chips .chip-item').forEach(c=>c.classList.remove('selected'));prefetchDashboard()}else showToast('❌ '+r.error,'error')}catch(err){showToast('❌ Error de conexión','error')}setLoading('btn-limp-refri-submit','spinner-limp-refri','btn-limp-refri-text',false)});
 
 // Forms — Conductividad
 document.getElementById('form-conductividad').addEventListener('submit',async e=>{
@@ -41,7 +41,7 @@ document.getElementById('form-conductividad').addEventListener('submit',async e=
   setLoading('btn-conduct-submit','spinner-conduct','btn-conduct-text',true);
   try{
     const r=await apiPost({action:'saveConductividad',fecha:document.getElementById('conduct-fecha').value,ampm:state.ampmConduct,conductividad:document.getElementById('conduct-valor').value,responsable:document.getElementById('conduct-resp').value,observaciones:document.getElementById('conduct-obs').value});
-    if(r.success){showToast('✅ '+r.message);e.target.reset();document.getElementById('conduct-fecha').value=today();resetRangoConductividad();autoSetAmPm()}
+    if(r.success){showToast('✅ '+r.message);e.target.reset();document.getElementById('conduct-fecha').value=today();resetRangoConductividad();autoSetAmPm();prefetchDashboard()}
     else showToast('❌ '+r.error,'error');
   }catch(err){showToast('❌ Error de conexión','error')}
   setLoading('btn-conduct-submit','spinner-conduct','btn-conduct-text',false);
@@ -49,11 +49,41 @@ document.getElementById('form-conductividad').addEventListener('submit',async e=
 
 // Dashboard
 function initDashSelectors(){const ms=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];const opts=ms.map((m,i)=>`<option value="${i+1}"${i+1===state.dashMes?' selected':''}>${m}</option>`).join('');document.getElementById('dash-mes').innerHTML=opts;const y=new Date().getFullYear();const yOpts=[y-1,y,y+1].map(a=>`<option value="${a}"${a===state.dashAnio?' selected':''}>${a}</option>`).join('');document.getElementById('dash-anio').innerHTML=yOpts}
-function cambiarMes(d){state.dashMes+=d;if(state.dashMes>12){state.dashMes=1;state.dashAnio++}if(state.dashMes<1){state.dashMes=12;state.dashAnio--}initDashSelectors();loadDashboard()}
+function cambiarMes(d){state.dashMes+=d;if(state.dashMes>12){state.dashMes=1;state.dashAnio++}if(state.dashMes<1){state.dashMes=12;state.dashAnio--}initDashSelectors();loadDashboard(true)}
 function switchDashTab(t){state.dashTab=t;document.getElementById('tab-diario').classList.toggle('active',t==='diario');document.getElementById('tab-mensual').classList.toggle('active',t==='mensual');document.getElementById('dash-daily-view').style.display=t==='diario'?'':'none';document.getElementById('dash-monthly-view').style.display=t==='mensual'?'':'none';if(state.dashData)renderDashContent(state.dashData)}
 function getDiasHasta(m,a){const h=new Date();const d=new Date(a,m,0).getDate();return(a===h.getFullYear()&&m===(h.getMonth()+1))?h.getDate():d}
 
-async function loadDashboard(){state.dashMes=parseInt(document.getElementById('dash-mes').value);state.dashAnio=parseInt(document.getElementById('dash-anio').value);document.getElementById('dash-loading').style.display='block';document.getElementById('dash-tables').innerHTML='';document.getElementById('dash-alerts-container').innerHTML='';document.getElementById('dash-daily-view').innerHTML='';document.getElementById('dash-monthly-view').innerHTML='';try{const[reg,rev]=await Promise.all([apiGet({action:'getRegistros',mes:state.dashMes,anio:state.dashAnio}),apiGet({action:'getRevisiones',mes:state.dashMes,anio:state.dashAnio})]);if(!state.dashMaestros){try{state.dashMaestros=await apiGet({action:'getMaestros'})}catch(e){state.dashMaestros={areas:state.areas,centrifugas:state.centrifugas,salas:state.salas,refrigeradores:state.refrigeradores,refriLimpieza:state.refriLimpieza}}}state.dashData=reg;document.getElementById('stat-termo').textContent=reg.termo.length;document.getElementById('stat-cent').textContent=reg.centrifugas.length;document.getElementById('stat-limp').textContent=reg.mesones.length;document.getElementById('stat-refri').textContent=(reg.refriTemp||[]).length;document.getElementById('stat-limp-refri').textContent=(reg.limpiezaRefri||[]).length;document.getElementById('stat-conduct').textContent=(reg.conductividad||[]).length;renderRevisionBadge(rev);renderDashContent(reg);renderTables(reg)}catch(err){showToast('❌ Error cargando dashboard','error')}document.getElementById('dash-loading').style.display='none'}
+async function loadDashboard(forceReload){
+  state.dashMes=parseInt(document.getElementById('dash-mes').value);
+  state.dashAnio=parseInt(document.getElementById('dash-anio').value);
+  const cacheKey=state.dashMes+'-'+state.dashAnio;
+  // Use cache if valid (<5min) and same month, unless forced
+  if(!forceReload&&state.dashCache&&state.dashCache.key===cacheKey&&getCacheAge()<5){
+    const reg=state.dashCache.data;state.dashData=reg;
+    if(!state.dashMaestros)state.dashMaestros={areas:state.areas,centrifugas:state.centrifugas,salas:state.salas,refrigeradores:state.refrigeradores,refriLimpieza:state.refriLimpieza};
+    applyDashData(reg);updateCacheIndicator();return;
+  }
+  document.getElementById('dash-loading').style.display='block';
+  document.getElementById('dash-tables').innerHTML='';document.getElementById('dash-alerts-container').innerHTML='';
+  document.getElementById('dash-daily-view').innerHTML='';document.getElementById('dash-monthly-view').innerHTML='';
+  try{
+    const[reg,rev]=await Promise.all([apiGet({action:'getRegistros',mes:state.dashMes,anio:state.dashAnio}),apiGet({action:'getRevisiones',mes:state.dashMes,anio:state.dashAnio})]);
+    if(!state.dashMaestros){try{state.dashMaestros=await apiGet({action:'getMaestros'})}catch(e){state.dashMaestros={areas:state.areas,centrifugas:state.centrifugas,salas:state.salas,refrigeradores:state.refrigeradores,refriLimpieza:state.refriLimpieza}}}
+    state.dashData=reg;
+    state.dashCache={key:cacheKey,data:reg,rev:rev,timestamp:Date.now()};
+    applyDashData(reg);
+  }catch(err){showToast('❌ Error cargando dashboard','error')}
+  document.getElementById('dash-loading').style.display='none';updateCacheIndicator();
+}
+function applyDashData(reg){
+  document.getElementById('stat-termo').textContent=reg.termo.length;
+  document.getElementById('stat-cent').textContent=reg.centrifugas.length;
+  document.getElementById('stat-limp').textContent=reg.mesones.length;
+  document.getElementById('stat-refri').textContent=(reg.refriTemp||[]).length;
+  document.getElementById('stat-limp-refri').textContent=(reg.limpiezaRefri||[]).length;
+  document.getElementById('stat-conduct').textContent=(reg.conductividad||[]).length;
+  renderDashContent(reg);renderTables(reg);
+}
 
 function renderDashContent(reg){if(state.dashTab==='diario')renderDailyView(reg);else renderMonthlyView(reg)}
 
@@ -96,42 +126,72 @@ html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-
 ['Mañana','Tarde'].forEach(turno=>{const dias=new Set((reg.conductividad||[]).filter(r=>r.turno===turno).map(r=>parseInt(r.dia)));let miss=0;let chips='';for(let d=1;d<=dh;d++){const ok=dias.has(d);if(!ok)miss++;chips+=`<span class="day-chip ${ok?'chip-ok':'chip-missing'}">${d}</span>`}html+=`<div style="font-size:11px;color:var(--text-dim);margin:4px 0 2px;">${turno} ${miss?'('+miss+' faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`});html+='</div>';
 document.getElementById('dash-monthly-view').innerHTML=html}
 
-function renderRevisionBadge(rev){
-  const b=document.getElementById('revision-badge');
-  if(rev.estado==='revisado'){b.className='revision-badge badge-revisado';b.textContent='✅ Revisado'}
-  else{b.className='revision-badge badge-pendiente';b.textContent='⏳ Pendiente'}
-}
-
 function renderTables(reg){const c=document.getElementById('dash-tables');c.innerHTML=renderTableCard('🌡️ Temp. Ambiental',reg.termo,['Día','Turno','Área','Temp°','Hum%','Resp','Acción','Obs'],r=>[r.dia,r.turno,r.area,r.temperatura,r.humedad,r.responsable,r.accion_correctiva||'',r.observaciones])+renderTableCard('⚙️ Centrífugas',reg.centrifugas,['Día','Centrífuga','Resp','Tipo','Obs'],r=>[r.dia,r.centrifuga,r.responsable,r.tipo_mantencion,r.observaciones])+renderTableCard('🧽 Mesones',reg.mesones,['Día','Sala','Resp','Obs'],r=>[r.dia,r.sala,r.responsable,r.observaciones])+renderTableCard('🧊 Temp. Refrigeradores',reg.refriTemp||[],['Día','Turno','Equipo','Temp°','Resp','Obs'],r=>[r.dia,r.turno,r.equipo,r.temperatura,r.responsable,r.observaciones])+renderTableCard('🧹 Limpieza Refrigeradores',reg.limpiezaRefri||[],['Día','Tipo','Equipo','Resp','Obs'],r=>[r.dia,r.tipo_mantencion,r.equipo,r.responsable,r.observaciones])+renderTableCard('💧 Conductividad',reg.conductividad||[],['Día','Turno','µS/cm','Resp','Obs'],r=>[r.dia,r.turno,r.conductividad,r.responsable,r.observaciones])}
 function renderTableCard(title,rows,headers,mapper){if(!rows.length)return`<div class="card card-sm" style="margin-bottom:16px;"><strong>${title}</strong><div style="color:var(--text-dim);font-size:13px;margin-top:8px;">Sin registros en este período.</div></div>`;const thead=`<tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr>`;const tbody=rows.map(r=>`<tr>${mapper(r).map(v=>`<td>${v??''}</td>`).join('')}</tr>`).join('');return`<div class="card" style="margin-bottom:16px;padding:16px 12px;"><strong style="font-family:'Outfit';font-size:15px;">${title}</strong><span style="color:var(--text-dim);font-size:12px;margin-left:8px;">${rows.length} registros</span><div class="records-table-wrap" style="margin-top:12px;"><table class="records-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table></div></div>`}
 
 // Modals
-function initModalSelectors(){
-  const ms=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-  const opts=ms.map((m,i)=>`<option value="${i+1}"${i+1===state.dashMes?' selected':''}>${m}</option>`).join('');
-  document.getElementById('modal-mes2').innerHTML=opts;
-  const y=new Date().getFullYear();
-  const yO=[y-1,y,y+1].map(a=>`<option value="${a}"${a===state.dashAnio?' selected':''}>${a}</option>`).join('');
-  document.getElementById('modal-anio2').innerHTML=yO;
-}
-function openModalRevisado(){initModalSelectors();document.querySelectorAll('.modal-card').forEach(m=>m.style.display='none');document.getElementById('modal-revisado').style.display='block';document.getElementById('modal-overlay').classList.add('active');document.getElementById('modal-error2').classList.remove('visible')}
 function closeModal(e){if(e&&e.target!==document.getElementById('modal-overlay'))return;document.getElementById('modal-overlay').classList.remove('active')}
 
-async function submitRevisado(){
-  const pwd=document.getElementById('modal-pwd2').value;
-  const mes=document.getElementById('modal-mes2').value;
-  const anio=document.getElementById('modal-anio2').value;
-  const err=document.getElementById('modal-error2');
-  err.classList.remove('visible');
-  document.getElementById('spinner-rev2').classList.add('visible');
-  document.getElementById('btn-rev2-text').style.display='none';
+// Admin — Revisión granular
+function initRevAdminSelectors(){
+  const ms=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const mesEl=document.getElementById('rev-admin-mes');
+  const anioEl=document.getElementById('rev-admin-anio');
+  if(!mesEl||!anioEl)return;
+  mesEl.innerHTML=ms.map((m,i)=>`<option value="${i+1}"${i+1===state.dashMes?' selected':''}>${m}</option>`).join('');
+  const y=new Date().getFullYear();
+  anioEl.innerHTML=[y-1,y,y+1].map(a=>`<option value="${a}"${a===state.dashAnio?' selected':''}>${a}</option>`).join('');
+  loadRevStatus();
+}
+function toggleAllRevChips(){
+  const chips=document.querySelectorAll('#rev-chips .chip-item');
+  const allSelected=Array.from(chips).every(c=>c.classList.contains('selected'));
+  chips.forEach(c=>{if(allSelected)c.classList.remove('selected');else c.classList.add('selected')});
+  const btn=document.getElementById('btn-rev-select-all');
+  btn.classList.toggle('active',!allSelected);
+}
+async function loadRevStatus(){
+  const mes=document.getElementById('rev-admin-mes').value;
+  const anio=document.getElementById('rev-admin-anio').value;
+  const panel=document.getElementById('rev-status-panel');
   try{
-    const r=await apiPost({action:'marcarRevisado',password:pwd,mes,anio});
-    if(r.success){showToast('✅ '+r.message);closeModal({target:document.getElementById('modal-overlay')});loadDashboard()}
-    else{err.textContent=r.error;err.classList.add('visible')}
-  }catch(e){err.textContent='Error de conexión.';err.classList.add('visible')}
-  document.getElementById('spinner-rev2').classList.remove('visible');
-  document.getElementById('btn-rev2-text').style.display='';
+    const rev=await apiGet({action:'getRevisiones',mes:mes,anio:anio});
+    const revisados=rev.revisados||[];
+    const ALL_TYPES=[{key:'termo',name:'🌡️ Temp. Ambiental'},{key:'centrifugas',name:'⚙️ Centrífugas'},{key:'mesones',name:'🧽 Mesones'},{key:'refriTemp',name:'🧊 Temp. Refri.'},{key:'limpRefri',name:'🧹 Limp. Refri.'},{key:'conductividad',name:'💧 Conductividad'}];
+    let html='<div class="rev-status-title">Estado de revisión del mes</div><div class="status-grid">';
+    ALL_TYPES.forEach(t=>{
+      const done=revisados.indexOf(t.key)!==-1;
+      html+=`<div class="status-item ${done?'done':'miss'}"><span class="status-dot ${done?'green':'red'}"></span>${t.name}</div>`;
+    });
+    html+='</div>';panel.innerHTML=html;panel.style.display='block';
+  }catch(e){panel.style.display='none';}
+}
+async function submitRevisadoAdmin(){
+  const registros=getSelectedChips('rev-chips');
+  const revisor=document.getElementById('rev-admin-revisor').value;
+  const pwd=document.getElementById('rev-admin-pwd').value;
+  const mes=document.getElementById('rev-admin-mes').value;
+  const anio=document.getElementById('rev-admin-anio').value;
+  const err=document.getElementById('rev-admin-error');
+  err.classList.remove('visible');
+  if(!registros.length){err.textContent='Seleccione al menos un registro.';err.classList.add('visible');return;}
+  if(!revisor||revisor.length<2){err.textContent='Ingrese las iniciales del revisor (mín. 2 caracteres).';err.classList.add('visible');return;}
+  if(!pwd){err.textContent='Ingrese la contraseña.';err.classList.add('visible');return;}
+  document.getElementById('spinner-rev-admin').classList.add('visible');
+  document.getElementById('btn-rev-admin-text').style.display='none';
+  try{
+    const r=await apiPost({action:'marcarRevisado',password:pwd,mes:mes,anio:anio,registros:registros,revisor:revisor});
+    if(r.success){
+      showToast('✅ '+r.message);
+      document.getElementById('rev-admin-pwd').value='';
+      document.querySelectorAll('#rev-chips .chip-item').forEach(c=>c.classList.remove('selected'));
+      document.getElementById('btn-rev-select-all').classList.remove('active');
+      state.dashCache=null; // invalidate cache
+      loadRevStatus();
+    } else{err.textContent=r.error;err.classList.add('visible');}
+  }catch(e){err.textContent='Error de conexión.';err.classList.add('visible');}
+  document.getElementById('spinner-rev-admin').classList.remove('visible');
+  document.getElementById('btn-rev-admin-text').style.display='';
 }
 
 // QR

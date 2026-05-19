@@ -1,6 +1,6 @@
 const API_URL='https://script.google.com/macros/s/AKfycbxuqcui0-hjJ721uMWZk3w-4l2fVCaBWQgdMJqVMb5Pno339Jqetq4r62p3-1gGBUvFOg/exec';
 const PREANALISIS=[1,2,3,4,5,18];
-const state={areas:[],centrifugas:[],salas:[],acciones:[],refrigeradores:[],refriLimpieza:[],ampm:'AM',ampmRefri:'AM',ampmConduct:'AM',qrInstance:null,qrTab:'areas',dashMes:new Date().getMonth()+1,dashAnio:new Date().getFullYear(),dashTab:'diario',dashData:null,dashMaestros:null};
+const state={areas:[],centrifugas:[],salas:[],acciones:[],refrigeradores:[],refriLimpieza:[],ampm:'AM',ampmRefri:'AM',ampmConduct:'AM',qrInstance:null,qrTab:'areas',dashMes:new Date().getMonth()+1,dashAnio:new Date().getFullYear(),dashTab:'diario',dashData:null,dashMaestros:null,dashCache:null};
 
 function today(){return new Date().toISOString().split('T')[0]}
 function showToast(m,t='success'){const el=document.getElementById('toast');el.textContent=m;el.className=`show toast-${t}`;setTimeout(()=>{el.className=''},3200)}
@@ -17,7 +17,7 @@ function toggleTheme(){const d=document.documentElement,dark=d.getAttribute('dat
 (function(){const t=localStorage.getItem('theme');if(t==='dark'){document.documentElement.setAttribute('data-theme','dark');document.getElementById('theme-toggle').textContent='🌙';document.querySelector('meta[name="theme-color"]').content='#0B1426'}})();
 
 // Navigation
-function navigateTo(s){document.querySelectorAll('.section').forEach(el=>el.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));document.getElementById('section-'+s).classList.add('active');document.querySelector(`[data-section="${s}"]`).classList.add('active');if(s==='dashboard')loadDashboard()}
+function navigateTo(s){document.querySelectorAll('.section').forEach(el=>el.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));document.getElementById('section-'+s).classList.add('active');document.querySelector(`[data-section="${s}"]`).classList.add('active');if(s==='dashboard')loadDashboard();if(s==='admin')initRevAdminSelectors()}
 
 // AM/PM — Termo (ambiental)
 function setAmPm(v){state.ampm=v;document.getElementById('btn-am').className='ampm-btn'+(v==='AM'?' selected-AM':'');document.getElementById('btn-pm').className='ampm-btn'+(v==='PM'?' selected-PM':'')}
@@ -177,3 +177,28 @@ function toggleGrupoPreanalisis(){const btn=document.getElementById('btn-grupo-p
 
 // URL params
 function checkUrlParams(){const p=new URLSearchParams(window.location.search);const area=p.get('area'),sala=p.get('sala'),cent=p.get('centrifuga'),grupo=p.get('grupo'),refri=p.get('refri'),limprefri=p.get('limprefri'),modulo=p.get('modulo');if(area){document.getElementById('area-prefill-name').textContent=area;document.getElementById('area-prefill-indicator').style.display='block';const w=setInterval(()=>{const s=document.getElementById('termo-area');if(Array.from(s.options).find(o=>o.value===area)){s.value=area;clearInterval(w)}},300);navigateTo('termo')}if(sala){const w=setInterval(()=>{const chips=document.querySelectorAll('#meson-chips .chip-item');if(chips.length){chips.forEach(c=>{if(c.dataset.value===sala)c.classList.add('selected')});clearInterval(w)}},300);navigateTo('mesones')}if(cent){const w=setInterval(()=>{const chips=document.querySelectorAll('#cent-chips .chip-item');if(chips.length){chips.forEach(c=>{if(c.dataset.value===cent)c.classList.add('selected')});clearInterval(w)}},300);navigateTo('centrifugas')}if(grupo==='preanalisis'){const w=setInterval(()=>{const chips=document.querySelectorAll('#cent-chips .chip-item');if(chips.length){document.getElementById('btn-grupo-preanalisis').classList.add('active');chips.forEach(c=>{if(PREANALISIS.includes(centNum(c.dataset.value)))c.classList.add('selected')});clearInterval(w)}},300);navigateTo('centrifugas')}if(refri){const w=setInterval(()=>{const s=document.getElementById('refri-equipo');if(Array.from(s.options).find(o=>o.value===refri)){s.value=refri;checkRangoRefri();clearInterval(w)}},300);navigateTo('refri-temp')}if(limprefri){const w=setInterval(()=>{const chips=document.querySelectorAll('#limp-refri-chips .chip-item');if(chips.length){chips.forEach(c=>{if(c.dataset.value===limprefri)c.classList.add('selected')});clearInterval(w)}},300);navigateTo('limp-refri')}if(modulo==='conductividad'){navigateTo('conductividad')}}
+
+// Dashboard cache & prefetch
+function prefetchDashboard(){
+  const mes=state.dashMes,anio=state.dashAnio;
+  const key=mes+'-'+anio;
+  Promise.all([apiGet({action:'getRegistros',mes:mes,anio:anio}),apiGet({action:'getRevisiones',mes:mes,anio:anio})]).then(function(results){
+    const reg=results[0],rev=results[1];
+    state.dashCache={key:key,data:reg,rev:rev,timestamp:Date.now()};
+  }).catch(function(){/* silent fail */});
+}
+function getCacheAge(){
+  if(!state.dashCache)return Infinity;
+  return(Date.now()-state.dashCache.timestamp)/1000/60; // minutes
+}
+function updateCacheIndicator(){
+  const el=document.getElementById('dash-cache-indicator');
+  if(!el)return;
+  if(!state.dashCache){el.style.display='none';return;}
+  const mins=Math.round(getCacheAge());
+  if(mins<1){el.textContent='✓ Actualizado';el.className='cache-indicator cache-fresh'}
+  else if(mins<5){el.textContent='hace '+mins+' min';el.className='cache-indicator cache-fresh'}
+  else{el.textContent='hace '+mins+' min';el.className='cache-indicator cache-stale'}
+  el.style.display='inline-block';
+}
+

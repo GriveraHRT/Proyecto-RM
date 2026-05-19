@@ -58,10 +58,11 @@
     <!-- Month Picker -->
     <div class="month-picker">
       <button class="month-nav-btn" onclick="cambiarMes(-1)">◀</button>
-      <select id="dash-mes" class="form-control" onchange="loadDashboard()" style="background:transparent;border:none;padding:0;font-size:16px;font-weight:700;"></select>
-      <select id="dash-anio" class="form-control" onchange="loadDashboard()" style="background:transparent;border:none;padding:0;font-size:15px;width:70px;"></select>
+      <select id="dash-mes" class="form-control" onchange="loadDashboard(true)" style="background:transparent;border:none;padding:0;font-size:16px;font-weight:700;"></select>
+      <select id="dash-anio" class="form-control" onchange="loadDashboard(true)" style="background:transparent;border:none;padding:0;font-size:15px;width:70px;"></select>
       <button class="month-nav-btn" onclick="cambiarMes(1)">▶</button>
-      <button class="month-nav-btn" onclick="loadDashboard()" title="Recargar">🔄</button>
+      <button class="month-nav-btn" onclick="loadDashboard(true)" title="Recargar">🔄</button>
+      <span id="dash-cache-indicator" class="cache-indicator" style="display:none;"></span>
     </div>
 
     <!-- Tabs Diario/Mensual -->
@@ -107,16 +108,7 @@
     <!-- Alertas faltantes -->
     <div id="dash-alerts-container"></div>
 
-    <!-- Estado de revisión -->
-    <div class="card card-sm" style="margin-bottom:16px;">
-      <div style="display:flex; flex-direction:column; gap:12px;">
-        <div style="display:flex; align-items:center; justify-content:space-between;">
-          <div style="font-size:12px;color:var(--text-dim);font-weight:700;text-transform:uppercase;letter-spacing:0.6px;">Estado del Mes</div>
-          <span class="revision-badge" id="revision-badge">⏳ Pendiente</span>
-        </div>
-        <button class="btn btn-success btn-sm" onclick="openModalRevisado()">★ Marcar como Revisado</button>
-      </div>
-    </div>
+
 
     <!-- Spinner carga -->
     <div id="dash-loading" style="text-align:center;padding:40px;display:none;">
@@ -560,6 +552,64 @@
         Al escanear, el formulario correspondiente se abrirá con el ítem pre-seleccionado.
       </div>
     </div>
+
+    <!-- ── Sección: Marcar como Revisado ─────────────────── -->
+    <div class="card" style="margin-top:20px;">
+      <div class="revision-admin-header">
+        <span class="revision-admin-icon">🏆</span>
+        <div>
+          <div class="revision-admin-title">Marcar Registros como Revisados</div>
+          <div class="revision-admin-subtitle">Seleccione qué registros desea confirmar como revisados</div>
+        </div>
+      </div>
+
+      <div class="form-row" style="margin-bottom:12px;">
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Mes</label>
+          <select id="rev-admin-mes" class="form-control" onchange="loadRevStatus()"></select>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Año</label>
+          <select id="rev-admin-anio" class="form-control" onchange="loadRevStatus()"></select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Registros a revisar</label>
+        <button type="button" class="chip-group-btn" id="btn-rev-select-all" onclick="toggleAllRevChips()">
+          ✅ Seleccionar todos
+        </button>
+        <div class="chip-grid" id="rev-chips" style="margin-top:8px;">
+          <div class="chip-item" data-value="termo" onclick="toggleChip(this)">🌡️ Temp. Ambiental</div>
+          <div class="chip-item" data-value="centrifugas" onclick="toggleChip(this)">⚙️ Centrífugas</div>
+          <div class="chip-item" data-value="mesones" onclick="toggleChip(this)">🧽 Mesones</div>
+          <div class="chip-item" data-value="refriTemp" onclick="toggleChip(this)">🧊 Temp. Refrigeradores</div>
+          <div class="chip-item" data-value="limpRefri" onclick="toggleChip(this)">🧹 Limp. Refrigeradores</div>
+          <div class="chip-item" data-value="conductividad" onclick="toggleChip(this)">💧 Conductividad</div>
+        </div>
+      </div>
+
+      <div id="rev-status-panel" class="rev-status-panel" style="display:none;"></div>
+
+      <div class="form-group">
+        <label class="form-label" for="rev-admin-revisor">Revisor (iniciales)</label>
+        <input type="text" id="rev-admin-revisor" class="form-control"
+          placeholder="ABC" maxlength="3"
+          style="text-transform:uppercase; letter-spacing:3px; font-weight:700; font-size:18px;" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="rev-admin-pwd">Contraseña de Revisión</label>
+        <input type="password" id="rev-admin-pwd" class="form-control" placeholder="••••••" />
+      </div>
+
+      <div id="rev-admin-error" class="alert-banner alert-danger" style="margin-bottom:12px;"></div>
+
+      <button class="btn btn-success" onclick="submitRevisadoAdmin()">
+        <div class="spinner" id="spinner-rev-admin"></div>
+        <span id="btn-rev-admin-text">★ Confirmar Revisión</span>
+      </button>
+    </div>
   </section>
 
 </main>
@@ -602,31 +652,6 @@
 
 <!-- ══ MODALES ═══════════════════════════════════════════════ -->
 <div id="modal-overlay" onclick="closeModal(event)">
-
-  <!-- Modal: Revisado -->
-  <div class="modal-card" id="modal-revisado" style="display:none;" onclick="event.stopPropagation()">
-    <button class="modal-close" onclick="closeModal()">✕</button>
-    <div class="modal-title">🏆 Confirmar Registros Como Revisados</div>
-    <div class="form-row" style="margin-bottom:12px;">
-      <div class="form-group" style="margin-bottom:0;">
-        <label class="form-label">Mes</label>
-        <select id="modal-mes2" class="form-control"></select>
-      </div>
-      <div class="form-group" style="margin-bottom:0;">
-        <label class="form-label">Año</label>
-        <select id="modal-anio2" class="form-control"></select>
-      </div>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Contraseña de Revisión</label>
-      <input type="password" id="modal-pwd2" class="form-control" placeholder="••••••" />
-    </div>
-    <div id="modal-error2" class="alert-banner alert-danger" style="margin-bottom:12px;"></div>
-    <button class="btn btn-success" onclick="submitRevisado()">
-      <div class="spinner" id="spinner-rev2"></div>
-      <span id="btn-rev2-text">Confirmar Revisión</span>
-    </button>
-  </div>
 
   <!-- Modal: Valores Fuera de Rango -->
   <div class="modal-card" id="modal-out-of-range" style="display:none;" onclick="event.stopPropagation()">

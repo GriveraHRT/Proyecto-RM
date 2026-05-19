@@ -12,6 +12,22 @@ const EMAIL_ALERTS = {
   conductividad:  'grivera@hospitaldetalca.cl'  // Cambiar cuando se defina el destinatario
 };
 
+// Configuración de mantenciones semanales (escalable: agregar nuevas aquí)
+const MANTENCIONES_SEMANALES = [
+  {
+    nombre: 'Centrífugas (Semanal)',
+    hoja: 'Reg. Centrífugas',
+    colFecha: 0,        // columna de Fecha (0-indexed)
+    filtro: function(row) { return String(row[6]).trim() === 'Semanal'; } // col 6 = Tipo Mantención
+  },
+  {
+    nombre: 'Limpieza Refrigeradores (Semanal externa)',
+    hoja: 'Reg. Limpieza Refrigeradores',
+    colFecha: 0,
+    filtro: function(row) { return String(row[4]).trim() === 'Semanal (externa)'; } // col 4 = Tipo Mantención
+  }
+];
+
 const SHEETS = {
   TERMO:            'Reg. Temp./Humedad',
   CENT_REG:         'Reg. Centrífugas',
@@ -449,15 +465,22 @@ function getRegistros(mes, anio) {
 
 function getRevision(mes, anio) {
   const rows = getSheet(SHEETS.REVISIONES).getDataRange().getValues();
+  // Collect all revision entries for this month/year
+  const revisiones = [];
   for (let i = 1; i < rows.length; i++) {
     if (parseInt(rows[i][0]) === parseInt(mes) && parseInt(rows[i][1]) === parseInt(anio)) {
-      return {
-        mes: rows[i][0], anio: rows[i][1], estado: rows[i][2],
-        timestamp: rows[i][3]
-      };
+      revisiones.push({
+        mes: rows[i][0], anio: rows[i][1],
+        registros: String(rows[i][2] || '').split(',').map(s => s.trim()).filter(Boolean),
+        revisor: rows[i][3] || '',
+        timestamp: rows[i][4] || ''
+      });
     }
   }
-  return { estado: 'pendiente' };
+  // Build a set of all reviewed register types
+  const revisados = new Set();
+  revisiones.forEach(rev => rev.registros.forEach(r => revisados.add(r)));
+  return { revisiones, revisados: Array.from(revisados) };
 }
 
 // ── Revisiones ────────────────────────────────────────────────
@@ -466,36 +489,44 @@ function marcarRevisado(data) {
   if (data.password !== PASSWORD_REVISION) {
     return { success: false, error: 'Contraseña incorrecta.' };
   }
+  const registros = data.registros || [];
+  if (registros.length === 0) {
+    return { success: false, error: 'Seleccione al menos un registro para revisar.' };
+  }
+  const revisor = (data.revisor || 'REV').toUpperCase().substring(0, 3);
   const mes  = parseInt(data.mes);
   const anio = parseInt(data.anio);
   const sheet = getSheet(SHEETS.REVISIONES);
-  const rows  = sheet.getDataRange().getValues();
   const ts    = new Date().toISOString();
   const fechaRev = new Date().toLocaleDateString('es-CL');
 
-  // Actualizar hoja Revisiones
-  let found = false;
-  for (let i = 1; i < rows.length; i++) {
-    if (parseInt(rows[i][0]) === mes && parseInt(rows[i][1]) === anio) {
-      sheet.getRange(i + 1, 3, 1, 2).setValues([['revisado', ts]]);
-      found = true;
-      break;
+  // Agregar nueva fila de revisión (permite múltiples revisiones parciales)
+  sheet.appendRow([mes, anio, registros.join(','), revisor, ts]);
+
+  // Mapa de qué hojas corresponden a cada registro seleccionable
+  const STAMP_MAP = {
+    termo:        { sheet: SHEETS.TERMO,        colMes: 5, colAnio: 6, colRev: 12, colFecha: 13 },
+    centrifugas:  { sheet: SHEETS.CENT_REG,     colMes: 2, colAnio: 3, colRev: 9,  colFecha: 10 },
+    mesones:      { sheet: SHEETS.MESONES,       colMes: 2, colAnio: 3, colRev: 8,  colFecha: 9  },
+    refriTemp:    { sheet: SHEETS.REFRI_REG,     colMes: 4, colAnio: 5, colRev: 12, colFecha: 13 },
+    limpRefri:    { sheet: SHEETS.LIMP_REFRI,    colMes: 2, colAnio: 3, colRev: 9,  colFecha: 10 },
+    conductividad:{ sheet: SHEETS.CONDUCT_REG,   colMes: 4, colAnio: 5, colRev: 9,  colFecha: 10 }
+  };
+
+  // Solo hacer stamp en los registros seleccionados
+  registros.forEach(function(reg) {
+    const cfg = STAMP_MAP[reg];
+    if (cfg) {
+      stampRevision(getSheet(cfg.sheet), cfg.colMes, cfg.colAnio, mes, anio, revisor, fechaRev, cfg.colRev, cfg.colFecha);
     }
-  }
-  if (!found) {
-    sheet.appendRow([mes, anio, 'revisado', ts]);
-  }
+  });
 
-  // Escribir "Revisado_Por" y "Fecha_Revisión" en todos los registros del mes
-  // Termo: col 12 = Revisado_Por, col 13 = Fecha_Revisión (0-indexed)
-  stampRevision(getSheet(SHEETS.TERMO), 5, 6, mes, anio, 'REV', fechaRev, 12, 13);
-  stampRevision(getSheet(SHEETS.CENT_REG), 2, 3, mes, anio, 'REV', fechaRev, 9, 10);
-  stampRevision(getSheet(SHEETS.MESONES), 2, 3, mes, anio, 'REV', fechaRev, 8, 9);
-  stampRevision(getSheet(SHEETS.REFRI_REG), 4, 5, mes, anio, 'REV', fechaRev, 12, 13);
-  stampRevision(getSheet(SHEETS.LIMP_REFRI), 2, 3, mes, anio, 'REV', fechaRev, 9, 10);
-  stampRevision(getSheet(SHEETS.CONDUCT_REG), 4, 5, mes, anio, 'REV', fechaRev, 9, 10);
-
-  return { success: true, message: 'Mes marcado como Revisado. Registros actualizados.' };
+  const nombres = {
+    termo: 'Temp. Ambiental', centrifugas: 'Centrífugas', mesones: 'Mesones',
+    refriTemp: 'Temp. Refrigeradores', limpRefri: 'Limp. Refrigeradores', conductividad: 'Conductividad'
+  };
+  const nombresRev = registros.map(function(r) { return nombres[r] || r; }).join(', ');
+  return { success: true, message: 'Revisión confirmada por ' + revisor + ': ' + nombresRev };
 }
 
 /** Escribe las iniciales del revisor y fecha en todos los registros de un mes */
@@ -600,16 +631,28 @@ function triggerRecordatorioMesAnterior() {
   }
 
   const rev = getRevision(mesAnterior, anioAnterior);
-  if (rev.estado === 'revisado') return; // Ya fue revisado
+  // Considerar revisado si todos los tipos principales están revisados
+  const allTypes = ['termo','centrifugas','mesones','refriTemp','limpRefri','conductividad'];
+  const allRevisados = allTypes.every(function(t) { return rev.revisados.indexOf(t) !== -1; });
+  if (allRevisados) return;
+
+  const faltantes = allTypes.filter(function(t) { return rev.revisados.indexOf(t) === -1; });
+  const nombres = {
+    termo: 'Temp. Ambiental', centrifugas: 'Centrífugas', mesones: 'Mesones',
+    refriTemp: 'Temp. Refrigeradores', limpRefri: 'Limp. Refrigeradores', conductividad: 'Conductividad'
+  };
 
   const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                  'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
   const nombreMes = meses[mesAnterior - 1];
 
+  const detalleFaltantes = faltantes.map(function(f) { return '  • ' + (nombres[f] || f); }).join('\n');
+
   const subject = '📋 [Registros Lab] Recordatorio: Revisar registros de ' + nombreMes + ' ' + anioAnterior;
   const body = 'Estimado/a,\n\n' +
-    'Le recordamos que los registros de ' + nombreMes + ' ' + anioAnterior +
-    ' aún no han sido marcados como revisados.\n\n' +
+    'Le recordamos que los siguientes registros de ' + nombreMes + ' ' + anioAnterior +
+    ' aún no han sido marcados como revisados:\n\n' +
+    detalleFaltantes + '\n\n' +
     'Por favor, ingrese al aplicativo y confirme la revisión del mes anterior.\n\n' +
     'Enlace a los datos:\n' + SHEET_URL + '\n\n' +
     '---\n' +
@@ -710,6 +753,76 @@ function triggerDatosNoRellenados() {
   MailApp.sendEmail({ to: EMAIL_ALERTS.default, subject: subject, body: body });
 }
 
+// ── Email — Alerta Mantenciones Semanales Vencidas ────────────
+
+function triggerMantencionSemanal() {
+  const hoy = new Date();
+  const vencidas = [];
+
+  MANTENCIONES_SEMANALES.forEach(function(mant) {
+    try {
+      const sheet = getSpreadsheet().getSheetByName(mant.hoja);
+      if (!sheet) return;
+      const rows = sheet.getDataRange().getValues();
+      let ultimaFecha = null;
+
+      for (var i = 1; i < rows.length; i++) {
+        // Aplicar filtro específico del tipo de mantención
+        if (mant.filtro && !mant.filtro(rows[i])) continue;
+
+        // Parsear fecha dd/mm/yyyy
+        var fechaStr = String(rows[i][mant.colFecha]);
+        var partes = fechaStr.split('/');
+        if (partes.length === 3) {
+          var fecha = new Date(parseInt(partes[2]), parseInt(partes[1]) - 1, parseInt(partes[0]));
+          if (!ultimaFecha || fecha > ultimaFecha) {
+            ultimaFecha = fecha;
+          }
+        }
+      }
+
+      if (!ultimaFecha) {
+        // No hay registros → considerar como vencido
+        vencidas.push({ nombre: mant.nombre, diasSinRegistro: '∞ (sin registros)', ultimaFecha: 'Nunca' });
+      } else {
+        var diffMs = hoy.getTime() - ultimaFecha.getTime();
+        var diffDias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        if (diffDias > 7) {
+          vencidas.push({
+            nombre: mant.nombre,
+            diasSinRegistro: diffDias,
+            ultimaFecha: ultimaFecha.toLocaleDateString('es-CL')
+          });
+        }
+      }
+    } catch (e) {
+      Logger.log('Error verificando mantención ' + mant.nombre + ': ' + e.toString());
+    }
+  });
+
+  if (vencidas.length === 0) return;
+
+  sendAlertaMantencionSemanal(vencidas);
+}
+
+function sendAlertaMantencionSemanal(vencidas) {
+  var detalle = vencidas.map(function(v) {
+    return '  • ' + v.nombre + '\n    Último registro: ' + v.ultimaFecha + '\n    Días sin registro: ' + v.diasSinRegistro;
+  }).join('\n\n');
+
+  var subject = '🔔 [Registros Lab] Mantenciones semanales vencidas (' + vencidas.length + ')';
+  var body = 'Estimado/a,\n\n' +
+    'Las siguientes mantenciones semanales llevan más de 7 días sin registrarse:\n\n' +
+    detalle + '\n\n' +
+    'Por favor, realice las mantenciones pendientes a la brevedad.\n\n' +
+    'Enlace al aplicativo:\n' + SHEET_URL + '\n\n' +
+    '---\n' +
+    'Este mensaje fue enviado automáticamente.\n' +
+    'Registros Mensuales — Laboratorio Clínico — Hospital de Talca\n';
+
+  MailApp.sendEmail({ to: EMAIL_ALERTS.default, subject: subject, body: body });
+}
+
 // ── Setup de Triggers (ejecutar una vez) ──────────────────────
 
 function setupTriggers() {
@@ -717,7 +830,7 @@ function setupTriggers() {
   const existingTriggers = ScriptApp.getProjectTriggers();
   existingTriggers.forEach(t => {
     const fn = t.getHandlerFunction();
-    if (fn === 'triggerRecordatorioMesAnterior' || fn === 'triggerDatosNoRellenados') {
+    if (fn === 'triggerRecordatorioMesAnterior' || fn === 'triggerDatosNoRellenados' || fn === 'triggerMantencionSemanal') {
       ScriptApp.deleteTrigger(t);
     }
   });
@@ -729,6 +842,13 @@ function setupTriggers() {
     .everyDays(1)
     .create();
 
+  // Trigger diario a las 09:00 para mantenciones semanales vencidas
+  ScriptApp.newTrigger('triggerMantencionSemanal')
+    .timeBased()
+    .atHour(9)
+    .everyDays(1)
+    .create();
+
   // Trigger diario a las 20:00 para datos no rellenados del día
   ScriptApp.newTrigger('triggerDatosNoRellenados')
     .timeBased()
@@ -737,7 +857,7 @@ function setupTriggers() {
     .create();
 
   Logger.log('Triggers configurados correctamente.');
-  return 'Triggers configurados: triggerRecordatorioMesAnterior (08:00), triggerDatosNoRellenados (20:00)';
+  return 'Triggers configurados: triggerRecordatorioMesAnterior (08:00), triggerMantencionSemanal (09:00), triggerDatosNoRellenados (20:00)';
 }
 
 // ── Inicialización del Spreadsheet ───────────────────────────
@@ -758,7 +878,7 @@ function initializeSpreadsheet() {
       hideCols: [2,3,4,9] },
     { name: SHEETS.CONDUCT_REG, headers: ['Responsable','Conductividad (µS/cm)','Fecha (dd/mm/aaaa)','Día','Mes','Año','Turno','Observaciones','Timestamp','Revisado Por','Fecha Revisión'],
       hideCols: [4,5,6,9] },
-    { name: SHEETS.REVISIONES,  headers: ['Mes','Año','Estado','Timestamp'] },
+    { name: SHEETS.REVISIONES,  headers: ['Mes','Año','Registros','Revisor','Timestamp'] },
     // Maestros al final
     { name: SHEETS.AREAS,       headers: ['Area'] },
     { name: SHEETS.CENTRIFUGAS, headers: ['Centrifuga'] },
@@ -768,45 +888,60 @@ function initializeSpreadsheet() {
     { name: SHEETS.ACCIONES,    headers: ['Acción'] }
   ];
 
+  const newlyCreated = {};
+
   defs.forEach(def => {
     let sheet = ss.getSheetByName(def.name);
-    if (!sheet) sheet = ss.insertSheet(def.name);
-    else sheet.clearContents();
-    if (sheet.getMaxColumns() > 1) sheet.showColumns(1, sheet.getMaxColumns());
-    // Ensure enough columns
-    const needed = def.headers.length;
-    const current = sheet.getMaxColumns();
-    if (current < needed) sheet.insertColumnsAfter(current, needed - current);
-    sheet.appendRow(def.headers);
-    sheet.getRange(1, 1, 1, def.headers.length)
-      .setBackground('#0F172A').setFontColor('#FFFFFF').setFontWeight('bold');
-    sheet.setFrozenRows(1);
-    if (def.hideCols) def.hideCols.forEach(col => sheet.hideColumns(col));
+    if (!sheet) {
+      sheet = ss.insertSheet(def.name);
+      newlyCreated[def.name] = true;
+    }
+    
+    if (newlyCreated[def.name]) {
+      if (sheet.getMaxColumns() > 1) sheet.showColumns(1, sheet.getMaxColumns());
+      // Ensure enough columns
+      const needed = def.headers.length;
+      const current = sheet.getMaxColumns();
+      if (current < needed) sheet.insertColumnsAfter(current, needed - current);
+      sheet.appendRow(def.headers);
+      sheet.getRange(1, 1, 1, def.headers.length)
+        .setBackground('#0F172A').setFontColor('#FFFFFF').setFontWeight('bold');
+      sheet.setFrozenRows(1);
+      if (def.hideCols) def.hideCols.forEach(col => sheet.hideColumns(col));
+    }
   });
 
-  // Maestros iniciales
-  const areasSheet = ss.getSheetByName(SHEETS.AREAS);
-  ['Microbiología', 'Hematología', 'Química'].forEach(a => areasSheet.appendRow([a]));
+  // Maestros iniciales (solo si se acaba de crear la hoja)
+  if (newlyCreated[SHEETS.AREAS]) {
+    const areasSheet = ss.getSheetByName(SHEETS.AREAS);
+    ['Microbiología', 'Hematología', 'Química'].forEach(a => areasSheet.appendRow([a]));
+  }
 
-  const centSheet = ss.getSheetByName(SHEETS.CENTRIFUGAS);
-  ['Centrífuga 1','Centrífuga 2','Centrífuga 3','Centrífuga 4','Centrífuga 5','Centrífuga 18']
-    .forEach(c => centSheet.appendRow([c]));
+  if (newlyCreated[SHEETS.CENTRIFUGAS]) {
+    const centSheet = ss.getSheetByName(SHEETS.CENTRIFUGAS);
+    ['Centrífuga 1','Centrífuga 2','Centrífuga 3','Centrífuga 4','Centrífuga 5','Centrífuga 18'].forEach(c => centSheet.appendRow([c]));
+  }
 
-  const salasSheet = ss.getSheetByName(SHEETS.SALAS);
-  ['Microbiología', 'Hematología', 'Química'].forEach(s => salasSheet.appendRow([s]));
+  if (newlyCreated[SHEETS.SALAS]) {
+    const salasSheet = ss.getSheetByName(SHEETS.SALAS);
+    ['Microbiología', 'Hematología', 'Química'].forEach(s => salasSheet.appendRow([s]));
+  }
 
-  // Maestro Refrigeradores (Equipo, Tipo, TempMin, TempMax)
-  const refriSheet = ss.getSheetByName(SHEETS.REFRI_MASTER);
-  [['R1','Refrigerador',2,8],['R2','Refrigerador',2,8],['R3','Refrigerador',2,8],
-   ['C1','Congelador',-30,-15],['C2','Congelador',-30,-15],['C3','Congelador',-80,-50]]
-    .forEach(r => refriSheet.appendRow(r));
+  if (newlyCreated[SHEETS.REFRI_MASTER]) {
+    const refriSheet = ss.getSheetByName(SHEETS.REFRI_MASTER);
+    [['R1','Refrigerador',2,8],['R2','Refrigerador',2,8],['R3','Refrigerador',2,8],
+     ['C1','Congelador',-30,-15],['C2','Congelador',-30,-15],['C3','Congelador',-80,-50]].forEach(r => refriSheet.appendRow(r));
+  }
 
-  // Maestro Limpieza Refrigeradores
-  const refriLimpSheet = ss.getSheetByName(SHEETS.REFRI_LIMP_MASTER);
-  ['R1','R2','R3','C1','C2','C3'].forEach(e => refriLimpSheet.appendRow([e]));
+  if (newlyCreated[SHEETS.REFRI_LIMP_MASTER]) {
+    const refriLimpSheet = ss.getSheetByName(SHEETS.REFRI_LIMP_MASTER);
+    ['R1','R2','R3','C1','C2','C3'].forEach(e => refriLimpSheet.appendRow([e]));
+  }
 
-  const accionesSheet = ss.getSheetByName(SHEETS.ACCIONES);
-  ['En observación'].forEach(a => accionesSheet.appendRow([a]));
+  if (newlyCreated[SHEETS.ACCIONES]) {
+    const accionesSheet = ss.getSheetByName(SHEETS.ACCIONES);
+    ['En observación'].forEach(a => accionesSheet.appendRow([a]));
+  }
 
   // Eliminar hojas por defecto
   ['Hoja 1','Sheet1','Hoja1'].forEach(n => {
