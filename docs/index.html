@@ -525,13 +525,21 @@
       <span class="area-pill">📍 <span id="etiquetadora-prefill-name"></span></span>
     </div>
 
-    <!-- Tarjeta de Selección -->
-    <div class="card">
-      <div class="form-group">
-        <label class="form-label" for="etiquetadora-select">Selecciona Etiquetadora</label>
-        <select id="etiquetadora-select" class="form-control" onchange="onEtiquetadoraChange()">
-          <option value="">Cargando etiquetadoras…</option>
-        </select>
+    <!-- Tarjeta de Selección con Buscador Interactivo -->
+    <div class="card" style="position: relative; overflow: visible;">
+      <div class="form-group" style="position: relative; margin-bottom: 0;">
+        <label class="form-label" for="etiquetadora-search-input">Selecciona Etiquetadora</label>
+        <div style="position: relative;">
+          <input type="text" id="etiquetadora-search-input" class="form-control" placeholder="🔍 Buscar por nombre, piso o ubicación..." onfocus="showEtiquetadoraDropdown()" oninput="filterEtiquetadoras()" autocomplete="off" style="padding-right: 32px;" />
+          <span id="btn-clear-et-search" onclick="clearEtiquetadoraSearch()" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text-dim); display: none; font-size: 14px;">✕</span>
+        </div>
+        <!-- Input oculto para compatibilidad con código existente -->
+        <input type="hidden" id="etiquetadora-select" onchange="onEtiquetadoraChange()" />
+        
+        <!-- Dropdown interactivo -->
+        <div id="etiquetadora-search-dropdown" class="custom-dropdown-list" style="display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 1000; margin-top: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.4); max-height: 260px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm);">
+          <!-- Se rellena dinámicamente con JS -->
+        </div>
       </div>
     </div>
 

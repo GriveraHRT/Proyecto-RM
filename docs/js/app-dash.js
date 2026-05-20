@@ -255,6 +255,98 @@ function printQR(){const val=document.getElementById('qr-label-text').textConten
 
 // ── Etiquetadoras ────────────────────────────────────────────
 
+// ── Buscador Interactivo de Etiquetadoras ────────────────────
+
+function renderEtiquetadoraDropdown(items) {
+  const dropdown = document.getElementById('etiquetadora-search-dropdown');
+  const list = items || state.etiquetadoras || [];
+  
+  if (list.length === 0) {
+    dropdown.innerHTML = '<div style="padding:12px; color:var(--text-dim); font-size:13px; text-align:center;">No se encontraron etiquetadoras</div>';
+    return;
+  }
+  
+  dropdown.innerHTML = list.map(e => `
+    <div class="custom-dropdown-item" onclick="selectEtiquetadora('${e.nombreReal.replace(/'/g, "\\'")}')">
+      <span style="font-weight: 700; font-size: 13.5px; color: var(--text-color);">${e.nombreReal}</span>
+      <span style="font-size: 11px; color: var(--text-dim);">📍 ${e.piso} — ${e.ubicacion}</span>
+    </div>
+  `).join('');
+}
+
+function showEtiquetadoraDropdown() {
+  const dropdown = document.getElementById('etiquetadora-search-dropdown');
+  dropdown.style.display = 'block';
+  renderEtiquetadoraDropdown();
+  
+  // Registrar evento para cerrar al hacer click fuera
+  setTimeout(() => {
+    const onClickOutside = (event) => {
+      const input = document.getElementById('etiquetadora-search-input');
+      if (!dropdown.contains(event.target) && event.target !== input) {
+        dropdown.style.display = 'none';
+        document.removeEventListener('click', onClickOutside);
+      }
+    };
+    document.addEventListener('click', onClickOutside);
+  }, 10);
+}
+
+function filterEtiquetadoras() {
+  const input = document.getElementById('etiquetadora-search-input');
+  const clearBtn = document.getElementById('btn-clear-et-search');
+  const query = input.value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  
+  if (query) {
+    clearBtn.style.display = 'block';
+  } else {
+    clearBtn.style.display = 'none';
+  }
+  
+  const filtered = state.etiquetadoras.filter(e => {
+    const name = (e.nombreReal || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const practico = (e.nombrePractico || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const piso = (e.piso || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const ubi = (e.ubicacion || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    
+    return name.includes(query) || practico.includes(query) || piso.includes(query) || ubi.includes(query);
+  });
+  
+  renderEtiquetadoraDropdown(filtered);
+}
+
+function selectEtiquetadora(nombreReal) {
+  const et = state.etiquetadoras.find(e => e.nombreReal === nombreReal);
+  if (!et) return;
+  
+  const displayText = `${et.nombreReal} - ${et.piso} - ${et.ubicacion}`;
+  document.getElementById('etiquetadora-search-input').value = displayText;
+  document.getElementById('btn-clear-et-search').style.display = 'block';
+  
+  const selectHidden = document.getElementById('etiquetadora-select');
+  selectHidden.value = nombreReal;
+  
+  // Ocultar dropdown
+  document.getElementById('etiquetadora-search-dropdown').style.display = 'none';
+  
+  // Disparar evento onchange
+  onEtiquetadoraChange();
+}
+
+function clearEtiquetadoraSearch() {
+  document.getElementById('etiquetadora-search-input').value = '';
+  document.getElementById('btn-clear-et-search').style.display = 'none';
+  
+  const selectHidden = document.getElementById('etiquetadora-select');
+  selectHidden.value = '';
+  
+  // Ocultar dropdown
+  document.getElementById('etiquetadora-search-dropdown').style.display = 'none';
+  
+  // Disparar evento onchange (ocultará detalles)
+  onEtiquetadoraChange();
+}
+
 function onEtiquetadoraChange() {
   const name = document.getElementById('etiquetadora-select').value;
   const container = document.getElementById('etiquetadora-details-container');
@@ -265,6 +357,10 @@ function onEtiquetadoraChange() {
   
   const et = state.etiquetadoras.find(e => e.nombreReal === name);
   if (!et) return;
+  
+  // Actualizar campo de búsqueda y botón de borrar
+  document.getElementById('etiquetadora-search-input').value = `${et.nombreReal} - ${et.piso} - ${et.ubicacion}`;
+  document.getElementById('btn-clear-et-search').style.display = 'block';
   
   // Rellenar Ficha Lectura
   document.getElementById('lbl-et-id').textContent = et.id || '--';
