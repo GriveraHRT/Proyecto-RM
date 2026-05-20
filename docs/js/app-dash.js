@@ -195,10 +195,11 @@ async function submitRevisadoAdmin(){
 }
 
 // QR
-const QR_TABS=['areas','salas','centrifugas','refrigeradores','refri-limpieza','conductividad'];
+const QR_TABS=['areas','salas','centrifugas','refrigeradores','refri-limpieza','conductividad','etiquetadoras'];
 function switchQrTab(tab){
   state.qrTab=tab;
-  document.querySelectorAll('.qr-tab').forEach((t,i)=>t.classList.toggle('active',QR_TABS[i]===tab));
+  const qrTabsElements = document.querySelectorAll('.qr-tab');
+  qrTabsElements.forEach((t,i)=>t.classList.toggle('active',QR_TABS[i]===tab));
   const lbl=document.getElementById('qr-select-label');
   const selGroup=document.getElementById('qr-select-group');
   // Reset QR display
@@ -217,6 +218,7 @@ function switchQrTab(tab){
     else if(tab==='centrifugas'){lbl.textContent='Selecciona Centrífuga';const items=[...state.centrifugas,'🏷️ Grupo Preanálisis'];populateSelect('admin-select',items,'— Seleccionar —')}
     else if(tab==='refrigeradores'){lbl.textContent='Selecciona Refrigerador/Congelador';const items=state.refrigeradores.map(r=>r.equipo);populateSelect('admin-select',items,'— Seleccionar —')}
     else if(tab==='refri-limpieza'){lbl.textContent='Selecciona Equipo (Limpieza)';populateSelect('admin-select',state.refriLimpieza,'— Seleccionar —')}
+    else if(tab==='etiquetadoras'){lbl.textContent='Selecciona Etiquetadora';const items=state.etiquetadoras.map(e=>e.nombreReal);populateSelect('admin-select',items,'— Seleccionar —')}
   }
 }
 
@@ -234,6 +236,7 @@ function generateQR(){
     else if(state.qrTab==='centrifugas'){if(rawVal.includes('Preanálisis'))url=`${base}?grupo=preanalisis`;else url=`${base}?centrifuga=${encodeURIComponent(rawVal)}`; val=`Mantención Centrífugas - ${rawVal}`;}
     else if(state.qrTab==='refrigeradores'){url=`${base}?refri=${encodeURIComponent(rawVal)}`; val=`Temperatura Refrigeradores - ${rawVal}`;}
     else if(state.qrTab==='refri-limpieza'){url=`${base}?limprefri=${encodeURIComponent(rawVal)}`; val=`Limpieza Refrigeradores - ${rawVal}`;}
+    else if(state.qrTab==='etiquetadoras'){url=`${base}?etiquetadora=${encodeURIComponent(rawVal)}`; val=`Etiquetadora - ${rawVal}`;}
   }
   const wrap=document.getElementById('qr-canvas-wrap');
   const canvas=document.getElementById('qr-canvas');
@@ -250,6 +253,245 @@ function generateQR(){
 
 function printQR(){const val=document.getElementById('qr-label-text').textContent;const img=document.querySelector('#qr-canvas img');if(!img)return;const w=window.open('','_blank');w.document.write(`<!DOCTYPE html><html><head><title>QR - ${val}</title><style>body{font-family:sans-serif;text-align:center;padding:40px;}h2{margin-bottom:16px;}p{color:#555;font-size:13px;margin-top:12px;}</style></head><body><h2>Registros Mensuales</h2><h3>${val}</h3><img src="${img.src}" style="width:200px;height:200px;"/><p>Escanear para registrar</p><script>window.onload=()=>{window.print();}<\/script></body></html>`);w.document.close()}
 
+// ── Etiquetadoras ────────────────────────────────────────────
+
+function onEtiquetadoraChange() {
+  const name = document.getElementById('etiquetadora-select').value;
+  const container = document.getElementById('etiquetadora-details-container');
+  if (!name) {
+    container.style.display = 'none';
+    return;
+  }
+  
+  const et = state.etiquetadoras.find(e => e.nombreReal === name);
+  if (!et) return;
+  
+  // Rellenar Ficha Lectura
+  document.getElementById('lbl-et-id').textContent = et.id || '--';
+  document.getElementById('lbl-et-practico').textContent = et.nombrePractico || '--';
+  document.getElementById('lbl-et-modelo').textContent = et.modelo || '--';
+  document.getElementById('lbl-et-conexion').textContent = et.tipoConexion || '--';
+  document.getElementById('lbl-et-ip').textContent = et.direccionIp || '--';
+  document.getElementById('lbl-et-piso').textContent = et.piso || '--';
+  document.getElementById('lbl-et-ubicacion').textContent = et.ubicacion || '--';
+  document.getElementById('lbl-et-comentario').textContent = et.comentario || '--';
+  
+  // Rellenar Formulario Edición
+  document.getElementById('edit-et-id').value = et.id || '';
+  document.getElementById('edit-et-practico').value = et.nombrePractico || '';
+  document.getElementById('edit-et-modelo').value = et.modelo || '';
+  document.getElementById('edit-et-conexion').value = et.tipoConexion || 'USB';
+  document.getElementById('edit-et-ip').value = et.direccionIp || 'No aplica';
+  document.getElementById('edit-et-piso').value = et.piso || '';
+  document.getElementById('edit-et-ubicacion').value = et.ubicacion || '';
+  document.getElementById('edit-et-comentario').value = et.comentario || '';
+  document.getElementById('edit-et-password').value = '';
+  
+  onEditConexionChange(); // Asegurar estado del input IP
+  
+  // Mostrar contenedor y cargar bitácora
+  container.style.display = '';
+  document.getElementById('et-bitacora-fecha').value = today();
+  document.getElementById('et-bitacora-accion').value = '';
+  onBitacoraAccionChange();
+  
+  loadEtiquetadoraBitacora(name);
+}
+
+async function loadEtiquetadoraBitacora(name) {
+  const loading = document.getElementById('et-bitacora-loading');
+  const empty = document.getElementById('et-bitacora-history-empty');
+  const list = document.getElementById('et-bitacora-history-list');
+  
+  loading.style.display = 'block';
+  empty.style.display = 'none';
+  list.style.display = 'none';
+  
+  try {
+    const data = await apiGet({ action: 'getEtiquetadoraHistorial', etiquetadora: name });
+    loading.style.display = 'none';
+    if (!data || data.length === 0) {
+      empty.style.display = 'block';
+    } else {
+      list.innerHTML = data.map(r => `
+        <div style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.04); font-size:13px; line-height:1.4;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-weight:700;">
+            <span style="color:var(--primary-color);">${r.accion}</span>
+            <span style="color:var(--text-dim); font-size:11px;">📅 ${r.fecha} — 👤 ${r.responsable}</span>
+          </div>
+          <div style="color:var(--text-color); font-weight:400; font-size:12.5px;">${r.descripcion}</div>
+        </div>
+      `).join('');
+      list.style.display = 'block';
+    }
+  } catch (e) {
+    loading.style.display = 'none';
+    empty.textContent = 'Error cargando historial.';
+    empty.style.display = 'block';
+  }
+}
+
+function toggleEditEtiquetadora() {
+  const view = document.getElementById('etiquetadora-view-panel');
+  const form = document.getElementById('form-etiquetadora-master');
+  const isEditing = form.style.display === '';
+  
+  if (isEditing) {
+    form.style.display = 'none';
+    view.style.display = '';
+    document.getElementById('btn-edit-etiquetadora').textContent = '✏️ Modificar Parámetros';
+  } else {
+    view.style.display = 'none';
+    form.style.display = '';
+    document.getElementById('edit-et-password').value = '';
+    document.getElementById('btn-edit-etiquetadora').textContent = '👁️ Ver Parámetros';
+  }
+}
+
+function onEditConexionChange() {
+  const type = document.getElementById('edit-et-conexion').value;
+  const ipInput = document.getElementById('edit-et-ip');
+  if (type === 'USB') {
+    ipInput.value = 'No aplica';
+    ipInput.disabled = true;
+    ipInput.style.opacity = '0.5';
+  } else {
+    ipInput.disabled = false;
+    ipInput.style.opacity = '1';
+    if (ipInput.value === 'No aplica') {
+      ipInput.value = '';
+    }
+  }
+}
+
+async function saveEtiquetadoraMaster(e) {
+  e.preventDefault();
+  const name = document.getElementById('etiquetadora-select').value;
+  const password = document.getElementById('edit-et-password').value;
+  
+  const spinner = document.getElementById('spinner-save-et-master');
+  const btnText = document.getElementById('btn-save-et-master-text');
+  
+  spinner.classList.add('visible');
+  btnText.style.display = 'none';
+  
+  const payload = {
+    action: 'updateEtiquetadoraMaestro',
+    nombreReal: name,
+    id: document.getElementById('edit-et-id').value,
+    nombrePractico: document.getElementById('edit-et-practico').value,
+    modelo: document.getElementById('edit-et-modelo').value,
+    tipoConexion: document.getElementById('edit-et-conexion').value,
+    direccionIp: document.getElementById('edit-et-ip').value,
+    piso: document.getElementById('edit-et-piso').value,
+    ubicacion: document.getElementById('edit-et-ubicacion').value,
+    comentario: document.getElementById('edit-et-comentario').value,
+    password: password
+  };
+  
+  try {
+    const res = await apiPost(payload);
+    spinner.classList.remove('visible');
+    btnText.style.display = '';
+    
+    if (res.success) {
+      showToast('Ficha técnica actualizada correctamente ✓', 'success');
+      
+      // Actualizar localmente el estado
+      const index = state.etiquetadoras.findIndex(x => x.nombreReal === name);
+      if (index !== -1) {
+        state.etiquetadoras[index] = {
+          nombreReal: payload.nombreReal,
+          id: payload.id,
+          nombrePractico: payload.nombrePractico,
+          modelo: payload.modelo,
+          tipoConexion: payload.tipoConexion,
+          direccionIp: payload.direccionIp,
+          piso: payload.piso,
+          ubicacion: payload.ubicacion,
+          comentario: payload.comentario
+        };
+      }
+      
+      onEtiquetadoraChange();
+      toggleEditEtiquetadora();
+    } else {
+      showToast(res.error || 'Error al actualizar ficha técnica.', 'error');
+    }
+  } catch (err) {
+    spinner.classList.remove('visible');
+    btnText.style.display = '';
+    showToast('Error de conexión con el servidor.', 'error');
+  }
+}
+
+function onBitacoraAccionChange() {
+  const val = document.getElementById('et-bitacora-accion').value;
+  const descGroup = document.getElementById('et-bitacora-desc-group');
+  const descInput = document.getElementById('et-bitacora-desc');
+  
+  if (val) {
+    descGroup.style.display = '';
+    descInput.required = true;
+  } else {
+    descGroup.style.display = 'none';
+    descInput.required = false;
+    descInput.value = '';
+  }
+}
+
+async function saveEtiquetadoraBitacora(e) {
+  e.preventDefault();
+  const name = document.getElementById('etiquetadora-select').value;
+  const respInput = document.getElementById('et-bitacora-responsable');
+  const resp = respInput.value.trim().toUpperCase();
+  
+  if (resp.length !== 3) {
+    showToast('Responsable debe tener exactamente 3 letras.', 'error');
+    return;
+  }
+  
+  const spinner = document.getElementById('spinner-save-et-bitacora');
+  const btnText = document.getElementById('btn-save-et-bitacora-text');
+  
+  spinner.classList.add('visible');
+  btnText.style.display = 'none';
+  
+  const payload = {
+    action: 'saveEtiquetadoraRegistro',
+    etiquetadora: name,
+    fecha: document.getElementById('et-bitacora-fecha').value,
+    accion: document.getElementById('et-bitacora-accion').value,
+    descripcion: document.getElementById('et-bitacora-desc').value,
+    responsable: resp
+  };
+  
+  try {
+    const res = await apiPost(payload);
+    spinner.classList.remove('visible');
+    btnText.style.display = '';
+    
+    if (res.success) {
+      showToast('Registro guardado en bitácora correctamente ✓', 'success');
+      
+      // Limpiar campos de bitacora (excepto fecha)
+      document.getElementById('et-bitacora-accion').value = '';
+      document.getElementById('et-bitacora-desc').value = '';
+      respInput.value = '';
+      onBitacoraAccionChange();
+      
+      // Recargar historial
+      loadEtiquetadoraBitacora(name);
+    } else {
+      showToast(res.error || 'Error al guardar en bitácora.', 'error');
+    }
+  } catch (err) {
+    spinner.classList.remove('visible');
+    btnText.style.display = '';
+    showToast('Error de conexión con el servidor.', 'error');
+  }
+}
+
 // Init
 async function init(){
   document.getElementById('termo-fecha').value=today();
@@ -258,6 +500,9 @@ async function init(){
   document.getElementById('refri-fecha').value=today();
   document.getElementById('limp-refri-fecha').value=today();
   document.getElementById('conduct-fecha').value=today();
+  if(document.getElementById('et-bitacora-fecha')) {
+    document.getElementById('et-bitacora-fecha').value=today();
+  }
   autoSetAmPm();
   updateInfoCentrifuga();
   updateInfoLimpRefri();

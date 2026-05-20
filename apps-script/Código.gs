@@ -41,7 +41,9 @@ const SHEETS = {
   SALAS:            'Maestro Salas',
   REFRI_MASTER:     'Maestro Refrigeradores',
   REFRI_LIMP_MASTER:'Maestro Refri. Limpieza',
-  ACCIONES:         'Maestro Acciones'
+  ACCIONES:         'Maestro Acciones',
+  ETIQUETADORAS_MASTER: 'Maestro Etiquetadoras',
+  ETIQUETADORAS_REG:    'Reg. Etiquetadoras'
 };
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -92,6 +94,8 @@ function doGet(e) {
       case 'getRegistros':      return jsonResponse(getRegistros(e.parameter.mes, e.parameter.anio));
       case 'getRevisiones':     return jsonResponse(getRevision(e.parameter.mes, e.parameter.anio));
       case 'getMaestros':       return jsonResponse(getMaestros());
+      case 'getEtiquetadoras':  return jsonResponse(getEtiquetadoras());
+      case 'getEtiquetadoraHistorial': return jsonResponse(getEtiquetadoraHistorial(e.parameter.etiquetadora));
       case 'SETUP_INIT_TA':     return jsonResponse(setup());
       case 'REINIT':            return jsonResponse(reinitialize());
       default:                  return jsonResponse({ error: 'Acción no reconocida: ' + action });
@@ -116,6 +120,8 @@ function doPost(e) {
       case 'saveRefriTemp':       return jsonResponse(saveRefriTemp(data));
       case 'saveLimpiezaRefri':   return jsonResponse(saveLimpiezaRefri(data));
       case 'saveConductividad':   return jsonResponse(saveConductividad(data));
+      case 'saveEtiquetadoraRegistro': return jsonResponse(saveEtiquetadoraRegistro(data));
+      case 'updateEtiquetadoraMaestro': return jsonResponse(updateEtiquetadoraMaestro(data));
       case 'marcarRevisado':      return jsonResponse(marcarRevisado(data));
       default:                    return jsonResponse({ error: 'Acción no reconocida: ' + data.action });
     }
@@ -169,7 +175,8 @@ function getMaestros() {
     salas: getSalas(),
     acciones: getAcciones(),
     refrigeradores: getRefrigeradores(),
-    refriLimpieza: getRefriLimpieza()
+    refriLimpieza: getRefriLimpieza(),
+    etiquetadoras: getEtiquetadoras()
   };
 }
 
@@ -879,13 +886,16 @@ function initializeSpreadsheet() {
     { name: SHEETS.CONDUCT_REG, headers: ['Responsable','Conductividad (µS/cm)','Fecha (dd/mm/aaaa)','Día','Mes','Año','Turno','Observaciones','Timestamp','Revisado Por','Fecha Revisión'],
       hideCols: [4,5,6,9] },
     { name: SHEETS.REVISIONES,  headers: ['Mes','Año','Registros','Revisor','Timestamp'] },
+    { name: SHEETS.ETIQUETADORAS_REG, headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Etiquetadora','Accion','Descripcion','Responsable','Timestamp'],
+      hideCols: [2,3,4,8] },
     // Maestros al final
     { name: SHEETS.AREAS,       headers: ['Area'] },
     { name: SHEETS.CENTRIFUGAS, headers: ['Centrifuga'] },
     { name: SHEETS.SALAS,       headers: ['Sala'] },
     { name: SHEETS.REFRI_MASTER, headers: ['Equipo','Tipo','Temp Min (°C)','Temp Max (°C)'] },
     { name: SHEETS.REFRI_LIMP_MASTER, headers: ['Equipo'] },
-    { name: SHEETS.ACCIONES,    headers: ['Acción'] }
+    { name: SHEETS.ACCIONES,    headers: ['Acción'] },
+    { name: SHEETS.ETIQUETADORAS_MASTER, headers: ['Nombre Real','ID','Nombre Práctico','Modelo','Tipo de Conexión','Dirección IP','Piso','Ubicación','Comentario'] }
   ];
 
   const newlyCreated = {};
@@ -943,6 +953,24 @@ function initializeSpreadsheet() {
     ['En observación'].forEach(a => accionesSheet.appendRow([a]));
   }
 
+  if (newlyCreated[SHEETS.ETIQUETADORAS_MASTER]) {
+    const etMasterSheet = ss.getSheetByName(SHEETS.ETIQUETADORAS_MASTER);
+    for (let i = 1; i <= 61; i++) {
+      const num2 = String(i).padStart(2, '0');
+      etMasterSheet.appendRow([
+        'Etiquetadora ' + i,             // Nombre Real
+        'EQ-' + num2,                     // ID
+        'Etiquetadora ' + num2,          // Nombre Práctico
+        'ZD220',                         // Modelo
+        'USB',                           // Tipo de Conexión
+        'No aplica',                     // Dirección IP
+        '1er Piso',                      // Piso
+        'Medicina',                      // Ubicación
+        '--'                             // Comentario
+      ]);
+    }
+  }
+
   // Eliminar hojas por defecto
   ['Hoja 1','Sheet1','Hoja1'].forEach(n => {
     const s = ss.getSheetByName(n);
@@ -973,7 +1001,7 @@ function resetRegistros() {
   const registroSheets = [
     SHEETS.TERMO, SHEETS.CENT_REG, SHEETS.MESONES,
     SHEETS.REFRI_REG, SHEETS.LIMP_REFRI, SHEETS.CONDUCT_REG,
-    SHEETS.REVISIONES
+    SHEETS.REVISIONES, SHEETS.ETIQUETADORAS_REG
   ];
   const results = [];
   registroSheets.forEach(function(name) {
@@ -993,3 +1021,93 @@ function resetRegistros() {
   }
   return { success: true, message: 'Registros limpiados', details: results };
 }
+
+// ── Etiquetadoras ────────────────────────────────────────────
+
+function getEtiquetadoras() {
+  const data = getSheet(SHEETS.ETIQUETADORAS_MASTER).getDataRange().getValues();
+  return data.slice(1).filter(r => r[0]).map(r => ({
+    nombreReal: String(r[0]),
+    id: String(r[1]),
+    nombrePractico: String(r[2]),
+    modelo: String(r[3]),
+    tipoConexion: String(r[4]),
+    direccionIp: String(r[5]),
+    piso: String(r[6]),
+    ubicacion: String(r[7]),
+    comentario: String(r[8])
+  }));
+}
+
+function getEtiquetadoraHistorial(etName) {
+  if (!etName) return [];
+  const data = getSheet(SHEETS.ETIQUETADORAS_REG).getDataRange().getValues();
+  return data.slice(1)
+    .filter(r => String(r[4]) === etName)
+    .map(r => ({
+      fecha: String(r[0]),
+      accion: String(r[5]),
+      descripcion: String(r[6]),
+      responsable: String(r[7])
+    }));
+}
+
+function saveEtiquetadoraRegistro(data) {
+  if (!data.etiquetadora || !data.accion || !data.descripcion || !data.responsable) {
+    return { success: false, error: 'Faltan campos obligatorios.' };
+  }
+  const f = parseFecha(data.fecha || new Date().toISOString().split('T')[0]);
+  const ts = new Date().toISOString();
+  
+  insertRowAtTop(getSheet(SHEETS.ETIQUETADORAS_REG), [
+    formatFechaDDMMYYYY(f), f.dia, f.mes, f.anio,
+    data.etiquetadora,
+    data.accion,
+    data.descripcion,
+    data.responsable.toUpperCase().substring(0, 3),
+    ts
+  ]);
+  
+  return { success: true, message: 'Registro de bitácora guardado.' };
+}
+
+function updateEtiquetadoraMaestro(data) {
+  if (data.password !== PASSWORD_REVISION) {
+    return { success: false, error: 'Contraseña incorrecta.' };
+  }
+  if (!data.nombreReal) {
+    return { success: false, error: 'Nombre real es obligatorio.' };
+  }
+  
+  const sheet = getSheet(SHEETS.ETIQUETADORAS_MASTER);
+  const rows = sheet.getDataRange().getValues();
+  let rowIndex = -1;
+  
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]).trim() === String(data.nombreReal).trim()) {
+      rowIndex = i + 1;
+      break;
+    }
+  }
+  
+  const rowData = [
+    data.nombreReal,
+    data.id || '',
+    data.nombrePractico || '',
+    data.modelo || 'ZD220',
+    data.tipoConexion || 'USB',
+    data.direccionIp || 'No aplica',
+    data.piso || '1er Piso',
+    data.ubicacion || 'Medicina',
+    data.comentario || '--'
+  ];
+  
+  if (rowIndex !== -1) {
+    sheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]);
+    return { success: true, message: 'Ficha de etiquetadora actualizada.' };
+  } else {
+    sheet.appendRow(rowData);
+    return { success: true, message: 'Nueva etiquetadora agregada al maestro.' };
+  }
+}
+

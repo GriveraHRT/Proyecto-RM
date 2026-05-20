@@ -515,6 +515,197 @@
     </div>
   </section>
 
+  <!-- ── SECCIÓN: ETIQUETADORAS ──────────────────────────── -->
+  <section id="section-etiquetadoras" class="section">
+    <p class="section-title">🏷️ Registro de Etiquetadoras</p>
+    <p class="section-subtitle">Gestión de inventario y bitácora de intervenciones</p>
+
+    <!-- Indicador de pre-rellenado si viene por QR -->
+    <div id="etiquetadora-prefill-indicator" style="display:none; margin-bottom: 16px;">
+      <span class="area-pill">📍 <span id="etiquetadora-prefill-name"></span></span>
+    </div>
+
+    <!-- Tarjeta de Selección -->
+    <div class="card">
+      <div class="form-group">
+        <label class="form-label" for="etiquetadora-select">Selecciona Etiquetadora</label>
+        <select id="etiquetadora-select" class="form-control" onchange="onEtiquetadoraChange()">
+          <option value="">Cargando etiquetadoras…</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Contenedor de Detalle (Oculto hasta que se seleccione una) -->
+    <div id="etiquetadora-details-container" style="display:none; margin-top: 16px;">
+      
+      <!-- Ficha Técnica (Lectura / Edición) -->
+      <div class="card" style="margin-bottom: 16px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <h3 style="margin:0; font-size:16px; font-weight:700; color:var(--text-color);">📋 Ficha Técnica</h3>
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-edit-etiquetadora" onclick="toggleEditEtiquetadora()" style="width:auto; padding:6px 12px; font-size:12px;">✏️ Modificar Parámetros</button>
+        </div>
+
+        <!-- Vista Fija (Lectura) -->
+        <div id="etiquetadora-view-panel">
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:12px;">
+            <div>
+              <span class="form-label" style="font-size:11px; margin-bottom:2px; color:var(--text-dim);">ID (Nº Serie)</span>
+              <strong id="lbl-et-id" style="font-size:14px; color:var(--text-color);">-</strong>
+            </div>
+            <div>
+              <span class="form-label" style="font-size:11px; margin-bottom:2px; color:var(--text-dim);">Nombre Práctico</span>
+              <strong id="lbl-et-practico" style="font-size:14px; color:var(--text-color);">-</strong>
+            </div>
+            <div>
+              <span class="form-label" style="font-size:11px; margin-bottom:2px; color:var(--text-dim);">Modelo</span>
+              <strong id="lbl-et-modelo" style="font-size:14px; color:var(--text-color);">-</strong>
+            </div>
+            <div>
+              <span class="form-label" style="font-size:11px; margin-bottom:2px; color:var(--text-dim);">Tipo de Conexión</span>
+              <strong id="lbl-et-conexion" style="font-size:14px; color:var(--text-color);">-</strong>
+            </div>
+            <div>
+              <span class="form-label" style="font-size:11px; margin-bottom:2px; color:var(--text-dim);">Dirección IP</span>
+              <strong id="lbl-et-ip" style="font-size:14px; color:var(--text-color);">-</strong>
+            </div>
+            <div>
+              <span class="form-label" style="font-size:11px; margin-bottom:2px; color:var(--text-dim);">Piso</span>
+              <strong id="lbl-et-piso" style="font-size:14px; color:var(--text-color);">-</strong>
+            </div>
+            <div>
+              <span class="form-label" style="font-size:11px; margin-bottom:2px; color:var(--text-dim);">Ubicación</span>
+              <strong id="lbl-et-ubicacion" style="font-size:14px; color:var(--text-color);">-</strong>
+            </div>
+          </div>
+          <div style="margin-top:12px; border-top:1px solid rgba(255,255,255,0.08); padding-top:8px;">
+            <span class="form-label" style="font-size:11px; margin-bottom:2px; color:var(--text-dim);">Comentario</span>
+            <span id="lbl-et-comentario" style="font-size:13px; color:var(--text-color); display:block;">-</span>
+          </div>
+        </div>
+
+        <!-- Panel de Edición (Oculto por defecto) -->
+        <form id="form-etiquetadora-master" style="display:none;" autocomplete="off" onsubmit="saveEtiquetadoraMaster(event)">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="edit-et-id">ID (Nº Serie)</label>
+              <input type="text" id="edit-et-id" class="form-control" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="edit-et-practico">Nombre Práctico</label>
+              <input type="text" id="edit-et-practico" class="form-control" required />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="edit-et-modelo">Modelo</label>
+              <input type="text" id="edit-et-modelo" class="form-control" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="edit-et-conexion">Tipo de Conexión</label>
+              <select id="edit-et-conexion" class="form-control" required onchange="onEditConexionChange()">
+                <option value="USB">USB</option>
+                <option value="Ethernet">Ethernet</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="edit-et-ip">Dirección IP</label>
+              <input type="text" id="edit-et-ip" class="form-control" placeholder="10.10.X.X o No aplica" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="edit-et-piso">Piso</label>
+              <input type="text" id="edit-et-piso" class="form-control" required />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="edit-et-ubicacion">Ubicación</label>
+              <input type="text" id="edit-et-ubicacion" class="form-control" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="edit-et-password">Contraseña (Autorización)</label>
+              <input type="password" id="edit-et-password" class="form-control" placeholder="Clave HRT..." required />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="edit-et-comentario">Comentario</label>
+            <input type="text" id="edit-et-comentario" class="form-control" />
+          </div>
+
+          <div style="display:flex; gap:12px; margin-top:16px;">
+            <button type="submit" class="btn btn-primary" id="btn-save-et-master" style="margin:0;">
+              <div class="spinner" id="spinner-save-et-master"></div>
+              <span id="btn-save-et-master-text">💾 Guardar Ficha</span>
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="toggleEditEtiquetadora()" style="margin:0; width:auto;">Cancelar</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Registrar Nueva Acción en Bitácora -->
+      <div class="card" style="margin-bottom: 16px;">
+        <h3 style="margin:0 0 12px 0; font-size:16px; font-weight:700; color:var(--text-color);">📝 Registrar Acción en Bitácora</h3>
+        
+        <form id="form-etiquetadora-bitacora" autocomplete="off" onsubmit="saveEtiquetadoraBitacora(event)">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="et-bitacora-fecha">Fecha</label>
+              <input type="date" id="et-bitacora-fecha" class="form-control" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="et-bitacora-accion">Acción a realizar</label>
+              <select id="et-bitacora-accion" class="form-control" required onchange="onBitacoraAccionChange()">
+                <option value="">— Seleccionar —</option>
+                <option value="Cambio de Papel">📄 Cambio de Papel</option>
+                <option value="Mantenimiento">🔧 Mantenimiento</option>
+                <option value="Intervención reparativa">🛠️ Intervención reparativa</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Detalle/Descripción (Oculto hasta que se seleccione una acción) -->
+          <div class="form-group" id="et-bitacora-desc-group" style="display:none;">
+            <label class="form-label" for="et-bitacora-desc">Detalle de lo realizado</label>
+            <textarea id="et-bitacora-desc" class="form-control" rows="3" placeholder="Describe brevemente la acción realizada..." required style="resize:none;"></textarea>
+          </div>
+
+          <!-- Responsable de la bitácora -->
+          <div class="form-group">
+            <label class="form-label" for="et-bitacora-responsable">Responsable (iniciales)</label>
+            <input type="text" id="et-bitacora-responsable" class="form-control"
+              placeholder="ABC" maxlength="3"
+              style="text-transform:uppercase; letter-spacing:3px; font-weight:700; font-size:18px;"
+              required />
+          </div>
+
+          <button type="submit" class="btn btn-primary" id="btn-save-et-bitacora" style="margin-top:8px;">
+            <div class="spinner" id="spinner-save-et-bitacora"></div>
+            <span id="btn-save-et-bitacora-text">💾 Registrar Acción</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- Historial de Bitácora -->
+      <div class="card">
+        <h3 style="margin:0 0 12px 0; font-size:16px; font-weight:700; color:var(--text-color);">📜 Historial de Bitácora</h3>
+        
+        <div id="et-bitacora-loading" style="text-align:center; padding:16px; display:none;">
+          <div class="spinner visible" style="margin:0 auto; width:20px; height:20px; border-width:2px;"></div>
+        </div>
+
+        <div id="et-bitacora-history-empty" style="text-align:center; padding:16px; color:var(--text-dim); font-size:13px;">
+          Sin registros en la bitácora de esta etiquetadora.
+        </div>
+
+        <div id="et-bitacora-history-list" style="display:none; max-height:250px; overflow-y:auto; border-radius:8px; border:1px solid rgba(255,255,255,0.06);">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+    </div>
+  </section>
+
   <!-- ── SECCIÓN: ADMIN / QR ─────────────────────────────── -->
   <section id="section-admin" class="section">
     <p class="section-title">🔑 Admin</p>
@@ -528,6 +719,7 @@
         <button class="qr-tab" onclick="switchQrTab('refrigeradores')">🧊 Refri.</button>
         <button class="qr-tab" onclick="switchQrTab('refri-limpieza')">🧹 Limp.R.</button>
         <button class="qr-tab" onclick="switchQrTab('conductividad')">💧 Conduct.</button>
+        <button class="qr-tab" onclick="switchQrTab('etiquetadoras')">🏷️ Etiquet.</button>
       </div>
 
       <div class="form-group" id="qr-select-group">
@@ -643,6 +835,10 @@
   <button class="nav-item" data-section="conductividad" onclick="navigateTo('conductividad')">
     <span class="nav-icon">💧</span>
     <span class="nav-label">Conduct.</span>
+  </button>
+  <button class="nav-item" data-section="etiquetadoras" onclick="navigateTo('etiquetadoras')">
+    <span class="nav-icon">🏷️</span>
+    <span class="nav-label">Etiquet.</span>
   </button>
   <button class="nav-item" data-section="admin" onclick="navigateTo('admin')">
     <span class="nav-icon">🔑</span>
