@@ -218,7 +218,14 @@ function switchQrTab(tab){
     else if(tab==='centrifugas'){lbl.textContent='Selecciona Centrífuga';const items=[...state.centrifugas,'🏷️ Grupo Preanálisis'];populateSelect('admin-select',items,'— Seleccionar —')}
     else if(tab==='refrigeradores'){lbl.textContent='Selecciona Refrigerador/Congelador';const items=state.refrigeradores.map(r=>r.equipo);populateSelect('admin-select',items,'— Seleccionar —')}
     else if(tab==='refri-limpieza'){lbl.textContent='Selecciona Equipo (Limpieza)';populateSelect('admin-select',state.refriLimpieza,'— Seleccionar —')}
-    else if(tab==='etiquetadoras'){lbl.textContent='Selecciona Etiquetadora';const items=state.etiquetadoras.map(e=>e.nombreReal);populateSelect('admin-select',items,'— Seleccionar —')}
+    else if(tab==='etiquetadoras'){
+      lbl.textContent='Selecciona Etiquetadora';
+      const sel=document.getElementById('admin-select');
+      sel.innerHTML='<option value="">— Seleccionar —</option>'+state.etiquetadoras.map(e=>{
+        const text=`${e.nombreReal} (${e.nombrePractico || '--'} - ${e.ubicacion || '--'})`;
+        return `<option value="${e.nombreReal}">${text}</option>`;
+      }).join('');
+    }
   }
 }
 
