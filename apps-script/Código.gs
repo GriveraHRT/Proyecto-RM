@@ -200,11 +200,11 @@ function saveTermo(data) {
   const humOOR = hum < 20 || hum > 70;
 
   insertRowAtTop(getSheet(SHEETS.TERMO), [
+    formatFechaDDMMYYYY(f),
+    f.dia, f.mes, f.anio,
     data.responsable.toUpperCase().substring(0, 3),
     temp,
     hum,
-    formatFechaDDMMYYYY(f),
-    f.dia, f.mes, f.anio,
     turno,
     data.area,
     accion,
@@ -311,10 +311,10 @@ function saveRefriTemp(data) {
   const tempOOR = temp < tempMin || temp > tempMax;
 
   insertRowAtTop(getSheet(SHEETS.REFRI_REG), [
-    data.responsable.toUpperCase().substring(0, 3),
-    temp,
     formatFechaDDMMYYYY(f),
     f.dia, f.mes, f.anio,
+    data.responsable.toUpperCase().substring(0, 3),
+    temp,
     turno,
     data.equipo,
     tipo,
@@ -380,10 +380,10 @@ function saveConductividad(data) {
   const cond = parseFloat(data.conductividad);
 
   insertRowAtTop(getSheet(SHEETS.CONDUCT_REG), [
-    data.responsable.toUpperCase().substring(0, 3),
-    cond,
     formatFechaDDMMYYYY(f),
     f.dia, f.mes, f.anio,
+    data.responsable.toUpperCase().substring(0, 3),
+    cond,
     turno,
     data.observaciones || '',
     ts,
@@ -419,16 +419,16 @@ function getRegistros(mes, anio) {
     return rows.slice(1).filter(r => parseInt(r[colMes]) === mes && parseInt(r[colAnio]) === anio);
   }
 
-  const termoRaw  = filtrar(getSheet(SHEETS.TERMO),    5, 6);
+  const termoRaw  = filtrar(getSheet(SHEETS.TERMO),    2, 3);
   const centRaw   = filtrar(getSheet(SHEETS.CENT_REG), 2, 3);
   const mesoRaw   = filtrar(getSheet(SHEETS.MESONES),  2, 3);
-  const refriRaw  = filtrar(getSheet(SHEETS.REFRI_REG), 4, 5);
+  const refriRaw  = filtrar(getSheet(SHEETS.REFRI_REG), 2, 3);
   const limpRaw   = filtrar(getSheet(SHEETS.LIMP_REFRI), 2, 3);
-  const condRaw   = filtrar(getSheet(SHEETS.CONDUCT_REG), 4, 5);
+  const condRaw   = filtrar(getSheet(SHEETS.CONDUCT_REG), 2, 3);
 
   const termo = termoRaw.map(r => ({
-    responsable: r[0], temperatura: r[1], humedad: r[2],
-    fecha: r[3], dia: r[4], mes: r[5], anio: r[6], turno: r[7],
+    fecha: r[0], dia: r[1], mes: r[2], anio: r[3],
+    responsable: r[4], temperatura: r[5], humedad: r[6], turno: r[7],
     area: r[8], accion_correctiva: r[9] || '', observaciones: r[10],
     revisado_por: r[12] || '', fecha_revision: r[13] || ''
   }));
@@ -445,10 +445,10 @@ function getRegistros(mes, anio) {
     revisado_por: r[8] || '', fecha_revision: r[9] || ''
   }));
 
-  // RefriTemp: Resp | Temp | Fecha | Día | Mes | Año | Turno | Equipo | Tipo | Acción | Obs | TS | Rev | FechaRev
+  // RefriTemp: Fecha | Día | Mes | Año | Resp | Temp | Turno | Equipo | Tipo | Acción | Obs | TS | Rev | FechaRev
   const refriTemp = refriRaw.map(r => ({
-    responsable: r[0], temperatura: r[1], fecha: r[2],
-    dia: r[3], mes: r[4], anio: r[5], turno: r[6],
+    fecha: r[0], dia: r[1], mes: r[2], anio: r[3],
+    responsable: r[4], temperatura: r[5], turno: r[6],
     equipo: r[7], tipo: r[8], accion_correctiva: r[9] || '', observaciones: r[10],
     revisado_por: r[12] || '', fecha_revision: r[13] || ''
   }));
@@ -460,10 +460,10 @@ function getRegistros(mes, anio) {
     revisado_por: r[9] || '', fecha_revision: r[10] || ''
   }));
 
-  // Conductividad: Resp | Cond | Fecha | Día | Mes | Año | Turno | Obs | TS | Rev | FechaRev
+  // Conductividad: Fecha | Día | Mes | Año | Resp | Cond | Turno | Obs | TS | Rev | FechaRev
   const conductividad = condRaw.map(r => ({
-    responsable: r[0], conductividad: r[1], fecha: r[2],
-    dia: r[3], mes: r[4], anio: r[5], turno: r[6], observaciones: r[7],
+    fecha: r[0], dia: r[1], mes: r[2], anio: r[3],
+    responsable: r[4], conductividad: r[5], turno: r[6], observaciones: r[7],
     revisado_por: r[9] || '', fecha_revision: r[10] || ''
   }));
 
@@ -512,12 +512,12 @@ function marcarRevisado(data) {
 
   // Mapa de qué hojas corresponden a cada registro seleccionable
   const STAMP_MAP = {
-    termo:        { sheet: SHEETS.TERMO,        colMes: 5, colAnio: 6, colRev: 12, colFecha: 13 },
+    termo:        { sheet: SHEETS.TERMO,        colMes: 2, colAnio: 3, colRev: 12, colFecha: 13 },
     centrifugas:  { sheet: SHEETS.CENT_REG,     colMes: 2, colAnio: 3, colRev: 9,  colFecha: 10 },
     mesones:      { sheet: SHEETS.MESONES,       colMes: 2, colAnio: 3, colRev: 8,  colFecha: 9  },
-    refriTemp:    { sheet: SHEETS.REFRI_REG,     colMes: 4, colAnio: 5, colRev: 12, colFecha: 13 },
+    refriTemp:    { sheet: SHEETS.REFRI_REG,     colMes: 2, colAnio: 3, colRev: 12, colFecha: 13 },
     limpRefri:    { sheet: SHEETS.LIMP_REFRI,    colMes: 2, colAnio: 3, colRev: 9,  colFecha: 10 },
-    conductividad:{ sheet: SHEETS.CONDUCT_REG,   colMes: 4, colAnio: 5, colRev: 9,  colFecha: 10 }
+    conductividad:{ sheet: SHEETS.CONDUCT_REG,   colMes: 2, colAnio: 3, colRev: 9,  colFecha: 10 }
   };
 
   // Solo hacer stamp en los registros seleccionados
@@ -873,21 +873,21 @@ function initializeSpreadsheet() {
   const ss = getSpreadsheet();
   const defs = [
     // Registros primero
-    { name: SHEETS.TERMO,       headers: ['Responsable','Temperatura (°C)','Humedad (%)','Fecha (dd/mm/aaaa)','Día','Mes','Año','Turno','Area','Acción Correctiva','Observaciones','Timestamp','Revisado Por','Fecha Revisión'],
-      hideCols: [5,6,7,12] },
+    { name: SHEETS.TERMO,       headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Responsable','Temperatura (°C)','Humedad (%)','Turno','Area','Acción Correctiva','Observaciones','Timestamp','Revisado Por','Fecha Revisión'],
+      hideCols: [2,3,4,12] },
     { name: SHEETS.CENT_REG,    headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Centrifuga','Responsable','Tipo Mantención','Observaciones','Timestamp','Revisado Por','Fecha Revisión'],
       hideCols: [2,3,4,9] },
     { name: SHEETS.MESONES,     headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Sala','Responsable','Observaciones','Timestamp','Revisado Por','Fecha Revisión'],
       hideCols: [2,3,4,8] },
-    { name: SHEETS.REFRI_REG,   headers: ['Responsable','Temperatura (°C)','Fecha (dd/mm/aaaa)','Día','Mes','Año','Turno','Equipo','Tipo','Acción Correctiva','Observaciones','Timestamp','Revisado Por','Fecha Revisión'],
-      hideCols: [4,5,6,12] },
+    { name: SHEETS.REFRI_REG,   headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Responsable','Temperatura (°C)','Turno','Equipo','Tipo','Acción Correctiva','Observaciones','Timestamp','Revisado Por','Fecha Revisión'],
+      hideCols: [2,3,4,12] },
     { name: SHEETS.LIMP_REFRI,  headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Tipo Mantención','Equipo','Responsable','Observaciones','Timestamp','Revisado Por','Fecha Revisión'],
       hideCols: [2,3,4,9] },
-    { name: SHEETS.CONDUCT_REG, headers: ['Responsable','Conductividad (µS/cm)','Fecha (dd/mm/aaaa)','Día','Mes','Año','Turno','Observaciones','Timestamp','Revisado Por','Fecha Revisión'],
-      hideCols: [4,5,6,9] },
+    { name: SHEETS.CONDUCT_REG, headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Responsable','Conductividad (µS/cm)','Turno','Observaciones','Timestamp','Revisado Por','Fecha Revisión'],
+      hideCols: [2,3,4,9] },
     { name: SHEETS.REVISIONES,  headers: ['Mes','Año','Registros','Revisor','Timestamp'] },
-    { name: SHEETS.ETIQUETADORAS_REG, headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Etiquetadora','Accion','Descripcion','Responsable','Timestamp'],
-      hideCols: [2,3,4,8] },
+    { name: SHEETS.ETIQUETADORAS_REG, headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Etiquetadora','Accion','Descripcion','Responsable'],
+      hideCols: [2,3,4] },
     // Maestros al final
     { name: SHEETS.AREAS,       headers: ['Area'] },
     { name: SHEETS.CENTRIFUGAS, headers: ['Centrifuga'] },
@@ -907,17 +907,29 @@ function initializeSpreadsheet() {
       newlyCreated[def.name] = true;
     }
     
-    if (newlyCreated[def.name]) {
-      if (sheet.getMaxColumns() > 1) sheet.showColumns(1, sheet.getMaxColumns());
-      // Ensure enough columns
-      const needed = def.headers.length;
-      const current = sheet.getMaxColumns();
-      if (current < needed) sheet.insertColumnsAfter(current, needed - current);
-      sheet.appendRow(def.headers);
-      sheet.getRange(1, 1, 1, def.headers.length)
-        .setBackground('#0F172A').setFontColor('#FFFFFF').setFontWeight('bold');
-      sheet.setFrozenRows(1);
-      if (def.hideCols) def.hideCols.forEach(col => sheet.hideColumns(col));
+    // Ensure column count is sufficient
+    const needed = def.headers.length;
+    const current = sheet.getMaxColumns();
+    if (current < needed) {
+      sheet.insertColumnsAfter(current, needed - current);
+    }
+    
+    // Enforce headers on the first row
+    sheet.getRange(1, 1, 1, needed).setValues([def.headers]);
+    sheet.getRange(1, 1, 1, needed)
+      .setBackground('#0F172A').setFontColor('#FFFFFF').setFontWeight('bold');
+    sheet.setFrozenRows(1);
+    
+    // Enforce column visibility
+    if (sheet.getMaxColumns() > 0) {
+      sheet.showColumns(1, sheet.getMaxColumns());
+    }
+    if (def.hideCols) {
+      def.hideCols.forEach(col => {
+        if (col <= sheet.getMaxColumns()) {
+          sheet.hideColumns(col);
+        }
+      });
     }
   });
 
@@ -993,8 +1005,9 @@ function setup() {
 }
 
 function reinitialize() {
+  resetRegistros();
   initializeSpreadsheet();
-  return { success: true, message: 'Estructura re-inicializada.' };
+  return { success: true, message: 'Estructura y registros re-inicializados.' };
 }
 
 function resetRegistros() {
@@ -1064,8 +1077,7 @@ function saveEtiquetadoraRegistro(data) {
     data.etiquetadora,
     data.accion,
     data.descripcion,
-    data.responsable.toUpperCase().substring(0, 3),
-    ts
+    data.responsable.toUpperCase().substring(0, 3)
   ]);
   
   return { success: true, message: 'Registro de bitácora guardado.' };

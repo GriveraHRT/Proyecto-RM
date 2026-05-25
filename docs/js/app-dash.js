@@ -262,6 +262,15 @@ function printQR(){const val=document.getElementById('qr-label-text').textConten
 
 // ── Etiquetadoras ────────────────────────────────────────────
 
+// ── Población de Modelos de Etiquetadoras ────────────────────
+function populateEtiquetadoraModelDropdown() {
+  const modelSelect = document.getElementById('edit-et-modelo');
+  if (modelSelect && state.etiquetadoras) {
+    const modelosUnicos = [...new Set(state.etiquetadoras.map(e => e.modelo).filter(Boolean))];
+    modelSelect.innerHTML = modelosUnicos.map(m => `<option value="${m}">${m}</option>`).join('');
+  }
+}
+
 // ── Buscador Interactivo de Etiquetadoras ────────────────────
 
 function renderEtiquetadoraDropdown(items) {
@@ -516,6 +525,7 @@ async function saveEtiquetadoraMaster(e) {
         };
       }
       
+      populateEtiquetadoraModelDropdown();
       onEtiquetadoraChange();
       toggleEditEtiquetadora();
     } else {
@@ -533,9 +543,16 @@ function onBitacoraAccionChange() {
   const descGroup = document.getElementById('et-bitacora-desc-group');
   const descInput = document.getElementById('et-bitacora-desc');
   
-  if (val) {
+  if (val === 'Cambio de Papel') {
+    descGroup.style.display = 'none';
+    descInput.required = false;
+    descInput.value = 'Cambio de papel estándar realizado';
+  } else if (val) {
     descGroup.style.display = '';
     descInput.required = true;
+    if (descInput.value === 'Cambio de papel estándar realizado') {
+      descInput.value = '';
+    }
   } else {
     descGroup.style.display = 'none';
     descInput.required = false;

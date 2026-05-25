@@ -526,7 +526,7 @@
     </div>
 
     <!-- Tarjeta de Selección con Buscador Interactivo -->
-    <div class="card" style="position: relative; overflow: visible;">
+    <div class="card" style="position: relative; overflow: visible; z-index: 10;">
       <div class="form-group" style="position: relative; margin-bottom: 0;">
         <label class="form-label" for="etiquetadora-search-input">Selecciona Etiquetadora</label>
         <div style="position: relative;">
@@ -606,7 +606,7 @@
           <div class="form-row">
             <div class="form-group">
               <label class="form-label" for="edit-et-modelo">Modelo</label>
-              <input type="text" id="edit-et-modelo" class="form-control" required />
+              <select id="edit-et-modelo" class="form-control" required></select>
             </div>
             <div class="form-group">
               <label class="form-label" for="edit-et-conexion">Tipo de Conexión</label>

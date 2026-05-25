@@ -170,6 +170,9 @@ async function loadMaestros(){
     if (typeof renderEtiquetadoraDropdown === 'function') {
       renderEtiquetadoraDropdown();
     }
+    if (typeof populateEtiquetadoraModelDropdown === 'function') {
+      populateEtiquetadoraModelDropdown();
+    }
   }catch(e){showToast('Error cargando maestros.','error')}
 }
 
