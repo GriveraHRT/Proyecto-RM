@@ -5,7 +5,7 @@ const state={areas:[],centrifugas:[],salas:[],acciones:[],refrigeradores:[],refr
 function today(){return new Date().toISOString().split('T')[0]}
 function showToast(m,t='success'){const el=document.getElementById('toast');el.textContent=m;el.className=`show toast-${t}`;setTimeout(()=>{el.className=''},3200)}
 function setLoading(b,s,t,l){document.getElementById(b).disabled=l;document.getElementById(s).classList.toggle('visible',l);document.getElementById(t).style.display=l?'none':''}
-async function fetchWithTimeout(url, options = {}, timeout = 3500) {
+async function fetchWithTimeout(url, options = {}, timeout = 25000) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
   try {
