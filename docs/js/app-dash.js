@@ -307,6 +307,18 @@ function printLabel50x30() {
     return res;
   };
 
+  const wrapText = (str, maxChars = 17) => {
+    if (!str) return [];
+    if (str.length <= maxChars) return [str];
+    let splitIdx = str.lastIndexOf(' ', maxChars);
+    if (splitIdx === -1 || splitIdx < 5) {
+      splitIdx = maxChars;
+    }
+    const first = str.substring(0, splitIdx).trim();
+    const second = str.substring(splitIdx).trim();
+    return [first, second];
+  };
+
   const cleanCategory = removeAccents(category);
   const cleanDetails = removeAccents(details);
   
@@ -318,17 +330,22 @@ function printLabel50x30() {
   const htmlDetails = details;
   const htmlDetails2 = cleanText(details2);
 
+  const slblDetails2Lines = wrapText(slblDetails2, 17);
+
   // 1. Generate SLBL file content (using literal #10 and #13)
   let slbl = '#10N#10';
-  slbl += `b25,30,Q,,s4,"${url}"#10#13`;
-  slbl += 'A215,30,0,3,1,1,N,"Lab. Clinico HRT"#10#13';
-  slbl += 'LO215,55,168,2#10#13';
-  slbl += `A215,70,0,1,1,1,N,"${slblCategory.substring(0, 24)}"#10#13`;
-  slbl += `A215,95,0,2,1,1,N,"${slblDetails.substring(0, 18)}"#10#13`;
-  if (slblDetails2) {
-    slbl += `A215,125,0,2,1,1,N,"${slblDetails2.substring(0, 18)}"#10#13`;
+  slbl += `b30,30,Q,,s4,"${url}"#10#13`;
+  slbl += 'A205,30,0,3,1,1,N,"Lab. Clinico HRT"#10#13';
+  slbl += 'LO205,55,178,2#10#13';
+  slbl += `A205,70,0,1,1,1,N,"${slblCategory.substring(0, 24)}"#10#13`;
+  slbl += `A205,95,0,2,1,1,N,"${slblDetails.substring(0, 18)}"#10#13`;
+  if (slblDetails2Lines[0]) {
+    slbl += `A205,122,0,2,1,1,N,"${slblDetails2Lines[0]}"#10#13`;
   }
-  slbl += 'A215,195,0,1,1,1,N,"Escanear para registrar"#10#13';
+  if (slblDetails2Lines[1]) {
+    slbl += `A205,148,0,2,1,1,N,"${slblDetails2Lines[1].substring(0, 18)}"#10#13`;
+  }
+  slbl += 'A205,195,0,1,1,1,N,"Escanear para registrar"#10#13';
   slbl += 'P1#10#13';
 
   // Trigger download of the SLBL file
@@ -433,9 +450,11 @@ function printLabel50x30() {
       line-height: 1.1;
       margin: 0 0 1mm 0;
       color: #444;
-      white-space: nowrap;
+      word-break: break-word;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
       overflow: hidden;
-      text-overflow: ellipsis;
       width: 100%;
     }
     .footer {
