@@ -5,8 +5,20 @@ const state={areas:[],centrifugas:[],salas:[],acciones:[],refrigeradores:[],refr
 function today(){return new Date().toISOString().split('T')[0]}
 function showToast(m,t='success'){const el=document.getElementById('toast');el.textContent=m;el.className=`show toast-${t}`;setTimeout(()=>{el.className=''},3200)}
 function setLoading(b,s,t,l){document.getElementById(b).disabled=l;document.getElementById(s).classList.toggle('visible',l);document.getElementById(t).style.display=l?'none':''}
-async function apiGet(p){const u=new URL(API_URL);Object.entries(p).forEach(([k,v])=>u.searchParams.set(k,v));const r=await fetch(u.toString(),{redirect:'follow'});if(!r.ok)throw new Error(`HTTP ${r.status}`);return r.json()}
-async function apiPost(b){const r=await fetch(API_URL,{method:'POST',redirect:'follow',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(b)});if(!r.ok)throw new Error(`HTTP ${r.status}`);return r.json()}
+async function fetchWithTimeout(url, options = {}, timeout = 3500) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(id);
+    return response;
+  } catch (error) {
+    clearTimeout(id);
+    throw error;
+  }
+}
+async function apiGet(p){const u=new URL(API_URL);Object.entries(p).forEach(([k,v])=>u.searchParams.set(k,v));const r=await fetchWithTimeout(u.toString(),{redirect:'follow'});if(!r.ok)throw new Error(`HTTP ${r.status}`);return r.json()}
+async function apiPost(b){const r=await fetchWithTimeout(API_URL,{method:'POST',redirect:'follow',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(b)});if(!r.ok)throw new Error(`HTTP ${r.status}`);return r.json()}
 
 // Clock
 function updateClock(){const n=new Date(),h=n.getHours(),m=n.getMinutes(),ap=h<12?'AM':'PM';document.getElementById('clock-time').textContent=String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');const b=document.getElementById('header-ampm-badge');b.textContent=ap;b.className=`ampm-${ap}`;const d=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'],ms=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];document.getElementById('clock-date').textContent=`${d[n.getDay()]} ${n.getDate()} ${ms[n.getMonth()]} ${n.getFullYear()}`}
@@ -173,7 +185,44 @@ async function loadMaestros(){
     if (typeof populateEtiquetadoraModelDropdown === 'function') {
       populateEtiquetadoraModelDropdown();
     }
-  }catch(e){showToast('Error cargando maestros.','error')}
+  }catch(e){
+    console.warn('Error cargando maestros de la API, cargando datos locales de prueba...', e);
+    showToast('⚠️ Usando datos de prueba locales (Modo Offline/Pruebas)','info');
+    state.areas = ["Área Química", "Área Hematología", "Área Preanálisis", "Área Microbiología"];
+    state.centrifugas = ["Centrífuga 1", "Centrífuga 2", "Centrífuga 3", "Centrífuga 4", "Centrífuga 5", "Centrífuga 18"];
+    state.salas = ["Sala Procesos", "Sala Recepción", "Sala Toma Muestras"];
+    state.acciones = ["Avisar a Coordinador", "Llamar a Soporte", "Reiniciar Equipo"];
+    state.refrigeradores = [
+      {equipo: "Refri 1 (2-8°C)", tempMin: 2, tempMax: 8, tipo: "Refrigerador"},
+      {equipo: "Refri 2 (2-8°C)", tempMin: 2, tempMax: 8, tipo: "Refrigerador"},
+      {equipo: "Congelador 1 (-20°C)", tempMin: -25, tempMax: -15, tipo: "Congelador"}
+    ];
+    state.refriLimpieza = ["Refri 1 (2-8°C)", "Refri 2 (2-8°C)", "Congelador 1 (-20°C)"];
+    state.etiquetadoras = [
+      {id: "ZD420-111", nombreReal: "ZD420-1", nombrePractico: "Rotuladora Preanálisis", modelo: "ZD420", tipoConexion: "USB", direccionIp: "No aplica", piso: "Piso 1", ubicacion: "Preanálisis", comentario: "Zebra ZD420 USB"},
+      {id: "ZD421-222", nombreReal: "ZD421-1", nombrePractico: "Rotuladora Hematología", modelo: "ZD421", tipoConexion: "Ethernet", direccionIp: "10.10.1.50", piso: "Piso 1", ubicacion: "Hematología", comentario: "Zebra ZD421 Red"},
+      {id: "ZD220-333", nombreReal: "ZD220-1", nombrePractico: "Rotuladora Microbiología", modelo: "ZD220", tipoConexion: "USB", direccionIp: "No aplica", piso: "Piso 2", ubicacion: "Microbiología", comentario: "Zebra ZD220 USB"}
+    ];
+    state.dashMaestros={areas:state.areas,centrifugas:state.centrifugas,salas:state.salas,refrigeradores:state.refrigeradores,refriLimpieza:state.refriLimpieza};
+    
+    populateSelect('termo-area',state.areas,'Seleccionar área…');
+    populateSelect('admin-select',state.areas,'— Seleccionar —');
+    populateChips('cent-chips',state.centrifugas);
+    populateChips('meson-chips',state.salas);
+    const refriNames=state.refrigeradores.map(r=>r.equipo);
+    populateSelect('refri-equipo',refriNames,'Seleccionar equipo…');
+    populateChips('limp-refri-chips',state.refriLimpieza);
+    const acOpts='<option value="">Seleccionar acción…</option>'+state.acciones.map(a=>`<option value="${a}">${a}</option>`).join('');
+    document.getElementById('termo-accion').innerHTML=acOpts;
+    document.getElementById('refri-accion').innerHTML=acOpts;
+    
+    if (typeof renderEtiquetadoraDropdown === 'function') {
+      renderEtiquetadoraDropdown();
+    }
+    if (typeof populateEtiquetadoraModelDropdown === 'function') {
+      populateEtiquetadoraModelDropdown();
+    }
+  }
 }
 
 function populateSelect(id,items,ph){const s=document.getElementById(id);s.innerHTML=`<option value="">${ph}</option>`+items.map(i=>`<option value="${i}">${i}</option>`).join('')}

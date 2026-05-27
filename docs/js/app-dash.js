@@ -72,7 +72,12 @@ async function loadDashboard(forceReload){
     state.dashData=reg;
     state.dashCache={key:cacheKey,data:reg,rev:rev,timestamp:Date.now()};
     applyDashData(reg);
-  }catch(err){showToast('❌ Error cargando dashboard','error')}
+  }catch(err){
+    console.warn('Error cargando dashboard, cargando mock local...', err);
+    const mockReg={termo:[],centrifugas:[],mesones:[],refriTemp:[],limpiezaRefri:[],conductividad:[]};
+    state.dashData=mockReg;
+    applyDashData(mockReg);
+  }
   document.getElementById('dash-loading').style.display='none';updateCacheIndicator();
 }
 function applyDashData(reg){
@@ -207,6 +212,7 @@ function switchQrTab(tab){
   document.getElementById('qr-label-text').style.display='none';
   document.getElementById('qr-url-text').style.display='none';
   document.getElementById('btn-print-qr').style.display='none';
+  document.getElementById('btn-print-label').style.display='none';
   if(tab==='conductividad'){
     // Conductividad: unique QR, no selector needed
     selGroup.style.display='none';
@@ -256,9 +262,186 @@ function generateQR(){
   document.getElementById('qr-url-text').textContent=url;
   document.getElementById('qr-url-text').style.display='block';
   document.getElementById('btn-print-qr').style.display='inline-flex';
+  document.getElementById('btn-print-label').style.display='inline-flex';
 }
 
 function printQR(){const val=document.getElementById('qr-label-text').textContent;const img=document.querySelector('#qr-canvas img');if(!img)return;const w=window.open('','_blank');w.document.write(`<!DOCTYPE html><html><head><title>QR - ${val}</title><style>body{font-family:sans-serif;text-align:center;padding:40px;}h2{margin-bottom:16px;}p{color:#555;font-size:13px;margin-top:12px;}</style></head><body><h2>Registros Mensuales</h2><h3>${val}</h3><img src="${img.src}" style="width:200px;height:200px;"/><p>Escanear para registrar</p><script>window.onload=()=>{window.print();}<\/script></body></html>`);w.document.close()}
+
+function printLabel50x30() {
+  const val = document.getElementById('qr-label-text').textContent;
+  const url = document.getElementById('qr-url-text').textContent;
+  const img = document.querySelector('#qr-canvas img');
+  if (!img) return;
+
+  let category = '';
+  let details = '';
+  let details2 = '';
+
+  if (state.qrTab === 'etiquetadoras') {
+    category = 'Etiquetadora';
+    const rawVal = document.getElementById('admin-select').value;
+    const et = state.etiquetadoras.find(e => e.nombreReal === rawVal);
+    if (et) {
+      details = et.nombreReal || '';
+      details2 = et.nombrePractico || '';
+    } else {
+      details = rawVal;
+    }
+  } else {
+    const parts = val.split('-');
+    category = parts[0] ? parts[0].trim() : '';
+    details = parts[1] ? parts[1].trim() : '';
+  }
+
+  // 1. Generate SLBL file content (using literal #10 and #13)
+  let slbl = '#10N#10';
+  slbl += `b30,30,Q,,s6,"${url}"#10#13`;
+  slbl += 'A208,30,0,3,1,1,N,"Lab. Clinico HRT"#10#13';
+  slbl += 'LO208,55,172,2#10#13';
+  slbl += `A208,70,0,1,1,1,N,"${category.substring(0, 24)}"#10#13`;
+  slbl += `A208,95,0,2,1,1,N,"${details.substring(0, 18)}"#10#13`;
+  if (details2) {
+    slbl += `A208,125,0,2,1,1,N,"${details2.substring(0, 18)}"#10#13`;
+  }
+  slbl += 'A208,195,0,1,1,1,N,"Escanear para registrar"#10#13';
+  slbl += 'P1#10#13';
+
+  // Trigger download of the SLBL file
+  const blob = new Blob([slbl], { type: 'text/plain;charset=utf-8' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  const cleanName = val.replace(/[^a-zA-Z0-9]/g, '_');
+  link.download = `etiqueta_${cleanName}.slbl`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  // 2. Open Fallback HTML Print window
+  const w = window.open('', '_blank');
+  w.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <title>Etiqueta 50x30 - ${val}</title>
+  <style>
+    @page {
+      size: 50mm 30mm;
+      margin: 0;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      padding: 1.5mm 1mm 1.5mm 3.5mm;
+      width: 50mm;
+      height: 30mm;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 2.5mm;
+      overflow: hidden;
+      background: white;
+      color: black;
+    }
+    .qr-container {
+      width: 24mm;
+      height: 24mm;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .qr-container img {
+      width: 23mm;
+      height: 23mm;
+      display: block;
+    }
+    .text-container {
+      width: 18mm;
+      height: 26mm;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: flex-start;
+      padding-left: 0.5mm;
+    }
+    .title {
+      font-size: 5pt;
+      font-weight: 800;
+      text-transform: uppercase;
+      margin: 0 0 1mm 0;
+      border-bottom: 0.5px solid #000;
+      width: 100%;
+      padding-bottom: 0.5mm;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .category {
+      font-size: 5pt;
+      font-weight: 600;
+      color: #333;
+      margin: 0 0 0.5mm 0;
+      text-transform: uppercase;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      width: 100%;
+    }
+    .details {
+      font-size: 7.5pt;
+      font-weight: 700;
+      line-height: 1.1;
+      margin: 0 0 0.5mm 0;
+      color: #000;
+      word-break: break-word;
+      display: -webkit-box;
+      -webkit-line-clamp: ${details2 ? '1' : '2'};
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      width: 100%;
+    }
+    .details-secondary {
+      font-size: 6.5pt;
+      font-weight: 600;
+      line-height: 1.1;
+      margin: 0 0 1mm 0;
+      color: #444;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      width: 100%;
+    }
+    .footer {
+      font-size: 4.5pt;
+      color: #555;
+      margin-top: auto;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="qr-container">
+    <img src="${img.src}" />
+  </div>
+  <div class="text-container">
+    <div class="title">Lab. Clínico HRT</div>
+    <div class="category">${category}</div>
+    <div class="details">${details}</div>
+    ${details2 ? '<div class="details-secondary">' + details2 + '</div>' : ''}
+    <div class="footer">Escanear para registrar</div>
+  </div>
+  <script>
+    window.onload = () => {
+      window.print();
+      setTimeout(() => { window.close(); }, 500);
+    };
+  </script>
+</body>
+</html>`);
+  w.document.close();
+}
 
 // ── Etiquetadoras ────────────────────────────────────────────
 
