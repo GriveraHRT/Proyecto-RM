@@ -330,22 +330,22 @@ function printLabel50x30() {
   const htmlDetails = details;
   const htmlDetails2 = cleanText(details2);
 
-  const slblDetails2Lines = wrapText(slblDetails2, 17);
+  const slblDetails2Lines = wrapText(slblDetails2, 18);
 
   // 1. Generate SLBL file content (using literal #10 and #13)
   let slbl = '#10N#10';
-  slbl += `b30,30,Q,,s4,"${url}"#10#13`;
-  slbl += 'A205,30,0,3,1,1,N,"Lab. Clinico HRT"#10#13';
-  slbl += 'LO205,55,178,2#10#13';
-  slbl += `A205,70,0,1,1,1,N,"${slblCategory.substring(0, 24)}"#10#13`;
-  slbl += `A205,95,0,2,1,1,N,"${slblDetails.substring(0, 18)}"#10#13`;
+  slbl += `b35,30,Q,,s4,"${url}"#10#13`;
+  slbl += 'A190,30,0,3,1,1,N,"Lab. Clinico HRT"#10#13';
+  slbl += 'LO190,55,195,2#10#13';
+  slbl += `A190,70,0,1,1,1,N,"${slblCategory.substring(0, 24)}"#10#13`;
+  slbl += `A190,95,0,2,1,1,N,"${slblDetails.substring(0, 20)}"#10#13`;
   if (slblDetails2Lines[0]) {
-    slbl += `A205,122,0,2,1,1,N,"${slblDetails2Lines[0]}"#10#13`;
+    slbl += `A190,122,0,2,1,1,N,"${slblDetails2Lines[0]}"#10#13`;
   }
   if (slblDetails2Lines[1]) {
-    slbl += `A205,148,0,2,1,1,N,"${slblDetails2Lines[1].substring(0, 18)}"#10#13`;
+    slbl += `A190,148,0,2,1,1,N,"${slblDetails2Lines[1].substring(0, 20)}"#10#13`;
   }
-  slbl += 'A205,195,0,1,1,1,N,"Escanear para registrar"#10#13';
+  slbl += 'A190,195,0,1,1,1,N,"Escanear para registrar"#10#13';
   slbl += 'P1#10#13';
 
   // Trigger download of the SLBL file
@@ -374,7 +374,7 @@ function printLabel50x30() {
     }
     body {
       margin: 0;
-      padding: 1.5mm 1mm 1.5mm 3.5mm;
+      padding: 1.5mm 1mm 1.5mm 4.2mm;
       width: 50mm;
       height: 30mm;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -382,7 +382,7 @@ function printLabel50x30() {
       flex-direction: row;
       align-items: center;
       justify-content: flex-start;
-      gap: 2.5mm;
+      gap: 1.2mm;
       overflow: hidden;
       background: white;
       color: black;
@@ -400,7 +400,7 @@ function printLabel50x30() {
       display: block;
     }
     .text-container {
-      width: 18mm;
+      width: 19.8mm;
       height: 26mm;
       display: flex;
       flex-direction: column;
