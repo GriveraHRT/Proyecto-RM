@@ -295,7 +295,7 @@ function printLabel50x30() {
 
   // 1. Generate SLBL file content (using literal #10 and #13)
   let slbl = '#10N#10';
-  slbl += `b30,30,Q,,s6,"${url}"#10#13`;
+  slbl += `b30,30,Q,,s3,"${url}"#10#13`;
   slbl += 'A208,30,0,3,1,1,N,"Lab. Clinico HRT"#10#13';
   slbl += 'LO208,55,172,2#10#13';
   slbl += `A208,70,0,1,1,1,N,"${category.substring(0, 24)}"#10#13`;
