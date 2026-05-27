@@ -297,21 +297,38 @@ function printLabel50x30() {
     if (!str) return '';
     return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   };
+
+  const cleanText = (str) => {
+    if (!str) return '';
+    let res = str.replace(/(etiquetadora|rotuladora)/gi, '').replace(/^[\s\-_,.:#|]+|[\s\-_,.:#|]+$/g, '').trim();
+    if (res) {
+      res = res.charAt(0).toUpperCase() + res.slice(1);
+    }
+    return res;
+  };
+
   const cleanCategory = removeAccents(category);
   const cleanDetails = removeAccents(details);
-  const cleanDetails2 = removeAccents(details2);
+  
+  const slblCategory = cleanCategory;
+  const slblDetails = cleanDetails;
+  const slblDetails2 = cleanText(removeAccents(details2));
+
+  const htmlCategory = category;
+  const htmlDetails = details;
+  const htmlDetails2 = cleanText(details2);
 
   // 1. Generate SLBL file content (using literal #10 and #13)
   let slbl = '#10N#10';
-  slbl += `b20,30,Q,,s4,"${url}"#10#13`;
-  slbl += 'A212,30,0,3,1,1,N,"Lab. Clinico HRT"#10#13';
-  slbl += 'LO212,55,170,2#10#13';
-  slbl += `A212,70,0,1,1,1,N,"${cleanCategory.substring(0, 24)}"#10#13`;
-  slbl += `A212,95,0,2,1,1,N,"${cleanDetails.substring(0, 18)}"#10#13`;
-  if (cleanDetails2) {
-    slbl += `A212,125,0,2,1,1,N,"${cleanDetails2.substring(0, 18)}"#10#13`;
+  slbl += `b25,30,Q,,s4,"${url}"#10#13`;
+  slbl += 'A215,30,0,3,1,1,N,"Lab. Clinico HRT"#10#13';
+  slbl += 'LO215,55,168,2#10#13';
+  slbl += `A215,70,0,1,1,1,N,"${slblCategory.substring(0, 24)}"#10#13`;
+  slbl += `A215,95,0,2,1,1,N,"${slblDetails.substring(0, 18)}"#10#13`;
+  if (slblDetails2) {
+    slbl += `A215,125,0,2,1,1,N,"${slblDetails2.substring(0, 18)}"#10#13`;
   }
-  slbl += 'A212,195,0,1,1,1,N,"Escanear para registrar"#10#13';
+  slbl += 'A215,195,0,1,1,1,N,"Escanear para registrar"#10#13';
   slbl += 'P1#10#13';
 
   // Trigger download of the SLBL file
@@ -435,9 +452,9 @@ function printLabel50x30() {
   </div>
   <div class="text-container">
     <div class="title">Lab. Clínico HRT</div>
-    <div class="category">${category}</div>
-    <div class="details">${details}</div>
-    ${details2 ? '<div class="details-secondary">' + details2 + '</div>' : ''}
+    <div class="category">${htmlCategory}</div>
+    <div class="details">${htmlDetails}</div>
+    ${htmlDetails2 ? '<div class="details-secondary">' + htmlDetails2 + '</div>' : ''}
     <div class="footer">Escanear para registrar</div>
   </div>
   <script>
