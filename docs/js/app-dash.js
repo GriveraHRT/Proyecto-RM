@@ -293,17 +293,25 @@ function printLabel50x30() {
     details = parts[1] ? parts[1].trim() : '';
   }
 
+  const removeAccents = (str) => {
+    if (!str) return '';
+    return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  };
+  const cleanCategory = removeAccents(category);
+  const cleanDetails = removeAccents(details);
+  const cleanDetails2 = removeAccents(details2);
+
   // 1. Generate SLBL file content (using literal #10 and #13)
   let slbl = '#10N#10';
-  slbl += `b30,30,Q,,s3,"${url}"#10#13`;
+  slbl += `b30,52,Q,,s3,"${url}"#10#13`;
   slbl += 'A208,30,0,3,1,1,N,"Lab. Clinico HRT"#10#13';
   slbl += 'LO208,55,172,2#10#13';
-  slbl += `A208,70,0,1,1,1,N,"${category.substring(0, 24)}"#10#13`;
-  slbl += `A208,95,0,2,1,1,N,"${details.substring(0, 18)}"#10#13`;
-  if (details2) {
-    slbl += `A208,125,0,2,1,1,N,"${details2.substring(0, 18)}"#10#13`;
+  slbl += `A208,70,0,1,1,1,N,"${cleanCategory.substring(0, 24)}"#10#13`;
+  slbl += `A208,95,0,2,1,1,N,"${cleanDetails.substring(0, 18)}"#10#13`;
+  if (cleanDetails2) {
+    slbl += `A208,125,0,2,1,1,N,"${cleanDetails2.substring(0, 18)}"#10#13`;
   }
-  slbl += 'A208,195,0,1,1,1,N,"Escanear para registrar"#10#13';
+  slbl += 'A200,195,0,1,1,1,N,"Escanear para registrar"#10#13';
   slbl += 'P1#10#13';
 
   // Trigger download of the SLBL file
