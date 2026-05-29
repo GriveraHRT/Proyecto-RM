@@ -117,7 +117,14 @@ function getSpreadsheet() {
 }
 
 function getSheet(name) {
-  return getSpreadsheet().getSheetByName(name);
+  const ss = getSpreadsheet();
+  let sheet = ss.getSheetByName(name);
+  if (!sheet) {
+    Logger.log('Hoja no encontrada: ' + name + '. Inicializando Spreadsheet...');
+    initializeSpreadsheet();
+    sheet = ss.getSheetByName(name);
+  }
+  return sheet;
 }
 
 function parseFecha(fechaStr) {
