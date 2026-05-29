@@ -1539,16 +1539,27 @@ function getNotificaciones() {
   }
   
   let data = sheet.getDataRange().getValues();
-  if (data.length <= 1) {
-    const defaults = [
-      ['Temperatura Ambiental', 'termo', 'grivera@hospitaldetalca.cl', 'FALSE'],
-      ['Mantenimiento Centrífugas', 'centrifugas', 'grivera@hospitaldetalca.cl', 'FALSE'],
-      ['Limpieza Mesones', 'mesones', 'grivera@hospitaldetalca.cl', 'FALSE'],
-      ['Temperatura Refrigeradores', 'refriTemp', 'grivera@hospitaldetalca.cl', 'FALSE'],
-      ['Limpieza Refrigeradores', 'limpRefri', 'grivera@hospitaldetalca.cl', 'FALSE'],
-      ['Conductividad del Agua', 'conductividad', 'grivera@hospitaldetalca.cl', 'FALSE']
-    ];
-    defaults.forEach(row => sheet.appendRow(row));
+  const existingClaves = data.slice(1).map(r => String(r[1]));
+  
+  const defaults = [
+    ['Temperatura Ambiental', 'termo', 'grivera@hospitaldetalca.cl', 'FALSE'],
+    ['Mantenimiento Centrífugas', 'centrifugas', 'grivera@hospitaldetalca.cl', 'FALSE'],
+    ['Limpieza Mesones', 'mesones', 'grivera@hospitaldetalca.cl', 'FALSE'],
+    ['Temperatura Refrigeradores', 'refriTemp', 'grivera@hospitaldetalca.cl', 'FALSE'],
+    ['Limpieza Refrigeradores', 'limpRefri', 'grivera@hospitaldetalca.cl', 'FALSE'],
+    ['Conductividad del Agua', 'conductividad', 'grivera@hospitaldetalca.cl', 'FALSE'],
+    ['Mantención Cobas', 'cobas', 'grivera@hospitaldetalca.cl', 'FALSE']
+  ];
+  
+  let changed = false;
+  defaults.forEach(def => {
+    if (existingClaves.indexOf(def[1]) === -1) {
+      sheet.appendRow(def);
+      changed = true;
+    }
+  });
+  
+  if (changed) {
     data = sheet.getDataRange().getValues();
   }
   
