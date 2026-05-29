@@ -7,7 +7,13 @@
   <meta name="description" content="Registros Mensuales — Laboratorio Clínico, Hospital de Talca." />
   <title>Registros Mensuales — Lab Clínico HRT</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600&display=swap" media="print" onload="this.media='all'" />
-  <link rel="stylesheet" href="css/style.css" />
+  <script>
+    // Se autodetecta y define la URL del Web App en tiempo de ejecución
+    var API_URL = '<?!= ScriptApp.getService().getUrl() ?>';
+    // Se reciben los parámetros pasados al doGet desde Apps Script
+    window.QR_PARAMS = <?!= JSON.stringify(parameter) ?>;
+  </script>
+  <?!= HtmlService.createHtmlOutputFromFile('css/style').getContent(); ?>
 </head>
 <body>
 
@@ -99,6 +105,14 @@
       <div class="stat-card">
         <div class="stat-number" id="stat-conduct">-</div>
         <div class="stat-label">💧 Conduct.</div>
+      </div>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card" style="grid-column: span 3; padding: 10px 14px;">
+        <div style="display:flex; align-items:center; justify-content:center; gap:16px;">
+          <span class="stat-number" id="stat-cobas">-</span>
+          <span class="stat-label" style="margin-top:0;">🔬 Mantención Cobas</span>
+        </div>
       </div>
     </div>
 
@@ -1059,8 +1073,8 @@
 <div id="toast"></div>
 
 <!-- ══ SCRIPTS ══════════════════════════════════════════════ -->
-<script src="js/qrcode.min.js"></script>
-<script src="js/app-core.js?v=1.1.2"></script>
-<script src="js/app-dash.js?v=1.1.2"></script>
+<?!= HtmlService.createHtmlOutputFromFile('js/qrcode').getContent(); ?>
+<?!= HtmlService.createHtmlOutputFromFile('js/app-core').getContent(); ?>
+<?!= HtmlService.createHtmlOutputFromFile('js/app-dash').getContent(); ?>
 </body>
 </html>

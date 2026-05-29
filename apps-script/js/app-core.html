@@ -1,4 +1,7 @@
-const API_URL='https://script.google.com/macros/s/AKfycbxuqcui0-hjJ721uMWZk3w-4l2fVCaBWQgdMJqVMb5Pno339Jqetq4r62p3-1gGBUvFOg/exec';
+<script>
+if (typeof API_URL === 'undefined') {
+  var API_URL = 'https://script.google.com/macros/s/AKfycbxuqcui0-hjJ721uMWZk3w-4l2fVCaBWQgdMJqVMb5Pno339Jqetq4r62p3-1gGBUvFOg/exec';
+}
 const PREANALISIS=[1,2,3,4,5,18];
 const state={areas:[],centrifugas:[],salas:[],acciones:[],refrigeradores:[],refriLimpieza:[],cobasObs:[],ampm:'AM',ampmRefri:'AM',ampmConduct:'AM',qrInstance:null,qrTab:'areas',dashMes:new Date().getMonth()+1,dashAnio:new Date().getFullYear(),dashTab:'diario',dashData:null,dashMaestros:null,dashCache:null};
 
@@ -425,4 +428,4 @@ function updateCacheIndicator(){
   else{el.textContent='hace '+mins+' min';el.className='cache-indicator cache-stale'}
   el.style.display='inline-block';
 }
-
+</script>

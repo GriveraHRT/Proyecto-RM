@@ -1,3 +1,4 @@
+<script>
 // Forms — Termo
 document.getElementById('form-termo').addEventListener('submit',async e=>{
   e.preventDefault();
@@ -590,12 +591,14 @@ function generateQR(){
   const canvas=document.getElementById('qr-canvas');
   canvas.innerHTML='';
   if(state.qrInstance)try{state.qrInstance.clear()}catch(e){}
+  
   try {
     state.qrInstance=new QRCode(canvas,{text:url,width:220,height:220,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H});
   } catch(e) {
     console.warn('Error con la librería local QRCode, usando API qrserver.com como respaldo:', e);
     canvas.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(url)}" style="width:220px;height:220px;display:block;" />`;
   }
+  
   wrap.classList.add('visible');
   document.getElementById('qr-label-text').textContent=val;
   document.getElementById('qr-label-text').style.display='block';
@@ -1243,3 +1246,4 @@ async function init(){
   loadDashboard();
 }
 init();
+</script>

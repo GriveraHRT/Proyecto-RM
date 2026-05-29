@@ -1,6 +1,13 @@
 // ============================================================
 // PROYECTO RM — Registros Laboratorio — Hospital de Talca
 // Backend: Google Apps Script  v4.0
+//
+// ⚠️ REGLA CRÍTICA Y MANDATORIA:
+// NO SE DEBEN MODIFICAR las rutas de enrutamiento (parámetros de consulta
+// como ?area=..., ?sala=..., ?centrifuga=..., ?grupo=..., ?refri=..., ?limprefri=..., ?modulo=conductividad, ?etiquetadora=...)
+// ni alterar la URL base de la aplicación.
+// Los códigos QR correspondientes ya han sido impresos y pegados físicamente en sus respectivas áreas.
+// Cualquier modificación a los nombres de estos parámetros romperá el prellenado y redireccionamiento de los códigos QR activos.
 // ============================================================
 
 const PASSWORD_REVISION = 'HRT123';
@@ -35,6 +42,7 @@ const SHEETS = {
   REFRI_REG:        'Reg. Temp. Refrigeradores',
   LIMP_REFRI:       'Reg. Limpieza Refrigeradores',
   CONDUCT_REG:      'Reg. Conductividad Agua',
+  COBAS_REG:        'Reg. Cobas',
   REVISIONES:       'Revisiones',
   AREAS:            'Maestro Areas',
   CENTRIFUGAS:      'Maestro Centrifugas',
@@ -43,7 +51,62 @@ const SHEETS = {
   REFRI_LIMP_MASTER:'Maestro Refri. Limpieza',
   ACCIONES:         'Maestro Acciones',
   ETIQUETADORAS_MASTER: 'Maestro Etiquetadoras',
-  ETIQUETADORAS_REG:    'Reg. Etiquetadoras'
+  ETIQUETADORAS_REG:    'Reg. Etiquetadoras',
+  NOTIFICACIONES:       'Maestro Notificaciones'
+};
+
+const COBAS_PERIODIC_TASKS = {
+  'Semanal': {
+    interval: 7,
+    items: [
+      'Limpieza cubiertas de cubetas (c702)',
+      'Limpieza estaciones de lavado (ISE, c702)',
+      'Limpieza boca de descarga de tapones (c702)',
+      'Chequeo gripper (c702)',
+      'Pipe semanal'
+    ]
+  },
+  'Quincenal': {
+    interval: 15,
+    items: [
+      'Limpieza conductos aspiración PC y CC (e801)',
+      'Limpieza agujas y sustitución copas PC y CC (e801)',
+      'Limpieza agitadores vortex y estaciones de separación (e801)',
+      'Limpieza disco incubación y agitador micropartículas (e801)',
+      'Limpieza estaciones de lavado (e801)',
+      'Pipe quincenal'
+    ]
+  },
+  'Mensual': {
+    interval: 30,
+    items: [
+      'Limpieza bidones de agua',
+      'Chequeo recipiente de dilución y limpieza filtros de aspiración (ISE)',
+      'Limpieza baño de incubación y cambio de cubetas (c702)',
+      'Limpieza filtros de aspiración de detergentes (c702)',
+      'Limpieza filtros de aire (c702/e801)',
+      'Limpieza pasos de flujo ECL y prelavado (e801)'
+    ]
+  },
+  'Cada 2 meses': {
+    interval: 60,
+    items: [
+      'Sustitución de electrodos (Na/K/Cl/Ref/ISE)'
+    ]
+  },
+  'Trimestral': {
+    interval: 90,
+    items: [
+      'Lavado paso de flujo ISE'
+    ]
+  },
+  'Semestral': {
+    interval: 180,
+    items: [
+      'Limpieza agitadores ultrasónicos y filtro de válvula solenoide',
+      'Sustitución de electrodo de referencia y lámpara fotométrica'
+    ]
+  }
 };
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -83,6 +146,17 @@ function insertRowAtTop(sheet, values) {
 
 function doGet(e) {
   const action = e.parameter.action;
+  
+  // Si no hay acción específica en la URL, servimos la interfaz de usuario (frontend)
+  if (!action) {
+    const tmp = HtmlService.createTemplateFromFile('index');
+    tmp.parameter = e.parameter || {};
+    return tmp.evaluate()
+      .setTitle('Registros Mensuales — Lab Clínico HRT')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  }
+
   try {
     switch (action) {
       case 'getAreas':          return jsonResponse(getAreas());
@@ -96,6 +170,7 @@ function doGet(e) {
       case 'getMaestros':       return jsonResponse(getMaestros());
       case 'getEtiquetadoras':  return jsonResponse(getEtiquetadoras());
       case 'getEtiquetadoraHistorial': return jsonResponse(getEtiquetadoraHistorial(e.parameter.etiquetadora));
+      case 'getNotificaciones': return jsonResponse(getNotificaciones());
       case 'SETUP_INIT_TA':     return jsonResponse(setup());
       case 'REINIT':            return jsonResponse(reinitialize());
       default:                  return jsonResponse({ error: 'Acción no reconocida: ' + action });
@@ -120,9 +195,11 @@ function doPost(e) {
       case 'saveRefriTemp':       return jsonResponse(saveRefriTemp(data));
       case 'saveLimpiezaRefri':   return jsonResponse(saveLimpiezaRefri(data));
       case 'saveConductividad':   return jsonResponse(saveConductividad(data));
+      case 'saveCobas':           return jsonResponse(saveCobas(data));
       case 'saveEtiquetadoraRegistro': return jsonResponse(saveEtiquetadoraRegistro(data));
       case 'updateEtiquetadoraMaestro': return jsonResponse(updateEtiquetadoraMaestro(data));
       case 'marcarRevisado':      return jsonResponse(marcarRevisado(data));
+      case 'saveNotificaciones':  return jsonResponse(saveNotificaciones(data));
       default:                    return jsonResponse({ error: 'Acción no reconocida: ' + data.action });
     }
   } catch (err) {
@@ -176,7 +253,47 @@ function getMaestros() {
     acciones: getAcciones(),
     refrigeradores: getRefrigeradores(),
     refriLimpieza: getRefriLimpieza(),
-    etiquetadoras: getEtiquetadoras()
+    etiquetadoras: getEtiquetadoras(),
+    sugerencias: getSugerenciasHistoricas()
+  };
+}
+
+/** Obtiene valores únicos de una columna específica de una hoja, escaneando desde el final hacia el principio */
+function getUniqueColumnValues(sheetName, colIndex) {
+  try {
+    const sheet = getSheet(sheetName);
+    if (!sheet) return [];
+    const lastRow = sheet.getLastRow();
+    if (lastRow <= 1) return [];
+    
+    const values = sheet.getRange(2, colIndex + 1, lastRow - 1, 1).getValues();
+    const set = new Set();
+    for (let i = values.length - 1; i >= 0; i--) {
+      const val = String(values[i][0]).trim();
+      if (val && val !== '-' && val !== '—' && val.toLowerCase() !== 'opcional...' && val.toLowerCase() !== 'opcional') {
+        set.add(val);
+        if (set.size >= 30) break; // Límite de 30 sugerencias por campo
+      }
+    }
+    return Array.from(set);
+  } catch (e) {
+    Logger.log('Error obteniendo sugerencias para ' + sheetName + ': ' + e.toString());
+    return [];
+  }
+}
+
+/** Compila las sugerencias históricas de observaciones y comentarios de todas las planillas */
+function getSugerenciasHistoricas() {
+  return {
+    termoObs: getUniqueColumnValues(SHEETS.TERMO, 10),
+    centObs: getUniqueColumnValues(SHEETS.CENT_REG, 7),
+    mesonObs: getUniqueColumnValues(SHEETS.MESONES, 6),
+    refriObs: getUniqueColumnValues(SHEETS.REFRI_REG, 10),
+    limpRefriObs: getUniqueColumnValues(SHEETS.LIMP_REFRI, 7),
+    conductObs: getUniqueColumnValues(SHEETS.CONDUCT_REG, 7),
+    etComentario: getUniqueColumnValues(SHEETS.ETIQUETADORAS_MASTER, 8),
+    etBitacoraDesc: getUniqueColumnValues(SHEETS.ETIQUETADORAS_REG, 6),
+    cobasObs: getUniqueColumnValues(SHEETS.COBAS_REG, 8)
   };
 }
 
@@ -408,6 +525,32 @@ function saveConductividad(data) {
   return { success: true, message: 'Registro de Conductividad guardado.' };
 }
 
+// Cobas: Fecha | Día | Mes | Año | Equipo | Responsable | Frecuencia | Actividad | Observaciones | Timestamp | Revisado_Por | Fecha_Revisión
+function saveCobas(data) {
+  if (!data.responsable || !data.fecha || !data.equipo || !data.actividades || !data.actividades.length) {
+    return { success: false, error: 'Faltan campos obligatorios.' };
+  }
+  const f = parseFecha(data.fecha);
+  const ts = new Date().toISOString();
+  const sheet = getSheet(SHEETS.COBAS_REG);
+  
+  data.actividades.forEach(act => {
+    insertRowAtTop(sheet, [
+      formatFechaDDMMYYYY(f), f.dia, f.mes, f.anio,
+      data.equipo,
+      data.responsable.toUpperCase().substring(0, 3),
+      act.frecuencia,
+      act.nombre,
+      data.observaciones || '',
+      ts,
+      '',  // Revisado_Por
+      ''   // Fecha_Revisión
+    ]);
+  });
+  
+  return { success: true, message: data.actividades.length + ' tarea(s) de Cobas guardada(s).' };
+}
+
 // ── Dashboard / Consultas ─────────────────────────────────────
 
 function getRegistros(mes, anio) {
@@ -425,6 +568,7 @@ function getRegistros(mes, anio) {
   const refriRaw  = filtrar(getSheet(SHEETS.REFRI_REG), 2, 3);
   const limpRaw   = filtrar(getSheet(SHEETS.LIMP_REFRI), 2, 3);
   const condRaw   = filtrar(getSheet(SHEETS.CONDUCT_REG), 2, 3);
+  const cobasRaw  = filtrar(getSheet(SHEETS.COBAS_REG), 2, 3);
 
   const termo = termoRaw.map(r => ({
     fecha: r[0], dia: r[1], mes: r[2], anio: r[3],
@@ -445,7 +589,6 @@ function getRegistros(mes, anio) {
     revisado_por: r[8] || '', fecha_revision: r[9] || ''
   }));
 
-  // RefriTemp: Fecha | Día | Mes | Año | Resp | Temp | Turno | Equipo | Tipo | Acción | Obs | TS | Rev | FechaRev
   const refriTemp = refriRaw.map(r => ({
     fecha: r[0], dia: r[1], mes: r[2], anio: r[3],
     responsable: r[4], temperatura: r[5], turno: r[6],
@@ -453,21 +596,25 @@ function getRegistros(mes, anio) {
     revisado_por: r[12] || '', fecha_revision: r[13] || ''
   }));
 
-  // LimpRefri: Fecha | Día | Mes | Año | TipoMant | Equipo | Resp | Obs | TS | Rev | FechaRev
   const limpiezaRefri = limpRaw.map(r => ({
     fecha: r[0], dia: r[1], mes: r[2], anio: r[3],
     tipo_mantencion: r[4], equipo: r[5], responsable: r[6], observaciones: r[7],
     revisado_por: r[9] || '', fecha_revision: r[10] || ''
   }));
 
-  // Conductividad: Fecha | Día | Mes | Año | Resp | Cond | Turno | Obs | TS | Rev | FechaRev
   const conductividad = condRaw.map(r => ({
     fecha: r[0], dia: r[1], mes: r[2], anio: r[3],
     responsable: r[4], conductividad: r[5], turno: r[6], observaciones: r[7],
     revisado_por: r[9] || '', fecha_revision: r[10] || ''
   }));
 
-  return { mes, anio, termo, centrifugas, mesones, refriTemp, limpiezaRefri, conductividad };
+  const cobas = cobasRaw.map(r => ({
+    fecha: r[0], dia: r[1], mes: r[2], anio: r[3],
+    equipo: r[4], responsable: r[5], frecuencia: r[6], actividad: r[7],
+    observaciones: r[8], revisado_por: r[10] || '', fecha_revision: r[11] || ''
+  }));
+
+  return { mes, anio, termo, centrifugas, mesones, refriTemp, limpiezaRefri, conductividad, cobas };
 }
 
 function getRevision(mes, anio) {
@@ -517,7 +664,8 @@ function marcarRevisado(data) {
     mesones:      { sheet: SHEETS.MESONES,       colMes: 2, colAnio: 3, colRev: 8,  colFecha: 9  },
     refriTemp:    { sheet: SHEETS.REFRI_REG,     colMes: 2, colAnio: 3, colRev: 12, colFecha: 13 },
     limpRefri:    { sheet: SHEETS.LIMP_REFRI,    colMes: 2, colAnio: 3, colRev: 9,  colFecha: 10 },
-    conductividad:{ sheet: SHEETS.CONDUCT_REG,   colMes: 2, colAnio: 3, colRev: 9,  colFecha: 10 }
+    conductividad:{ sheet: SHEETS.CONDUCT_REG,   colMes: 2, colAnio: 3, colRev: 9,  colFecha: 10 },
+    cobas:        { sheet: SHEETS.COBAS_REG,     colMes: 2, colAnio: 3, colRev: 10, colFecha: 11 }
   };
 
   // Solo hacer stamp en los registros seleccionados
@@ -530,7 +678,8 @@ function marcarRevisado(data) {
 
   const nombres = {
     termo: 'Temp. Ambiental', centrifugas: 'Centrífugas', mesones: 'Mesones',
-    refriTemp: 'Temp. Refrigeradores', limpRefri: 'Limp. Refrigeradores', conductividad: 'Conductividad'
+    refriTemp: 'Temp. Refrigeradores', limpRefri: 'Limp. Refrigeradores', conductividad: 'Conductividad',
+    cobas: 'Mantención Cobas'
   };
   const nombresRev = registros.map(function(r) { return nombres[r] || r; }).join(', ');
   return { success: true, message: 'Revisión confirmada por ' + revisor + ': ' + nombresRev };
@@ -575,7 +724,10 @@ function sendAlertaFueraDeRango(info) {
     'Este mensaje fue enviado automáticamente.\n' +
     'Registros Mensuales — Laboratorio Clínico — Hospital de Talca\n';
 
-  MailApp.sendEmail({ to: EMAIL_ALERTS.default, subject: subject, body: body });
+  const to = getEmailRecipients('termo');
+  if (to) {
+    MailApp.sendEmail({ to: to, subject: subject, body: body });
+  }
 }
 
 // ── Email — Alerta Temp Refrigeradores Fuera de Rango ─────────
@@ -598,7 +750,10 @@ function sendAlertaRefriTemp(info) {
     'Este mensaje fue enviado automáticamente.\n' +
     'Registros Mensuales — Laboratorio Clínico — Hospital de Talca\n';
 
-  MailApp.sendEmail({ to: EMAIL_ALERTS.default, subject: subject, body: body });
+  const to = getEmailRecipients('refriTemp');
+  if (to) {
+    MailApp.sendEmail({ to: to, subject: subject, body: body });
+  }
 }
 
 // ── Email — Alerta Conductividad ──────────────────────────────
@@ -620,7 +775,10 @@ function sendAlertaConductividad(info) {
     'Este mensaje fue enviado automáticamente.\n' +
     'Registros Mensuales — Laboratorio Clínico — Hospital de Talca\n';
 
-  MailApp.sendEmail({ to: EMAIL_ALERTS.conductividad, subject: subject, body: body });
+  const to = getEmailRecipients('conductividad');
+  if (to) {
+    MailApp.sendEmail({ to: to, subject: subject, body: body });
+  }
 }
 
 // ── Email — Recordatorio Mes Anterior (Trigger Mensual) ──────
@@ -653,20 +811,43 @@ function triggerRecordatorioMesAnterior() {
                  'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
   const nombreMes = meses[mesAnterior - 1];
 
-  const detalleFaltantes = faltantes.map(function(f) { return '  • ' + (nombres[f] || f); }).join('\n');
+  // Group by recipient email
+  const emailBuckets = {};
 
-  const subject = '📋 [Registros Lab] Recordatorio: Revisar registros de ' + nombreMes + ' ' + anioAnterior;
-  const body = 'Estimado/a,\n\n' +
-    'Le recordamos que los siguientes registros de ' + nombreMes + ' ' + anioAnterior +
-    ' aún no han sido marcados como revisados:\n\n' +
-    detalleFaltantes + '\n\n' +
-    'Por favor, ingrese al aplicativo y confirme la revisión del mes anterior.\n\n' +
-    'Enlace a los datos:\n' + SHEET_URL + '\n\n' +
-    '---\n' +
-    'Este mensaje fue enviado automáticamente.\n' +
-    'Registros Mensuales — Laboratorio Clínico — Hospital de Talca\n';
+  faltantes.forEach(function(clave) {
+    const recipientsStr = getEmailRecipients(clave);
+    if (!recipientsStr) return; // Paused or no recipients
+    
+    const emails = recipientsStr.split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+    emails.forEach(email => {
+      if (!emailBuckets[email]) emailBuckets[email] = [];
+      emailBuckets[email].push('  • ' + (nombres[clave] || clave));
+    });
+  });
 
-  MailApp.sendEmail({ to: EMAIL_ALERTS.default, subject: subject, body: body });
+  // Send combined emails
+  Object.keys(emailBuckets).forEach(email => {
+    const list = emailBuckets[email];
+    if (list.length === 0) return;
+
+    const detalleFaltantes = list.join('\n');
+    const subject = '📋 [Registros Lab] Recordatorio: Revisar registros de ' + nombreMes + ' ' + anioAnterior;
+    const body = 'Estimado/a,\n\n' +
+      'Le recordamos que los siguientes registros de ' + nombreMes + ' ' + anioAnterior +
+      ' bajo su responsabilidad aún no han sido marcados como revisados:\n\n' +
+      detalleFaltantes + '\n\n' +
+      'Por favor, ingrese al aplicativo y confirme la revisión del mes anterior.\n\n' +
+      'Enlace a los datos:\n' + SHEET_URL + '\n\n' +
+      '---\n' +
+      'Este mensaje fue enviado automáticamente.\n' +
+      'Registros Mensuales — Laboratorio Clínico — Hospital de Talca\n';
+
+    try {
+      MailApp.sendEmail({ to: email, subject: subject, body: body });
+    } catch (e) {
+      Logger.log('Error enviando correo mensual a ' + email + ': ' + e.toString());
+    }
+  });
 }
 
 // ── Email — Datos No Rellenados (Trigger Diario) ──────────────
@@ -684,6 +865,9 @@ function triggerDatosNoRellenados() {
 
   const reg = getRegistros(mes, anio);
 
+  // Gather missing items per key
+  const missingByRegister = {};
+
   // Temperatura/Humedad faltantes
   const termoFaltantes = [];
   areas.forEach(area => {
@@ -692,6 +876,9 @@ function triggerDatosNoRellenados() {
       if (!existe) termoFaltantes.push(area + ' (' + turno + ')');
     });
   });
+  if (termoFaltantes.length > 0) {
+    missingByRegister['termo'] = { name: '🌡️ Temperatura/Humedad Ambiental', items: termoFaltantes };
+  }
 
   // Centrífugas faltantes (solo mantenimiento Diario)
   const centFaltantes = [];
@@ -699,6 +886,9 @@ function triggerDatosNoRellenados() {
     const existe = reg.centrifugas.some(r => parseInt(r.dia) === dia && r.centrifuga === c && r.tipo_mantencion === 'Diaria');
     if (!existe) centFaltantes.push(c);
   });
+  if (centFaltantes.length > 0) {
+    missingByRegister['centrifugas'] = { name: '⚙️ Centrífugas (Diaria)', items: centFaltantes };
+  }
 
   // Mesones faltantes
   const mesonFaltantes = [];
@@ -706,6 +896,9 @@ function triggerDatosNoRellenados() {
     const existe = reg.mesones.some(r => parseInt(r.dia) === dia && r.sala === s);
     if (!existe) mesonFaltantes.push(s);
   });
+  if (mesonFaltantes.length > 0) {
+    missingByRegister['mesones'] = { name: '🧽 Limpieza de Mesones', items: mesonFaltantes };
+  }
 
   // Temp Refrigeradores faltantes (AM y PM)
   const refriFaltantes = [];
@@ -715,6 +908,9 @@ function triggerDatosNoRellenados() {
       if (!existe) refriFaltantes.push(r.equipo + ' (' + turno + ')');
     });
   });
+  if (refriFaltantes.length > 0) {
+    missingByRegister['refriTemp'] = { name: '🧊 Temp. Refrigeradores', items: refriFaltantes };
+  }
 
   // Conductividad faltantes (AM y PM)
   const condFaltantes = [];
@@ -722,49 +918,81 @@ function triggerDatosNoRellenados() {
     const existe = reg.conductividad.some(c => parseInt(c.dia) === dia && c.turno === turno);
     if (!existe) condFaltantes.push('Conductividad (' + turno + ')');
   });
+  if (condFaltantes.length > 0) {
+    missingByRegister['conductividad'] = { name: '💧 Conductividad Agua', items: condFaltantes };
+  }
 
-  // Si todo está completo, no enviar correo
-  if (termoFaltantes.length === 0 && centFaltantes.length === 0 && mesonFaltantes.length === 0 && refriFaltantes.length === 0 && condFaltantes.length === 0) return;
+  // Cobas diarias faltantes
+  const cobasFaltantes = [];
+  const cobasEquipos = ['Cobas 1', 'Cobas 2'];
+  const cobasDiarias = [
+    'Limpieza pipeta y puertos de vaciado (ISE)',
+    'Limpieza pipetas y agujas de lavado (c702)',
+    'Limpieza pipetas, agujas prelavado y sipper (e801)',
+    'Pipe diario y rack verde'
+  ];
+  const cobasHoy = reg.cobas ? reg.cobas.filter(r => parseInt(r.dia) === dia) : [];
+  cobasEquipos.forEach(eq => {
+    cobasDiarias.forEach(act => {
+      const existe = cobasHoy.some(r => r.equipo === eq && r.actividad === act);
+      if (!existe) cobasFaltantes.push(eq + ': ' + act);
+    });
+  });
+  if (cobasFaltantes.length > 0) {
+    missingByRegister['cobas'] = { name: '🔬 Mantención Cobas (Diaria)', items: cobasFaltantes };
+  }
+
+  // Map to recipient emails
+  const emailBuckets = {};
+
+  Object.keys(missingByRegister).forEach(clave => {
+    const recipientsStr = getEmailRecipients(clave);
+    if (!recipientsStr) return; // Paused or no recipients
+    
+    const emails = recipientsStr.split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+    emails.forEach(email => {
+      if (!emailBuckets[email]) emailBuckets[email] = [];
+      emailBuckets[email].push(missingByRegister[clave]);
+    });
+  });
 
   const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                  'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
-  let detalle = '';
-  if (termoFaltantes.length > 0) {
-    detalle += '\n🌡️ Temperatura/Humedad Ambiental:\n' + termoFaltantes.map(f => '  • ' + f).join('\n');
-  }
-  if (centFaltantes.length > 0) {
-    detalle += '\n⚙️ Centrífugas (Diaria):\n' + centFaltantes.map(f => '  • ' + f).join('\n');
-  }
-  if (mesonFaltantes.length > 0) {
-    detalle += '\n🧽 Mesones:\n' + mesonFaltantes.map(f => '  • ' + f).join('\n');
-  }
-  if (refriFaltantes.length > 0) {
-    detalle += '\n🧊 Temp. Refrigeradores:\n' + refriFaltantes.map(f => '  • ' + f).join('\n');
-  }
-  if (condFaltantes.length > 0) {
-    detalle += '\n💧 Conductividad Agua:\n' + condFaltantes.map(f => '  • ' + f).join('\n');
-  }
+  // Send consolidated emails
+  Object.keys(emailBuckets).forEach(email => {
+    const list = emailBuckets[email];
+    if (list.length === 0) return;
 
-  const subject = '📝 [Registros Lab] Datos pendientes del día ' + dia + ' de ' + meses[mes - 1];
-  const body = 'Estimado/a,\n\n' +
-    'Los siguientes registros del día ' + dia + ' de ' + meses[mes - 1] + ' ' + anio +
-    ' no han sido completados:\n' +
-    detalle + '\n\n' +
-    'Por favor, complete los registros pendientes a la brevedad.\n\n' +
-    'Enlace al aplicativo:\n' + SHEET_URL + '\n\n' +
-    '---\n' +
-    'Este mensaje fue enviado automáticamente.\n' +
-    'Registros Mensuales — Laboratorio Clínico — Hospital de Talca\n';
+    let detailText = '';
+    list.forEach(regInfo => {
+      detailText += '\n' + regInfo.name + ':\n' + regInfo.items.map(f => '  • ' + f).join('\n') + '\n';
+    });
 
-  MailApp.sendEmail({ to: EMAIL_ALERTS.default, subject: subject, body: body });
+    const subject = '📝 [Registros Lab] Datos pendientes del día ' + dia + ' de ' + meses[mes - 1];
+    const body = 'Estimado/a,\n\n' +
+      'Los siguientes registros correspondientes al día ' + dia + ' de ' + meses[mes - 1] + ' ' + anio +
+      ' bajo su responsabilidad no han sido completados:\n' +
+      detailText + '\n' +
+      'Por favor, complete los registros pendientes a la brevedad.\n\n' +
+      'Enlace al aplicativo:\n' + SHEET_URL + '\n\n' +
+      '---\n' +
+      'Este mensaje fue enviado automáticamente.\n' +
+      'Registros Mensuales — Laboratorio Clínico — Hospital de Talca\n';
+
+    try {
+      MailApp.sendEmail({ to: email, subject: subject, body: body });
+    } catch (e) {
+      Logger.log('Error enviando correo diario a ' + email + ': ' + e.toString());
+    }
+  });
 }
 
 // ── Email — Alerta Mantenciones Semanales Vencidas ────────────
 
 function triggerMantencionSemanal() {
   const hoy = new Date();
-  const vencidas = [];
+  const missingByRegister = {};
 
   MANTENCIONES_SEMANALES.forEach(function(mant) {
     try {
@@ -788,46 +1016,198 @@ function triggerMantencionSemanal() {
         }
       }
 
+      let isOverdue = false;
+      let diasSinRegistro = '';
+      let ultimaFechaStr = 'Nunca';
+
       if (!ultimaFecha) {
-        // No hay registros → considerar como vencido
-        vencidas.push({ nombre: mant.nombre, diasSinRegistro: '∞ (sin registros)', ultimaFecha: 'Nunca' });
+        isOverdue = true;
+        diasSinRegistro = '∞ (sin registros)';
       } else {
         var diffMs = hoy.getTime() - ultimaFecha.getTime();
         var diffDias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
         if (diffDias > 7) {
-          vencidas.push({
+          isOverdue = true;
+          diasSinRegistro = diffDias + ' días';
+          ultimaFechaStr = ultimaFecha.toLocaleDateString('es-CL');
+        }
+      }
+
+      if (isOverdue) {
+        let clave = '';
+        if (mant.nombre.indexOf('Centrífugas') !== -1) clave = 'centrifugas';
+        else if (mant.nombre.indexOf('Limpieza Refrigeradores') !== -1) clave = 'limpRefri';
+        
+        if (clave) {
+          missingByRegister[clave] = {
             nombre: mant.nombre,
-            diasSinRegistro: diffDias,
-            ultimaFecha: ultimaFecha.toLocaleDateString('es-CL')
-          });
+            ultimaFecha: ultimaFechaStr,
+            diasSinRegistro: diasSinRegistro
+          };
         }
       }
     } catch (e) {
-      Logger.log('Error verificando mantención ' + mant.nombre + ': ' + e.toString());
+      Logger.log('Error verificado mantención ' + mant.nombre + ': ' + e.toString());
     }
   });
 
-  if (vencidas.length === 0) return;
+  // Group by email
+  const emailBuckets = {};
 
-  sendAlertaMantencionSemanal(vencidas);
+  Object.keys(missingByRegister).forEach(clave => {
+    const recipientsStr = getEmailRecipients(clave);
+    if (!recipientsStr) return; // Paused or empty
+    
+    const emails = recipientsStr.split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+    emails.forEach(email => {
+      if (!emailBuckets[email]) emailBuckets[email] = [];
+      emailBuckets[email].push(missingByRegister[clave]);
+    });
+  });
+
+  // Send emails
+  Object.keys(emailBuckets).forEach(email => {
+    const vencidas = emailBuckets[email];
+    if (vencidas.length === 0) return;
+
+    var detail = vencidas.map(function(v) {
+      return '  • ' + v.nombre + '\n    Último registro: ' + v.ultimaFecha + '\n    Días sin registro: ' + v.diasSinRegistro;
+    }).join('\n\n');
+
+    var subject = '🔔 [Registros Lab] Mantenciones semanales vencidas (' + vencidas.length + ')';
+    var body = 'Estimado/a,\n\n' +
+      'Las siguientes mantenciones semanales bajo su responsabilidad llevan más de 7 días sin registrarse:\n\n' +
+      detail + '\n\n' +
+      'Por favor, realice las mantenciones pendientes a la brevedad.\n\n' +
+      'Enlace al aplicativo:\n' + SHEET_URL + '\n\n' +
+      '---\n' +
+      'Este mensaje fue enviado automáticamente.\n' +
+      'Registros Mensuales — Laboratorio Clínico — Hospital de Talca\n';
+
+    try {
+      MailApp.sendEmail({ to: email, subject: subject, body: body });
+    } catch (e) {
+      Logger.log('Error enviando correo semanal a ' + email + ': ' + e.toString());
+    }
+  });
+
+  // Ejecutar alerta periódica de Cobas
+  try {
+    triggerAlertaMantencionesCobas();
+  } catch(e) {
+    Logger.log('Error en triggerAlertaMantencionesCobas: ' + e.toString());
+  }
 }
 
 function sendAlertaMantencionSemanal(vencidas) {
-  var detalle = vencidas.map(function(v) {
-    return '  • ' + v.nombre + '\n    Último registro: ' + v.ultimaFecha + '\n    Días sin registro: ' + v.diasSinRegistro;
-  }).join('\n\n');
+  // Función mantenida por compatibilidad pero vacía ya que el envío ahora se realiza agrupado en triggerMantencionSemanal
+}
 
-  var subject = '🔔 [Registros Lab] Mantenciones semanales vencidas (' + vencidas.length + ')';
-  var body = 'Estimado/a,\n\n' +
-    'Las siguientes mantenciones semanales llevan más de 7 días sin registrarse:\n\n' +
-    detalle + '\n\n' +
-    'Por favor, realice las mantenciones pendientes a la brevedad.\n\n' +
+function checkCobasPeriodicasVencidas() {
+  const hoy = new Date();
+  const sheet = getSheet(SHEETS.COBAS_REG);
+  if (!sheet) return [];
+  
+  const rows = sheet.getDataRange().getValues();
+  const ultimasFechas = {};
+  
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    const fechaStr = String(r[0]);
+    const equipo = String(r[4]);
+    const freq = String(r[6]);
+    const actividad = String(r[7]);
+    
+    if (freq === 'Diaria' || freq === 'Según sea necesario') continue;
+    
+    const partes = fechaStr.split('/');
+    if (partes.length === 3) {
+      const fecha = new Date(parseInt(partes[2]), parseInt(partes[1]) - 1, parseInt(partes[0]));
+      const key = equipo + '|' + actividad;
+      if (!ultimasFechas[key] || fecha > ultimasFechas[key]) {
+        ultimasFechas[key] = fecha;
+      }
+    }
+  }
+  
+  const vencidas = [];
+  const equipos = ['Cobas 1', 'Cobas 2'];
+  
+  equipos.forEach(eq => {
+    Object.keys(COBAS_PERIODIC_TASKS).forEach(freq => {
+      const config = COBAS_PERIODIC_TASKS[freq];
+      config.items.forEach(act => {
+        const key = eq + '|' + act;
+        const ultimaFecha = ultimasFechas[key];
+        
+        let isOverdue = false;
+        let diffDias = 0;
+        
+        if (!ultimaFecha) {
+          isOverdue = true;
+        } else {
+          const diffMs = hoy.getTime() - ultimaFecha.getTime();
+          diffDias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+          if (diffDias > config.interval) {
+            isOverdue = true;
+          }
+        }
+        
+        if (isOverdue) {
+          vencidas.push({
+            equipo: eq,
+            actividad: act,
+            frecuencia: freq,
+            ultimaFechaStr: ultimaFecha ? ultimaFecha.toLocaleDateString('es-CL') : 'Nunca',
+            diasSinRegistro: ultimaFecha ? diffDias + ' días' : '∞ (sin registros)'
+          });
+        }
+      });
+    });
+  });
+  
+  return vencidas;
+}
+
+function triggerAlertaMantencionesCobas() {
+  const vencidas = checkCobasPeriodicasVencidas();
+  if (!vencidas || vencidas.length === 0) return;
+  
+  const recipients = getEmailRecipients('cobas');
+  if (!recipients) return;
+  
+  const subject = '⚠️ [Registros Lab] Alerta: Mantenciones periódicas de Cobas vencidas (' + vencidas.length + ')';
+  
+  const eqGroup = { 'Cobas 1': [], 'Cobas 2': [] };
+  vencidas.forEach(v => {
+    if (eqGroup[v.equipo]) {
+      eqGroup[v.equipo].push('  • [' + v.frecuencia + '] ' + v.actividad + '\n    Último registro: ' + v.ultimaFechaStr + ' (hace ' + v.diasSinRegistro + ')');
+    }
+  });
+  
+  const detailsList = [];
+  if (eqGroup['Cobas 1'].length > 0) {
+    detailsList.push('🤖 COBAS 1:\n' + eqGroup['Cobas 1'].join('\n\n'));
+  }
+  if (eqGroup['Cobas 2'].length > 0) {
+    detailsList.push('🤖 COBAS 2:\n' + eqGroup['Cobas 2'].join('\n\n'));
+  }
+  
+  const body = 'Estimado/a,\n\n' +
+    'Se ha detectado que las siguientes mantenciones periódicas de los equipos Cobas 1 y 2 están vencidas en el sistema:\n\n' +
+    detailsList.join('\n\n') + '\n\n' +
+    'Por favor, realice las mantenciones pendientes y regístrelas en el aplicativo a la brevedad.\n\n' +
     'Enlace al aplicativo:\n' + SHEET_URL + '\n\n' +
     '---\n' +
     'Este mensaje fue enviado automáticamente.\n' +
     'Registros Mensuales — Laboratorio Clínico — Hospital de Talca\n';
-
-  MailApp.sendEmail({ to: EMAIL_ALERTS.default, subject: subject, body: body });
+    
+  try {
+    MailApp.sendEmail({ to: recipients, subject: subject, body: body });
+    Logger.log('Correo de alerta de Cobas enviado a: ' + recipients);
+  } catch (e) {
+    Logger.log('Error enviando correo de Cobas: ' + e.toString());
+  }
 }
 
 // ── Setup de Triggers (ejecutar una vez) ──────────────────────
@@ -885,6 +1265,8 @@ function initializeSpreadsheet() {
       hideCols: [2,3,4,9] },
     { name: SHEETS.CONDUCT_REG, headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Responsable','Conductividad (µS/cm)','Turno','Observaciones','Timestamp','Revisado Por','Fecha Revisión'],
       hideCols: [2,3,4,9] },
+    { name: SHEETS.COBAS_REG,   headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Equipo','Responsable','Frecuencia','Actividad','Observaciones','Timestamp','Revisado Por','Fecha Revisión'],
+      hideCols: [2,3,4,10] },
     { name: SHEETS.REVISIONES,  headers: ['Mes','Año','Registros','Revisor','Timestamp'] },
     { name: SHEETS.ETIQUETADORAS_REG, headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Etiquetadora','Accion','Descripcion','Responsable'],
       hideCols: [2,3,4] },
@@ -895,7 +1277,8 @@ function initializeSpreadsheet() {
     { name: SHEETS.REFRI_MASTER, headers: ['Equipo','Tipo','Temp Min (°C)','Temp Max (°C)'] },
     { name: SHEETS.REFRI_LIMP_MASTER, headers: ['Equipo'] },
     { name: SHEETS.ACCIONES,    headers: ['Acción'] },
-    { name: SHEETS.ETIQUETADORAS_MASTER, headers: ['Nombre Real','ID','Nombre Práctico','Modelo','Tipo de Conexión','Dirección IP','Piso','Ubicación','Comentario'] }
+    { name: SHEETS.ETIQUETADORAS_MASTER, headers: ['Nombre Real','ID','Nombre Práctico','Modelo','Tipo de Conexión','Dirección IP','Piso','Ubicación','Comentario'] },
+    { name: SHEETS.NOTIFICACIONES, headers: ['Registro','Clave','Destinatarios','Pausado'] }
   ];
 
   const newlyCreated = {};
@@ -983,6 +1366,23 @@ function initializeSpreadsheet() {
     }
   }
 
+  if (newlyCreated[SHEETS.NOTIFICACIONES] || getSheet(SHEETS.NOTIFICACIONES).getLastRow() <= 1) {
+    const notifSheet = ss.getSheetByName(SHEETS.NOTIFICACIONES);
+    const defaults = [
+      ['Temperatura Ambiental', 'termo', 'grivera@hospitaldetalca.cl', 'FALSE'],
+      ['Mantenimiento Centrífugas', 'centrifugas', 'grivera@hospitaldetalca.cl', 'FALSE'],
+      ['Limpieza Mesones', 'mesones', 'grivera@hospitaldetalca.cl', 'FALSE'],
+      ['Temperatura Refrigeradores', 'refriTemp', 'grivera@hospitaldetalca.cl', 'FALSE'],
+      ['Limpieza Refrigeradores', 'limpRefri', 'grivera@hospitaldetalca.cl', 'FALSE'],
+      ['Conductividad del Agua', 'conductividad', 'grivera@hospitaldetalca.cl', 'FALSE'],
+      ['Mantención Cobas', 'cobas', 'grivera@hospitaldetalca.cl', 'FALSE']
+    ];
+    if (notifSheet.getLastRow() > 1) {
+      notifSheet.deleteRows(2, notifSheet.getLastRow() - 1);
+    }
+    defaults.forEach(row => notifSheet.appendRow(row));
+  }
+
   // Eliminar hojas por defecto
   ['Hoja 1','Sheet1','Hoja1'].forEach(n => {
     const s = ss.getSheetByName(n);
@@ -1014,7 +1414,7 @@ function resetRegistros() {
   const registroSheets = [
     SHEETS.TERMO, SHEETS.CENT_REG, SHEETS.MESONES,
     SHEETS.REFRI_REG, SHEETS.LIMP_REFRI, SHEETS.CONDUCT_REG,
-    SHEETS.REVISIONES, SHEETS.ETIQUETADORAS_REG
+    SHEETS.COBAS_REG, SHEETS.REVISIONES, SHEETS.ETIQUETADORAS_REG
   ];
   const results = [];
   registroSheets.forEach(function(name) {
@@ -1121,5 +1521,87 @@ function updateEtiquetadoraMaestro(data) {
     sheet.appendRow(rowData);
     return { success: true, message: 'Nueva etiquetadora agregada al maestro.' };
   }
+}
+
+// ── Configuración de Notificaciones por Correo ──────────────────
+
+function getNotificaciones() {
+  let sheet = getSheet(SHEETS.NOTIFICACIONES);
+  if (!sheet) {
+    try {
+      const ss = getSpreadsheet();
+      sheet = ss.insertSheet(SHEETS.NOTIFICACIONES);
+      sheet.appendRow(['Registro', 'Clave', 'Destinatarios', 'Pausado']);
+    } catch (e) {
+      Logger.log('Error al crear hoja de notificaciones: ' + e.toString());
+      return [];
+    }
+  }
+  
+  let data = sheet.getDataRange().getValues();
+  if (data.length <= 1) {
+    const defaults = [
+      ['Temperatura Ambiental', 'termo', 'grivera@hospitaldetalca.cl', 'FALSE'],
+      ['Mantenimiento Centrífugas', 'centrifugas', 'grivera@hospitaldetalca.cl', 'FALSE'],
+      ['Limpieza Mesones', 'mesones', 'grivera@hospitaldetalca.cl', 'FALSE'],
+      ['Temperatura Refrigeradores', 'refriTemp', 'grivera@hospitaldetalca.cl', 'FALSE'],
+      ['Limpieza Refrigeradores', 'limpRefri', 'grivera@hospitaldetalca.cl', 'FALSE'],
+      ['Conductividad del Agua', 'conductividad', 'grivera@hospitaldetalca.cl', 'FALSE']
+    ];
+    defaults.forEach(row => sheet.appendRow(row));
+    data = sheet.getDataRange().getValues();
+  }
+  
+  return data.slice(1).map(r => ({
+    registro: String(r[0]),
+    clave: String(r[1]),
+    destinatarios: String(r[2]),
+    pausado: String(r[3]).toUpperCase() === 'TRUE'
+  }));
+}
+
+function saveNotificaciones(data) {
+  if (data.password !== PASSWORD_REVISION) {
+    return { success: false, error: 'Contraseña incorrecta.' };
+  }
+  if (!data.notificaciones || !data.notificaciones.length) {
+    return { success: false, error: 'Datos de notificaciones inválidos.' };
+  }
+  
+  const sheet = getSheet(SHEETS.NOTIFICACIONES);
+  if (!sheet) return { success: false, error: 'Hoja de notificaciones no encontrada.' };
+  
+  // Limpiar datos anteriores
+  const lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    sheet.deleteRows(2, lastRow - 1);
+  }
+  
+  // Guardar nuevos datos
+  data.notificaciones.forEach(n => {
+    sheet.appendRow([
+      n.registro,
+      n.clave,
+      n.destinatarios || '',
+      n.pausado ? 'TRUE' : 'FALSE'
+    ]);
+  });
+  
+  return { success: true, message: 'Configuración de notificaciones guardada con éxito.' };
+}
+
+function getEmailRecipients(clave) {
+  try {
+    const list = getNotificaciones();
+    const found = list.find(n => n.clave === clave);
+    if (found) {
+      if (found.pausado) return null;
+      if (found.destinatarios) return found.destinatarios;
+    }
+  } catch (e) {
+    Logger.log('Error obteniendo destinatarios para ' + clave + ': ' + e.toString());
+  }
+  // Fallback
+  return (clave === 'conductividad') ? EMAIL_ALERTS.conductividad : EMAIL_ALERTS.default;
 }
 
