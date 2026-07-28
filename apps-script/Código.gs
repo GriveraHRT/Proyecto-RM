@@ -1788,7 +1788,8 @@ function getNotificaciones() {
     ['Limpieza Refrigeradores', 'limpRefri', 'grivera@hospitaldetalca.cl', 'FALSE'],
     ['Conductividad del Agua', 'conductividad', 'grivera@hospitaldetalca.cl', 'FALSE'],
     ['Mantención Cobas', 'cobas', 'grivera@hospitaldetalca.cl', 'FALSE'],
-    ['Reparaciones DxH 900 Urgencias', 'dxh900', 'grivera@hospitaldetalca.cl', 'FALSE']
+    ['Reparaciones DxH 900 Urgencias', 'dxh900', 'grivera@hospitaldetalca.cl', 'FALSE'],
+    ['Registro de eliminación de muestras', 'elimMuestras', 'grivera@hospitaldetalca.cl', 'FALSE']
   ];
   
   let changed = false;
