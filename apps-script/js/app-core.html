@@ -3,7 +3,7 @@ if (typeof API_URL === 'undefined') {
   var API_URL = 'https://script.google.com/macros/s/AKfycbxuqcui0-hjJ721uMWZk3w-4l2fVCaBWQgdMJqVMb5Pno339Jqetq4r62p3-1gGBUvFOg/exec';
 }
 const PREANALISIS=[1,2,3,4,5,18];
-const state={areas:[],centrifugas:[],salas:[],acciones:[],refrigeradores:[],refriLimpieza:[],cobasObs:[],ampm:'AM',ampmRefri:'AM',ampmConduct:'AM',qrInstance:null,qrTab:'areas',dashMes:new Date().getMonth()+1,dashAnio:new Date().getFullYear(),dashTab:'diario',dashData:null,dashMaestros:null,dashCache:null};
+const state={areas:[],centrifugas:[],salas:[],acciones:[],refrigeradores:[],refriLimpieza:[],cobasObs:[],ampm:'AM',ampmRefri:'AM',ampmConduct:'AM',qrInstance:null,qrTab:'areas',dashMes:new Date().getMonth()+1,dashAnio:new Date().getFullYear(),dashTab:'diario',dashData:null,dashMaestros:null,dashCache:null,maestrosPromise:null};
 
 function today(){return new Date().toISOString().split('T')[0]}
 function showToast(m,t='success'){const el=document.getElementById('toast');el.textContent=m;el.className=`show toast-${t}`;setTimeout(()=>{el.className=''},3200)}
@@ -32,7 +32,7 @@ function toggleTheme(){const d=document.documentElement,dark=d.getAttribute('dat
 (function(){const t=localStorage.getItem('theme');if(t==='dark'){document.documentElement.setAttribute('data-theme','dark');document.getElementById('theme-toggle').textContent='🌙';document.querySelector('meta[name="theme-color"]').content='#0B1426'}})();
 
 // Navigation
-function navigateTo(s){document.querySelectorAll('.section').forEach(el=>el.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));document.getElementById('section-'+s).classList.add('active');document.querySelector(`[data-section="${s}"]`).classList.add('active');if(s==='dashboard')loadDashboard();if(s==='admin'){initRevAdminSelectors();loadNotificacionesAdmin()}}
+function navigateTo(s){document.querySelectorAll('.section').forEach(el=>el.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));const sec=document.getElementById('section-'+s);if(sec)sec.classList.add('active');const navBtn=document.querySelector(`[data-section="${s}"]`);if(navBtn)navBtn.classList.add('active');if(s==='dashboard')loadDashboard();if(s==='admin'){initRevAdminSelectors();loadNotificacionesAdmin()}if(s==='dxh900'){loadDxH900HistorialForm()}if(s==='elim-muestras'){loadElimMuestrasHistorialForm()}}
 
 // AM/PM — Termo (ambiental)
 function setAmPm(v){state.ampm=v;document.getElementById('btn-am').className='ampm-btn'+(v==='AM'?' selected-AM':'');document.getElementById('btn-pm').className='ampm-btn'+(v==='PM'?' selected-PM':'')}
@@ -158,9 +158,13 @@ function updateInfoCentrifuga(){const t=document.getElementById('cent-tipo').val
 
 // Load masters
 async function loadMaestros(){
-  try{
-    const data=await apiGet({action:'getMaestros'});
-    state.areas=data.areas||[];
+  if (state.maestrosPromise && !state.dashMaestros) {
+    return state.maestrosPromise;
+  }
+  state.maestrosPromise = (async () => {
+    try{
+      const data=await apiGet({action:'getMaestros'});
+      state.areas=data.areas||[];
     state.centrifugas=data.centrifugas||[];
     state.salas=data.salas||[];
     state.acciones=data.acciones||[];
@@ -258,7 +262,9 @@ async function loadMaestros(){
     populateDatalist('list-et-comentario', fallbackSugerencias.etComentario);
     populateDatalist('list-et-bitacora-desc', fallbackSugerencias.etBitacoraDesc);
     populateDatalist('list-cobas-obs', fallbackSugerencias.cobasObs);
-  }
+    }
+  })();
+  return state.maestrosPromise;
 }
 
 function populateSelect(id,items,ph){const s=document.getElementById(id);s.innerHTML=`<option value="">${ph}</option>`+items.map(i=>`<option value="${i}">${i}</option>`).join('')}
@@ -369,6 +375,9 @@ function checkUrlParams(){
   if(modulo==='conductividad'){
     navigateTo('conductividad');
   }
+  if(modulo==='dxh900'){
+    navigateTo('dxh900');
+  }
   if(etName){
     document.getElementById('etiquetadora-prefill-name').textContent=etName;
     document.getElementById('etiquetadora-prefill-indicator').style.display='block';
@@ -402,6 +411,9 @@ function checkUrlParams(){
   }
   if(modulo==='cobas'){
     navigateTo('cobas');
+  }
+  if(modulo==='elim-muestras'){
+    navigateTo('elim-muestras');
   }
 }
 

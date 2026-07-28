@@ -52,7 +52,9 @@ const SHEETS = {
   ACCIONES:         'Maestro Acciones',
   ETIQUETADORAS_MASTER: 'Maestro Etiquetadoras',
   ETIQUETADORAS_REG:    'Reg. Etiquetadoras',
-  NOTIFICACIONES:       'Maestro Notificaciones'
+  NOTIFICACIONES:       'Maestro Notificaciones',
+  DXH900_REG:       'Reg. Reparaciones DxH 900 Urgencias',
+  ELIM_MUESTRAS:    'Reg. Eliminación Muestras'
 };
 
 const COBAS_PERIODIC_TASKS = {
@@ -110,6 +112,52 @@ const COBAS_PERIODIC_TASKS = {
 };
 
 // ── Helpers ──────────────────────────────────────────────────
+
+// Caching settings
+const CACHE_TTL_MAESTROS = 1800; // 30 minutes
+const CACHE_TTL_REGISTROS = 21600; // 6 hours
+
+function getCacheKey(prefix, ...parts) {
+  return prefix + '_' + parts.join('_');
+}
+
+function getCachedJson(key) {
+  try {
+    const val = CacheService.getScriptCache().get(key);
+    if (val) {
+      return JSON.parse(val);
+    }
+  } catch (e) {
+    Logger.log('Error leyendo caché para ' + key + ': ' + e.toString());
+  }
+  return null;
+}
+
+function setCachedJson(key, data, ttl) {
+  try {
+    const str = JSON.stringify(data);
+    if (str.length < 100000) { // Limit defined by CacheService (100KB)
+      CacheService.getScriptCache().put(key, str, ttl);
+    } else {
+      Logger.log('Caché omitida para ' + key + ' por exceder límite de tamaño (' + str.length + ' bytes)');
+    }
+  } catch (e) {
+    Logger.log('Error escribiendo caché para ' + key + ': ' + e.toString());
+  }
+}
+
+function clearCacheKeys(keys) {
+  try {
+    CacheService.getScriptCache().removeAll(keys);
+  } catch (e) {
+    Logger.log('Error limpiando claves de caché: ' + e.toString());
+  }
+}
+
+function clearSheetCache(keyPrefix, mes, anio) {
+  const cacheKey = getCacheKey('regs', keyPrefix, mes, anio);
+  clearCacheKeys([cacheKey]);
+}
 
 function getSpreadsheet() {
   const id = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');
@@ -178,6 +226,7 @@ function doGet(e) {
       case 'getEtiquetadoras':  return jsonResponse(getEtiquetadoras());
       case 'getEtiquetadoraHistorial': return jsonResponse(getEtiquetadoraHistorial(e.parameter.etiquetadora));
       case 'getNotificaciones': return jsonResponse(getNotificaciones());
+      case 'getDxH900Historial': return jsonResponse(getDxH900Historial());
       case 'SETUP_INIT_TA':     return jsonResponse(setup());
       case 'REINIT':            return jsonResponse(reinitialize());
       default:                  return jsonResponse({ error: 'Acción no reconocida: ' + action });
@@ -207,6 +256,8 @@ function doPost(e) {
       case 'updateEtiquetadoraMaestro': return jsonResponse(updateEtiquetadoraMaestro(data));
       case 'marcarRevisado':      return jsonResponse(marcarRevisado(data));
       case 'saveNotificaciones':  return jsonResponse(saveNotificaciones(data));
+      case 'saveDxH900Registro':  return jsonResponse(saveDxH900Registro(data));
+      case 'saveElimMuestras':    return jsonResponse(saveElimMuestras(data));
       default:                    return jsonResponse({ error: 'Acción no reconocida: ' + data.action });
     }
   } catch (err) {
@@ -253,7 +304,13 @@ function getRefriLimpieza() {
 
 /** Devuelve todos los maestros en una sola llamada para optimizar carga */
 function getMaestros() {
-  return {
+  const cacheKey = 'maestros_all';
+  let cached = getCachedJson(cacheKey);
+  if (cached) {
+    return cached;
+  }
+  
+  const data = {
     areas: getAreas(),
     centrifugas: getCentrifugas(),
     salas: getSalas(),
@@ -263,6 +320,9 @@ function getMaestros() {
     etiquetadoras: getEtiquetadoras(),
     sugerencias: getSugerenciasHistoricas()
   };
+  
+  setCachedJson(cacheKey, data, CACHE_TTL_MAESTROS);
+  return data;
 }
 
 /** Obtiene valores únicos de una columna específica de una hoja, escaneando desde el final hacia el principio */
@@ -291,7 +351,13 @@ function getUniqueColumnValues(sheetName, colIndex) {
 
 /** Compila las sugerencias históricas de observaciones y comentarios de todas las planillas */
 function getSugerenciasHistoricas() {
-  return {
+  const cacheKey = 'sugerencias_historicas';
+  let cached = getCachedJson(cacheKey);
+  if (cached) {
+    return cached;
+  }
+  
+  const data = {
     termoObs: getUniqueColumnValues(SHEETS.TERMO, 10),
     centObs: getUniqueColumnValues(SHEETS.CENT_REG, 7),
     mesonObs: getUniqueColumnValues(SHEETS.MESONES, 6),
@@ -299,9 +365,12 @@ function getSugerenciasHistoricas() {
     limpRefriObs: getUniqueColumnValues(SHEETS.LIMP_REFRI, 7),
     conductObs: getUniqueColumnValues(SHEETS.CONDUCT_REG, 7),
     etComentario: getUniqueColumnValues(SHEETS.ETIQUETADORAS_MASTER, 8),
-    etBitacoraDesc: getUniqueColumnValues(SHEETS.ETIQUETADORAS_REG, 6),
+    etBitacoraDesc: getUniqueColumnValues(SHEETS.ETIQUETADORAS_REG, 7),
     cobasObs: getUniqueColumnValues(SHEETS.COBAS_REG, 8)
   };
+  
+  setCachedJson(cacheKey, data, 7200); // 2 hours
+  return data;
 }
 
 // ── Guardar Registros ─────────────────────────────────────────
@@ -337,6 +406,8 @@ function saveTermo(data) {
     '',  // Revisado_Por
     ''   // Fecha_Revisión
   ]);
+
+  clearSheetCache('termo', f.mes, f.anio);
 
   // Send alert email if out of range
   if (tempOOR || humOOR) {
@@ -385,6 +456,7 @@ function saveCentrifuga(data) {
       ''   // Fecha_Revisión
     ]);
   });
+  clearSheetCache('centrifugas', f.mes, f.anio);
   return { success: true, message: centrifugas.length + ' registro(s) de Centrífuga guardado(s).' };
 }
 
@@ -411,6 +483,7 @@ function saveMesones(data) {
       ''   // Fecha_Revisión
     ]);
   });
+  clearSheetCache('mesones', f.mes, f.anio);
   return { success: true, message: salas.length + ' registro(s) de Mesones guardado(s).' };
 }
 
@@ -448,6 +521,8 @@ function saveRefriTemp(data) {
     '',  // Revisado_Por
     ''   // Fecha_Revisión
   ]);
+
+  clearSheetCache('refriTemp', f.mes, f.anio);
 
   if (tempOOR) {
     try {
@@ -489,6 +564,7 @@ function saveLimpiezaRefri(data) {
       ''   // Fecha_Revisión
     ]);
   });
+  clearSheetCache('limpiezaRefri', f.mes, f.anio);
   return { success: true, message: equipos.length + ' registro(s) de Limpieza Refrigeradores guardado(s).' };
 }
 
@@ -514,6 +590,8 @@ function saveConductividad(data) {
     '',  // Revisado_Por
     ''   // Fecha_Revisión
   ]);
+
+  clearSheetCache('conductividad', f.mes, f.anio);
 
   // Alert if > 0.5 (warning to encargado)
   if (cond > 0.5) {
@@ -555,6 +633,7 @@ function saveCobas(data) {
     ]);
   });
   
+  clearSheetCache('cobas', f.mes, f.anio);
   return { success: true, message: data.actividades.length + ' tarea(s) de Cobas guardada(s).' };
 }
 
@@ -564,67 +643,78 @@ function getRegistros(mes, anio) {
   mes  = parseInt(mes);
   anio = parseInt(anio);
 
-  function filtrar(sheet, colMes, colAnio) {
-    const rows = sheet.getDataRange().getValues();
-    return rows.slice(1).filter(r => parseInt(r[colMes]) === mes && parseInt(r[colAnio]) === anio);
-  }
+  const sheetsToFetch = [
+    { key: 'termo',         sheetName: SHEETS.TERMO,       colMes: 2, colAnio: 3, mapper: r => ({
+      fecha: r[0], dia: r[1], mes: r[2], anio: r[3],
+      responsable: r[4], temperatura: r[5], humedad: r[6], turno: r[7],
+      area: r[8], accion_correctiva: r[9] || '', observaciones: r[10],
+      revisado_por: r[12] || '', fecha_revision: r[13] || ''
+    }) },
+    { key: 'centrifugas',   sheetName: SHEETS.CENT_REG,    colMes: 2, colAnio: 3, mapper: r => ({
+      fecha: r[0], dia: r[1], mes: r[2], anio: r[3], centrifuga: r[4],
+      responsable: r[5], tipo_mantencion: r[6], observaciones: r[7],
+      revisado_por: r[9] || '', fecha_revision: r[10] || ''
+    }) },
+    { key: 'mesones',       sheetName: SHEETS.MESONES,     colMes: 2, colAnio: 3, mapper: r => ({
+      fecha: r[0], dia: r[1], mes: r[2], anio: r[3], sala: r[4],
+      responsable: r[5], observaciones: r[6],
+      revisado_por: r[8] || '', fecha_revision: r[9] || ''
+    }) },
+    { key: 'refriTemp',     sheetName: SHEETS.REFRI_REG,    colMes: 2, colAnio: 3, mapper: r => ({
+      fecha: r[0], dia: r[1], mes: r[2], anio: r[3],
+      responsable: r[4], temperatura: r[5], turno: r[6],
+      equipo: r[7], tipo: r[8], accion_correctiva: r[9] || '', observaciones: r[10],
+      revisado_por: r[12] || '', fecha_revision: r[13] || ''
+    }) },
+    { key: 'limpiezaRefri',  sheetName: SHEETS.LIMP_REFRI,   colMes: 2, colAnio: 3, mapper: r => ({
+      fecha: r[0], dia: r[1], mes: r[2], anio: r[3],
+      tipo_mantencion: r[4], equipo: r[5], responsable: r[6], observaciones: r[7],
+      revisado_por: r[9] || '', fecha_revision: r[10] || ''
+    }) },
+    { key: 'conductividad', sheetName: SHEETS.CONDUCT_REG,  colMes: 2, colAnio: 3, mapper: r => ({
+      fecha: r[0], dia: r[1], mes: r[2], anio: r[3],
+      responsable: r[4], conductividad: r[5], turno: r[6], observaciones: r[7],
+      revisado_por: r[9] || '', fecha_revision: r[10] || ''
+    }) },
+    { key: 'cobas',         sheetName: SHEETS.COBAS_REG,   colMes: 2, colAnio: 3, mapper: r => ({
+      fecha: r[0], dia: r[1], mes: r[2], anio: r[3],
+      equipo: r[4], responsable: r[5], frecuencia: r[6], actividad: r[7],
+      observaciones: r[8], revisado_por: r[10] || '', fecha_revision: r[11] || ''
+    }) },
+    { key: 'elimMuestras',  sheetName: SHEETS.ELIM_MUESTRAS, colMes: 2, colAnio: 3, mapper: r => ({
+      fecha: r[0], dia: r[1], mes: r[2], anio: r[3],
+      responsable: r[4], muestras_eliminadas: r[5],
+      revisado_por: r[7] || '', fecha_revision: r[8] || ''
+    }) }
+  ];
 
-  const termoRaw  = filtrar(getSheet(SHEETS.TERMO),    2, 3);
-  const centRaw   = filtrar(getSheet(SHEETS.CENT_REG), 2, 3);
-  const mesoRaw   = filtrar(getSheet(SHEETS.MESONES),  2, 3);
-  const refriRaw  = filtrar(getSheet(SHEETS.REFRI_REG), 2, 3);
-  const limpRaw   = filtrar(getSheet(SHEETS.LIMP_REFRI), 2, 3);
-  const condRaw   = filtrar(getSheet(SHEETS.CONDUCT_REG), 2, 3);
-  const cobasRaw  = filtrar(getSheet(SHEETS.COBAS_REG), 2, 3);
+  const result = { mes, anio };
 
-  const termo = termoRaw.map(r => ({
-    fecha: r[0], dia: r[1], mes: r[2], anio: r[3],
-    responsable: r[4], temperatura: r[5], humedad: r[6], turno: r[7],
-    area: r[8], accion_correctiva: r[9] || '', observaciones: r[10],
-    revisado_por: r[12] || '', fecha_revision: r[13] || ''
-  }));
+  sheetsToFetch.forEach(cfg => {
+    const cacheKey = getCacheKey('regs', cfg.key, mes, anio);
+    let cached = getCachedJson(cacheKey);
+    if (cached) {
+      result[cfg.key] = cached;
+    } else {
+      const sheet = getSheet(cfg.sheetName);
+      const rows = sheet.getDataRange().getValues();
+      const filteredRaw = rows.slice(1).filter(r => parseInt(r[cfg.colMes]) === mes && parseInt(r[cfg.colAnio]) === anio);
+      const mapped = filteredRaw.map(cfg.mapper);
+      setCachedJson(cacheKey, mapped, CACHE_TTL_REGISTROS);
+      result[cfg.key] = mapped;
+    }
+  });
 
-  const centrifugas = centRaw.map(r => ({
-    fecha: r[0], dia: r[1], mes: r[2], anio: r[3], centrifuga: r[4],
-    responsable: r[5], tipo_mantencion: r[6], observaciones: r[7],
-    revisado_por: r[9] || '', fecha_revision: r[10] || ''
-  }));
-
-  const mesones = mesoRaw.map(r => ({
-    fecha: r[0], dia: r[1], mes: r[2], anio: r[3], sala: r[4],
-    responsable: r[5], observaciones: r[6],
-    revisado_por: r[8] || '', fecha_revision: r[9] || ''
-  }));
-
-  const refriTemp = refriRaw.map(r => ({
-    fecha: r[0], dia: r[1], mes: r[2], anio: r[3],
-    responsable: r[4], temperatura: r[5], turno: r[6],
-    equipo: r[7], tipo: r[8], accion_correctiva: r[9] || '', observaciones: r[10],
-    revisado_por: r[12] || '', fecha_revision: r[13] || ''
-  }));
-
-  const limpiezaRefri = limpRaw.map(r => ({
-    fecha: r[0], dia: r[1], mes: r[2], anio: r[3],
-    tipo_mantencion: r[4], equipo: r[5], responsable: r[6], observaciones: r[7],
-    revisado_por: r[9] || '', fecha_revision: r[10] || ''
-  }));
-
-  const conductividad = condRaw.map(r => ({
-    fecha: r[0], dia: r[1], mes: r[2], anio: r[3],
-    responsable: r[4], conductividad: r[5], turno: r[6], observaciones: r[7],
-    revisado_por: r[9] || '', fecha_revision: r[10] || ''
-  }));
-
-  const cobas = cobasRaw.map(r => ({
-    fecha: r[0], dia: r[1], mes: r[2], anio: r[3],
-    equipo: r[4], responsable: r[5], frecuencia: r[6], actividad: r[7],
-    observaciones: r[8], revisado_por: r[10] || '', fecha_revision: r[11] || ''
-  }));
-
-  return { mes, anio, termo, centrifugas, mesones, refriTemp, limpiezaRefri, conductividad, cobas };
+  return result;
 }
 
 function getRevision(mes, anio) {
+  const cacheKey = getCacheKey('revs', mes, anio);
+  let cached = getCachedJson(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
   const rows = getSheet(SHEETS.REVISIONES).getDataRange().getValues();
   // Collect all revision entries for this month/year
   const revisiones = [];
@@ -641,7 +731,10 @@ function getRevision(mes, anio) {
   // Build a set of all reviewed register types
   const revisados = new Set();
   revisiones.forEach(rev => rev.registros.forEach(r => revisados.add(r)));
-  return { revisiones, revisados: Array.from(revisados) };
+  const result = { revisiones, revisados: Array.from(revisados) };
+  
+  setCachedJson(cacheKey, result, CACHE_TTL_REGISTROS);
+  return result;
 }
 
 // ── Revisiones ────────────────────────────────────────────────
@@ -672,7 +765,19 @@ function marcarRevisado(data) {
     refriTemp:    { sheet: SHEETS.REFRI_REG,     colMes: 2, colAnio: 3, colRev: 12, colFecha: 13 },
     limpRefri:    { sheet: SHEETS.LIMP_REFRI,    colMes: 2, colAnio: 3, colRev: 9,  colFecha: 10 },
     conductividad:{ sheet: SHEETS.CONDUCT_REG,   colMes: 2, colAnio: 3, colRev: 9,  colFecha: 10 },
-    cobas:        { sheet: SHEETS.COBAS_REG,     colMes: 2, colAnio: 3, colRev: 10, colFecha: 11 }
+    cobas:        { sheet: SHEETS.COBAS_REG,     colMes: 2, colAnio: 3, colRev: 10, colFecha: 11 },
+    elimMuestras: { sheet: SHEETS.ELIM_MUESTRAS, colMes: 2, colAnio: 3, colRev: 7,  colFecha: 8  }
+  };
+
+  const cacheKeyMap = {
+    termo: 'termo',
+    centrifugas: 'centrifugas',
+    mesones: 'mesones',
+    refriTemp: 'refriTemp',
+    limpRefri: 'limpiezaRefri',
+    conductividad: 'conductividad',
+    cobas: 'cobas',
+    elimMuestras: 'elimMuestras'
   };
 
   // Solo hacer stamp en los registros seleccionados
@@ -680,13 +785,18 @@ function marcarRevisado(data) {
     const cfg = STAMP_MAP[reg];
     if (cfg) {
       stampRevision(getSheet(cfg.sheet), cfg.colMes, cfg.colAnio, mes, anio, revisor, fechaRev, cfg.colRev, cfg.colFecha);
+      if (cacheKeyMap[reg]) {
+        clearSheetCache(cacheKeyMap[reg], mes, anio);
+      }
     }
   });
+
+  clearCacheKeys([getCacheKey('revs', mes, anio)]);
 
   const nombres = {
     termo: 'Temp. Ambiental', centrifugas: 'Centrífugas', mesones: 'Mesones',
     refriTemp: 'Temp. Refrigeradores', limpRefri: 'Limp. Refrigeradores', conductividad: 'Conductividad',
-    cobas: 'Mantención Cobas'
+    cobas: 'Mantención Cobas', elimMuestras: 'Eliminación Muestras'
   };
   const nombresRev = registros.map(function(r) { return nombres[r] || r; }).join(', ');
   return { success: true, message: 'Revisión confirmada por ' + revisor + ': ' + nombresRev };
@@ -932,21 +1042,21 @@ function triggerDatosNoRellenados() {
   // Cobas diarias faltantes
   const cobasFaltantes = [];
   const cobasEquipos = ['Cobas 1', 'Cobas 2'];
-  const cobasDiarias = [
-    'Limpieza pipeta y puertos de vaciado (ISE)',
-    'Limpieza pipetas y agujas de lavado (c702)',
-    'Limpieza pipetas, agujas prelavado y sipper (e801)',
-    'Pipe diario y rack verde'
-  ];
   const cobasHoy = reg.cobas ? reg.cobas.filter(r => parseInt(r.dia) === dia) : [];
   cobasEquipos.forEach(eq => {
-    cobasDiarias.forEach(act => {
-      const existe = cobasHoy.some(r => r.equipo === eq && r.actividad === act);
-      if (!existe) cobasFaltantes.push(eq + ': ' + act);
-    });
+    const existe = cobasHoy.some(r => r.equipo === eq && r.frecuencia === 'Diaria');
+    if (!existe) {
+      cobasFaltantes.push(eq + ': Mantención Diaria');
+    }
   });
   if (cobasFaltantes.length > 0) {
     missingByRegister['cobas'] = { name: '🔬 Mantención Cobas (Diaria)', items: cobasFaltantes };
+  }
+
+  // Eliminación de Muestras faltante (diaria)
+  const elimHoy = reg.elimMuestras ? reg.elimMuestras.filter(r => parseInt(r.dia) === dia) : [];
+  if (elimHoy.length === 0) {
+    missingByRegister['elimMuestras'] = { name: '🗑️ Registro de Eliminación de Muestras', items: ['Eliminación de Muestras del día'] };
   }
 
   // Map to recipient emails
@@ -1117,6 +1227,7 @@ function checkCobasPeriodicasVencidas() {
   
   const rows = sheet.getDataRange().getValues();
   const ultimasFechas = {};
+  const groupedFreqs = ['Semanal', 'Quincenal', 'Mensual'];
   
   for (let i = 1; i < rows.length; i++) {
     const r = rows[i];
@@ -1130,7 +1241,9 @@ function checkCobasPeriodicasVencidas() {
     const partes = fechaStr.split('/');
     if (partes.length === 3) {
       const fecha = new Date(parseInt(partes[2]), parseInt(partes[1]) - 1, parseInt(partes[0]));
-      const key = equipo + '|' + actividad;
+      const isGrouped = groupedFreqs.includes(freq);
+      const key = isGrouped ? (equipo + '|' + freq) : (equipo + '|' + actividad);
+      
       if (!ultimasFechas[key] || fecha > ultimasFechas[key]) {
         ultimasFechas[key] = fecha;
       }
@@ -1143,10 +1256,11 @@ function checkCobasPeriodicasVencidas() {
   equipos.forEach(eq => {
     Object.keys(COBAS_PERIODIC_TASKS).forEach(freq => {
       const config = COBAS_PERIODIC_TASKS[freq];
-      config.items.forEach(act => {
-        const key = eq + '|' + act;
+      const isGrouped = groupedFreqs.includes(freq);
+      
+      if (isGrouped) {
+        const key = eq + '|' + freq;
         const ultimaFecha = ultimasFechas[key];
-        
         let isOverdue = false;
         let diffDias = 0;
         
@@ -1163,13 +1277,40 @@ function checkCobasPeriodicasVencidas() {
         if (isOverdue) {
           vencidas.push({
             equipo: eq,
-            actividad: act,
+            actividad: 'Mantención ' + freq,
             frecuencia: freq,
             ultimaFechaStr: ultimaFecha ? ultimaFecha.toLocaleDateString('es-CL') : 'Nunca',
             diasSinRegistro: ultimaFecha ? diffDias + ' días' : '∞ (sin registros)'
           });
         }
-      });
+      } else {
+        config.items.forEach(act => {
+          const key = eq + '|' + act;
+          const ultimaFecha = ultimasFechas[key];
+          let isOverdue = false;
+          let diffDias = 0;
+          
+          if (!ultimaFecha) {
+            isOverdue = true;
+          } else {
+            const diffMs = hoy.getTime() - ultimaFecha.getTime();
+            diffDias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+            if (diffDias > config.interval) {
+              isOverdue = true;
+            }
+          }
+          
+          if (isOverdue) {
+            vencidas.push({
+              equipo: eq,
+              actividad: act,
+              frecuencia: freq,
+              ultimaFechaStr: ultimaFecha ? ultimaFecha.toLocaleDateString('es-CL') : 'Nunca',
+              diasSinRegistro: ultimaFecha ? diffDias + ' días' : '∞ (sin registros)'
+            });
+          }
+        });
+      }
     });
   });
   
@@ -1275,7 +1416,11 @@ function initializeSpreadsheet() {
     { name: SHEETS.COBAS_REG,   headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Equipo','Responsable','Frecuencia','Actividad','Observaciones','Timestamp','Revisado Por','Fecha Revisión'],
       hideCols: [2,3,4,10] },
     { name: SHEETS.REVISIONES,  headers: ['Mes','Año','Registros','Revisor','Timestamp'] },
-    { name: SHEETS.ETIQUETADORAS_REG, headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Etiquetadora','Accion','Descripcion','Responsable'],
+    { name: SHEETS.ETIQUETADORAS_REG, headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Etiquetadora','Nombre Práctico','Accion','Descripcion','Responsable'],
+      hideCols: [2,3,4] },
+    { name: SHEETS.DXH900_REG,  headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Usuario Responsable','Descripción Intervención','Nombre Especialista','Timestamp'],
+      hideCols: [2,3,4] },
+    { name: SHEETS.ELIM_MUESTRAS, headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Responsable','Muestras Eliminadas','Timestamp','Revisado Por','Fecha Revisión'],
       hideCols: [2,3,4] },
     // Maestros al final
     { name: SHEETS.AREAS,       headers: ['Area'] },
@@ -1382,7 +1527,9 @@ function initializeSpreadsheet() {
       ['Temperatura Refrigeradores', 'refriTemp', 'grivera@hospitaldetalca.cl', 'FALSE'],
       ['Limpieza Refrigeradores', 'limpRefri', 'grivera@hospitaldetalca.cl', 'FALSE'],
       ['Conductividad del Agua', 'conductividad', 'grivera@hospitaldetalca.cl', 'FALSE'],
-      ['Mantención Cobas', 'cobas', 'grivera@hospitaldetalca.cl', 'FALSE']
+      ['Mantención Cobas', 'cobas', 'grivera@hospitaldetalca.cl', 'FALSE'],
+      ['Reparaciones DxH 900 Urgencias', 'dxh900', 'grivera@hospitaldetalca.cl', 'FALSE'],
+      ['Registro de eliminación de muestras', 'elimMuestras', 'grivera@hospitaldetalca.cl', 'FALSE']
     ];
     if (notifSheet.getLastRow() > 1) {
       notifSheet.deleteRows(2, notifSheet.getLastRow() - 1);
@@ -1412,16 +1559,25 @@ function setup() {
 }
 
 function reinitialize() {
+  try {
+    const cache = CacheService.getScriptCache();
+    cache.remove('maestros_all');
+    cache.remove('sugerencias_historicas');
+    cache.remove('dxh900_hist');
+  } catch (e) {
+    Logger.log('Error clearing all cache on reinitialize: ' + e.toString());
+  }
   resetRegistros();
   initializeSpreadsheet();
-  return { success: true, message: 'Estructura y registros re-inicializados.' };
+  return { success: true, message: 'Estructura y registros re-inicializados y caché borrada.' };
 }
 
 function resetRegistros() {
   const registroSheets = [
     SHEETS.TERMO, SHEETS.CENT_REG, SHEETS.MESONES,
     SHEETS.REFRI_REG, SHEETS.LIMP_REFRI, SHEETS.CONDUCT_REG,
-    SHEETS.COBAS_REG, SHEETS.REVISIONES, SHEETS.ETIQUETADORAS_REG
+    SHEETS.COBAS_REG, SHEETS.REVISIONES, SHEETS.ETIQUETADORAS_REG,
+    SHEETS.DXH900_REG
   ];
   const results = [];
   registroSheets.forEach(function(name) {
@@ -1461,15 +1617,50 @@ function getEtiquetadoras() {
 
 function getEtiquetadoraHistorial(etName) {
   if (!etName) return [];
+  const cacheKey = getCacheKey('et_hist', etName);
+  let cached = getCachedJson(cacheKey);
+  if (cached) {
+    return cached;
+  }
   const data = getSheet(SHEETS.ETIQUETADORAS_REG).getDataRange().getValues();
-  return data.slice(1)
-    .filter(r => String(r[4]) === etName)
-    .map(r => ({
-      fecha: String(r[0]),
-      accion: String(r[5]),
-      descripcion: String(r[6]),
-      responsable: String(r[7])
-    }));
+  const result = data.slice(1)
+    .filter(r => r[4] && String(r[4]) === etName)
+    .map(r => {
+      let fechaStr = '';
+      const rawFecha = r[0];
+      if (rawFecha instanceof Date) {
+        const dia = String(rawFecha.getDate()).padStart(2, '0');
+        const mes = String(rawFecha.getMonth() + 1).padStart(2, '0');
+        const anio = rawFecha.getFullYear();
+        fechaStr = dia + '/' + mes + '/' + anio;
+      } else if (rawFecha) {
+        const strVal = String(rawFecha).trim();
+        if (/^\d{2}\/\d{2}\/\d{4}$/.test(strVal)) {
+          fechaStr = strVal;
+        } else {
+          // Si tiene formato de fecha de JS con huso horario
+          const cleaned = strVal.replace(/\s*\(.*\)\s*/g, '').trim();
+          const d = new Date(cleaned);
+          if (!isNaN(d.getTime())) {
+            const dia = String(d.getDate()).padStart(2, '0');
+            const mes = String(d.getMonth() + 1).padStart(2, '0');
+            const anio = d.getFullYear();
+            fechaStr = dia + '/' + mes + '/' + anio;
+          } else {
+            fechaStr = strVal;
+          }
+        }
+      }
+      return {
+        fecha: fechaStr,
+        nombrePractico: String(r[5]),
+        accion: String(r[6]),
+        descripcion: String(r[7]),
+        responsable: String(r[8])
+      };
+    });
+  setCachedJson(cacheKey, result, 3600); // 1 hour cache
+  return result;
 }
 
 function saveEtiquetadoraRegistro(data) {
@@ -1479,14 +1670,28 @@ function saveEtiquetadoraRegistro(data) {
   const f = parseFecha(data.fecha || new Date().toISOString().split('T')[0]);
   const ts = new Date().toISOString();
   
+  let nombrePractico = data.nombrePractico || '';
+  if (!nombrePractico) {
+    const masterSheet = getSheet(SHEETS.ETIQUETADORAS_MASTER);
+    if (masterSheet) {
+      const masterRows = masterSheet.getDataRange().getValues();
+      const match = masterRows.find(r => String(r[0]).trim() === String(data.etiquetadora).trim());
+      if (match) {
+        nombrePractico = match[2];
+      }
+    }
+  }
+  
   insertRowAtTop(getSheet(SHEETS.ETIQUETADORAS_REG), [
     formatFechaDDMMYYYY(f), f.dia, f.mes, f.anio,
     data.etiquetadora,
+    nombrePractico,
     data.accion,
     data.descripcion,
     data.responsable.toUpperCase().substring(0, 3)
   ]);
   
+  clearCacheKeys([getCacheKey('et_hist', data.etiquetadora)]);
   return { success: true, message: 'Registro de bitácora guardado.' };
 }
 
@@ -1501,14 +1706,39 @@ function updateEtiquetadoraMaestro(data) {
   const sheet = getSheet(SHEETS.ETIQUETADORAS_MASTER);
   const rows = sheet.getDataRange().getValues();
   let rowIndex = -1;
+  let oldPractico = '';
   
   for (let i = 1; i < rows.length; i++) {
     if (String(rows[i][0]).trim() === String(data.nombreReal).trim()) {
       rowIndex = i + 1;
+      oldPractico = String(rows[i][2]).trim(); // Index 2 is 'Nombre Práctico'
       break;
     }
   }
   
+  const newPractico = (data.nombrePractico || '').trim();
+  
+  // If the label printer exists and its practical name was changed:
+  if (rowIndex !== -1 && oldPractico !== newPractico) {
+    if (!data.responsable) {
+      return { success: false, error: 'Se requiere usuario responsable para cambiar el nombre práctico.' };
+    }
+    
+    // Log the change in Reg. Etiquetadoras
+    const f = parseFecha(new Date().toISOString().split('T')[0]);
+    insertRowAtTop(getSheet(SHEETS.ETIQUETADORAS_REG), [
+      formatFechaDDMMYYYY(f), f.dia, f.mes, f.anio,
+      data.nombreReal,
+      newPractico,
+      'Cambio de ubicación',
+      'Se cambia la ubicación y el nombre práctico de la etiquetadora',
+      data.responsable.toUpperCase().substring(0, 3)
+    ]);
+    
+    // Clear history cache for this label printer
+    clearCacheKeys([getCacheKey('et_hist', data.nombreReal)]);
+  }
+
   const rowData = [
     data.nombreReal,
     data.id || '',
@@ -1523,9 +1753,11 @@ function updateEtiquetadoraMaestro(data) {
   
   if (rowIndex !== -1) {
     sheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]);
+    clearCacheKeys(['maestros_all', 'sugerencias_historicas']);
     return { success: true, message: 'Ficha de etiquetadora actualizada.' };
   } else {
     sheet.appendRow(rowData);
+    clearCacheKeys(['maestros_all', 'sugerencias_historicas']);
     return { success: true, message: 'Nueva etiquetadora agregada al maestro.' };
   }
 }
@@ -1555,7 +1787,8 @@ function getNotificaciones() {
     ['Temperatura Refrigeradores', 'refriTemp', 'grivera@hospitaldetalca.cl', 'FALSE'],
     ['Limpieza Refrigeradores', 'limpRefri', 'grivera@hospitaldetalca.cl', 'FALSE'],
     ['Conductividad del Agua', 'conductividad', 'grivera@hospitaldetalca.cl', 'FALSE'],
-    ['Mantención Cobas', 'cobas', 'grivera@hospitaldetalca.cl', 'FALSE']
+    ['Mantención Cobas', 'cobas', 'grivera@hospitaldetalca.cl', 'FALSE'],
+    ['Reparaciones DxH 900 Urgencias', 'dxh900', 'grivera@hospitaldetalca.cl', 'FALSE']
   ];
   
   let changed = false;
@@ -1621,5 +1854,131 @@ function getEmailRecipients(clave) {
   }
   // Fallback
   return (clave === 'conductividad') ? EMAIL_ALERTS.conductividad : EMAIL_ALERTS.default;
+}
+
+// ── Registro de reparaciones DxH 900 Urgencias ────────────────
+
+function getDxH900Historial() {
+  const cacheKey = 'dxh900_hist';
+  let cached = getCachedJson(cacheKey);
+  if (cached) {
+    return cached;
+  }
+  const sheet = getSheet(SHEETS.DXH900_REG);
+  if (!sheet) return [];
+  const data = sheet.getDataRange().getValues();
+  const result = data.slice(1)
+    .filter(r => r[0] !== '' && r[5] !== '') // Ignore empty/deleted rows
+    .map(r => {
+    let fechaStr = '';
+    const rawFecha = r[0];
+    if (rawFecha instanceof Date) {
+      const dia = String(rawFecha.getDate()).padStart(2, '0');
+      const mes = String(rawFecha.getMonth() + 1).padStart(2, '0');
+      const anio = rawFecha.getFullYear();
+      fechaStr = dia + '/' + mes + '/' + anio;
+    } else if (rawFecha) {
+      const strVal = String(rawFecha).trim();
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(strVal)) {
+        fechaStr = strVal;
+      } else {
+        const cleaned = strVal.replace(/\s*\(.*\)\s*/g, '').trim();
+        const d = new Date(cleaned);
+        if (!isNaN(d.getTime())) {
+          const dia = String(d.getDate()).padStart(2, '0');
+          const mes = String(d.getMonth() + 1).padStart(2, '0');
+          const anio = d.getFullYear();
+          fechaStr = dia + '/' + mes + '/' + anio;
+        } else {
+          fechaStr = strVal;
+        }
+      }
+    }
+    return {
+      fecha: fechaStr,
+      usuario_responsable: String(r[4]),
+      descripcion: String(r[5]),
+      especialista: String(r[6])
+    };
+  });
+  setCachedJson(cacheKey, result, 3600); // 1 hour cache
+  return result;
+}
+
+// Guarda registro en la hoja Reg. Reparaciones DxH 900 Urgencias
+function saveDxH900Registro(data) {
+  if (!data.usuario_responsable || !data.descripcion || !data.especialista) {
+    return { success: false, error: 'Faltan campos obligatorios.' };
+  }
+  const f = parseFecha(data.fecha || new Date().toISOString().split('T')[0]);
+  const ts = new Date().toISOString();
+  
+  insertRowAtTop(getSheet(SHEETS.DXH900_REG), [
+    formatFechaDDMMYYYY(f), f.dia, f.mes, f.anio,
+    data.usuario_responsable,
+    data.descripcion,
+    data.especialista,
+    ts
+  ]);
+  
+  try {
+    sendAlertaDxH900(data);
+  } catch (e) {
+    Logger.log('Error enviando correo DxH 900: ' + e.toString());
+  }
+
+  clearCacheKeys(['dxh900_hist']);
+  return { success: true, message: 'Registro de reparación guardado.' };
+}
+
+// Alerta de correo electrónico
+function sendAlertaDxH900(info) {
+  const subject = '🛠️ [Registros Lab] Nuevo Registro de Reparación DxH 900 Urgencias';
+  
+  const f = parseFecha(info.fecha || new Date().toISOString().split('T')[0]);
+  const fechaFormateada = `${String(f.dia).padStart(2, '0')}/${String(f.mes).padStart(2, '0')}/${f.anio}`;
+  
+  const body = 'Estimado/a,\n\n' +
+    'Se ha ingresado una nueva intervención reparativa para el equipo DxH 900 Urgencias.\n\n' +
+    '📅 Fecha: ' + fechaFormateada + '\n' +
+    '👤 Usuario Responsable: ' + info.usuario_responsable + '\n' +
+    '🔧 Especialista: ' + info.especialista + '\n\n' +
+    '📝 Descripción de la intervención:\n' + info.descripcion + '\n\n' +
+    'Puede revisar los registros en:\n' + SHEET_URL + '\n\n' +
+    '---\n' +
+    'Este mensaje fue enviado automáticamente.\n' +
+    'Registros Mensuales — Laboratorio Clínico — Hospital de Talca\n';
+
+  const to = getEmailRecipients('dxh900');
+  if (to) {
+    MailApp.sendEmail({ to: to, subject: subject, body: body });
+  }
+}
+
+// ── Registro de eliminación de muestras ───────────────────────
+
+function saveElimMuestras(data) {
+  if (!data.responsable || !data.fecha || !data.muestras_eliminadas) {
+    return { success: false, error: 'Faltan campos obligatorios.' };
+  }
+  const resp = String(data.responsable).toUpperCase().trim().substring(0, 3);
+  if (!/^[A-Z]{3}$/.test(resp)) {
+    return { success: false, error: 'El responsable debe constar de 3 siglas alfabéticas.' };
+  }
+  const f = parseFecha(data.fecha);
+  const ts = new Date().toISOString();
+
+  insertRowAtTop(getSheet(SHEETS.ELIM_MUESTRAS), [
+    formatFechaDDMMYYYY(f),
+    f.dia, f.mes, f.anio,
+    resp,
+    data.muestras_eliminadas,
+    ts,
+    '',  // Revisado Por
+    ''   // Fecha Revisión
+  ]);
+
+  clearSheetCache('elimMuestras', f.mes, f.anio);
+  return { success: true, message: 'Registro de eliminación de muestras guardado con éxito.' };
 }
 

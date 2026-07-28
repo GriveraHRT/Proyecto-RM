@@ -667,7 +667,7 @@
               <label class="form-label" for="et-bitacora-accion">Acción a realizar</label>
               <select id="et-bitacora-accion" class="form-control" required onchange="onBitacoraAccionChange()">
                 <option value="">— Seleccionar —</option>
-                <option value="Cambio de Papel">📄 Cambio de Papel</option>
+                <option value="Cambio de papel">📄 Cambio de papel</option>
                 <option value="Mantenimiento">🔧 Mantenimiento</option>
                 <option value="Intervención reparativa">🛠️ Intervención reparativa</option>
               </select>
@@ -750,9 +750,6 @@
                 <span class="accordion-chevron">▲</span>
               </div>
               <div class="accordion-content">
-                <div style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
-                  <button type="button" class="btn btn-secondary btn-sm btn-select-all" onclick="toggleSelectAllAccordion(this)" style="width: auto; padding: 4px 10px; font-size: 11px;">☑️ Marcar todas</button>
-                </div>
                 <div class="checklist-grid" data-frecuencia="Diaria">
                   <!-- JS populated -->
                 </div>
@@ -766,9 +763,6 @@
                 <span class="accordion-chevron">▼</span>
               </div>
               <div class="accordion-content">
-                <div style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
-                  <button type="button" class="btn btn-secondary btn-sm btn-select-all" onclick="toggleSelectAllAccordion(this)" style="width: auto; padding: 4px 10px; font-size: 11px;">☑️ Marcar todas</button>
-                </div>
                 <div class="checklist-grid" data-frecuencia="Semanal">
                   <!-- JS populated -->
                 </div>
@@ -782,9 +776,6 @@
                 <span class="accordion-chevron">▼</span>
               </div>
               <div class="accordion-content">
-                <div style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
-                  <button type="button" class="btn btn-secondary btn-sm btn-select-all" onclick="toggleSelectAllAccordion(this)" style="width: auto; padding: 4px 10px; font-size: 11px;">☑️ Marcar todas</button>
-                </div>
                 <div class="checklist-grid" data-frecuencia="Quincenal">
                   <!-- JS populated -->
                 </div>
@@ -798,9 +789,6 @@
                 <span class="accordion-chevron">▼</span>
               </div>
               <div class="accordion-content">
-                <div style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
-                  <button type="button" class="btn btn-secondary btn-sm btn-select-all" onclick="toggleSelectAllAccordion(this)" style="width: auto; padding: 4px 10px; font-size: 11px;">☑️ Marcar todas</button>
-                </div>
                 <div class="checklist-grid" data-frecuencia="Mensual">
                   <!-- JS populated -->
                 </div>
@@ -873,6 +861,8 @@
         <button class="qr-tab" onclick="switchQrTab('conductividad')">💧 Conduct.</button>
         <button class="qr-tab" onclick="switchQrTab('etiquetadoras')">🏷️ Etiquet.</button>
         <button class="qr-tab" onclick="switchQrTab('cobas')">🔬 Cobas</button>
+        <button class="qr-tab" onclick="switchQrTab('dxh900')">🛠️ DxH 900</button>
+        <button class="qr-tab" onclick="switchQrTab('elim-muestras')">🗑️ Muestras</button>
       </div>
 
       <div class="form-group" id="qr-select-group">
@@ -933,6 +923,7 @@
           <div class="chip-item" data-value="limpRefri" onclick="toggleChip(this)">🧹 Limp. Refrigeradores</div>
           <div class="chip-item" data-value="conductividad" onclick="toggleChip(this)">💧 Conductividad</div>
           <div class="chip-item" data-value="cobas" onclick="toggleChip(this)">🔬 Mantención Cobas</div>
+          <div class="chip-item" data-value="elimMuestras" onclick="toggleChip(this)">🗑️ Eliminación Muestras</div>
         </div>
       </div>
 
@@ -991,6 +982,63 @@
     </div>
   </section>
 
+  <!-- ── SECCIÓN: REGISTRO DE ELIMINACIÓN DE MUESTRAS ─────────── -->
+  <section id="section-elim-muestras" class="section">
+    <p class="section-title">🗑️ Eliminación de muestras</p>
+    <p class="section-subtitle">Registro y control diario de eliminación de muestras</p>
+
+    <!-- Registrar Nueva Eliminación -->
+    <div class="card">
+      <h3 style="margin:0 0 12px 0; font-size:16px; font-weight:700; color:var(--text-color);">📝 Registrar Eliminación</h3>
+      
+      <form id="form-elim-muestras" autocomplete="off" onsubmit="saveElimMuestrasForm(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="elim-fecha">Fecha de eliminación</label>
+            <input type="date" id="elim-fecha" class="form-control" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="elim-responsable">Responsable (3 siglas)</label>
+            <input type="text" id="elim-responsable" class="form-control" placeholder="Ej: ABC" maxlength="3" pattern="[A-Za-z]{3}" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z]/g,'')" required />
+            <span class="form-help" style="font-size:11px; color:var(--text-dim);">Limitado a 3 iniciales alfabéticas</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="elim-fecha-corte">Seleccionar fecha corte de muestras</label>
+          <input type="date" id="elim-fecha-corte" class="form-control" onchange="updateMuestrasEliminadasText()" required />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="elim-muestras-texto">Muestras eliminadas</label>
+          <input type="text" id="elim-muestras-texto" class="form-control" placeholder="Se eliminan muestras anteriores al dd/mm/aa" required />
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="btn-elim-submit" style="margin-top:8px;">
+          <div class="spinner" id="spinner-elim"></div>
+          <span id="btn-elim-text">💾 Guardar Registro</span>
+        </button>
+      </form>
+    </div>
+
+    <!-- Historial de Registros -->
+    <div class="card">
+      <h3 style="margin:0 0 12px 0; font-size:16px; font-weight:700; color:var(--text-color);">📜 Historial de Registros</h3>
+      
+      <div id="elim-loading" style="text-align:center; padding:16px; display:none;">
+        <div class="spinner visible" style="margin:0 auto; width:20px; height:20px; border-width:2px;"></div>
+      </div>
+
+      <div id="elim-history-empty" style="text-align:center; padding:16px; color:var(--text-dim); font-size:13px;">
+        Sin registros de eliminación de muestras.
+      </div>
+
+      <div id="elim-history-list" style="display:none; max-height:300px; overflow-y:auto; border-radius:8px; border:1px solid rgba(255,255,255,0.06);">
+        <!-- Se rellena con JS -->
+      </div>
+    </div>
+  </section>
+
 </main>
 
 <!-- ══ BOTTOM NAVIGATION ════════════════════════════════════ -->
@@ -1030,6 +1078,14 @@
   <button class="nav-item" data-section="cobas" onclick="navigateTo('cobas')">
     <span class="nav-icon">🔬</span>
     <span class="nav-label">Cobas</span>
+  </button>
+  <button class="nav-item" data-section="dxh900" onclick="navigateTo('dxh900')">
+    <span class="nav-icon">🛠️</span>
+    <span class="nav-label">DxH 900</span>
+  </button>
+  <button class="nav-item" data-section="elim-muestras" onclick="navigateTo('elim-muestras')">
+    <span class="nav-icon">🗑️</span>
+    <span class="nav-label">Muestras</span>
   </button>
   <button class="nav-item" data-section="admin" onclick="navigateTo('admin')">
     <span class="nav-icon">🔑</span>

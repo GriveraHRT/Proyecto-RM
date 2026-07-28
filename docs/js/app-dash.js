@@ -111,24 +111,56 @@ window.toggleSelectAllAccordion = function(btn) {
 
 function initCobasChecklist() {
   const grids = document.querySelectorAll('#form-cobas .checklist-grid');
+  const groupedFreqs = ['Diaria', 'Semanal', 'Quincenal', 'Mensual'];
   grids.forEach(grid => {
     const freq = grid.dataset.frecuencia;
     const tasks = COBAS_TASKS.filter(t => t.displayFreq === freq);
-    grid.innerHTML = tasks.map(t => `
-      <div class="checklist-item" data-id="${t.id}" onclick="this.classList.toggle('selected')">
-        <div class="checkbox-box"></div>
-        <div class="checklist-label">${t.name}</div>
-      </div>
-    `).join('');
+    
+    if (groupedFreqs.includes(freq)) {
+      const listItemsHtml = tasks.map(t => `<li style="margin-bottom: 4px;">${t.name}</li>`).join('');
+      grid.innerHTML = `
+        <div class="checklist-item group-item" data-group-freq="${freq}" onclick="this.classList.toggle('selected')">
+          <div class="checkbox-box"></div>
+          <div class="checklist-label" style="font-weight: 600;">Realizar todas las actividades ${freq.toLowerCase()}s</div>
+        </div>
+        <div style="margin-top: 8px; padding-left: 12px; font-size: 13px; color: var(--text-dim);">
+          <ul style="margin: 0; padding-left: 16px; list-style-type: disc;">
+            ${listItemsHtml}
+          </ul>
+        </div>
+      `;
+    } else {
+      grid.innerHTML = tasks.map(t => `
+        <div class="checklist-item" data-id="${t.id}" onclick="this.classList.toggle('selected')">
+          <div class="checkbox-box"></div>
+          <div class="checklist-label">${t.name}</div>
+        </div>
+      `).join('');
+    }
   });
 }
 
 function getSelectedCobasTasks() {
-  return Array.from(document.querySelectorAll('#form-cobas .checklist-item.selected')).map(el => {
+  const selected = [];
+  
+  // 1. Grouped frequencies
+  document.querySelectorAll('#form-cobas .checklist-item.group-item.selected').forEach(el => {
+    const freq = el.dataset.groupFreq;
+    const tasks = COBAS_TASKS.filter(t => t.displayFreq === freq);
+    const concatenatedNames = tasks.map(t => t.name).join(', ');
+    selected.push({ nombre: concatenatedNames, frecuencia: freq });
+  });
+  
+  // 2. Individual frequencies
+  document.querySelectorAll('#form-cobas .checklist-item.selected:not(.group-item)').forEach(el => {
     const id = el.dataset.id;
     const task = COBAS_TASKS.find(t => t.id === id);
-    return { nombre: task.name, frecuencia: task.freq };
+    if (task) {
+      selected.push({ nombre: task.name, frecuencia: task.freq });
+    }
   });
+  
+  return selected;
 }
 
 // Forms — Cobas
@@ -267,16 +299,18 @@ html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-
 ['Mañana','Tarde'].forEach(turno=>{const done=condHoy.some(r=>r.turno===turno);html+=`<div class="status-item ${done?'done':'miss'}"><span class="status-dot ${done?'green':'red'}"></span>${turno}</div>`});html+='</div></div>';
 // Cobas Diarias
 const cobasHoy=(reg.cobas||[]).filter(r=>parseInt(r.dia)===hoy&&r.frecuencia==='Diaria');
-const cobasDiarias=['Limpieza pipeta y puertos de vaciado (ISE)','Limpieza pipetas y agujas de lavado (c702)','Limpieza pipetas, agujas prelavado y sipper (e801)','Pipe diario y rack verde'];
+html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🔬 Mantención Cobas (Diaria)</div><div class="status-grid">';
 ['Cobas 1','Cobas 2'].forEach(eq=>{
-  html+=`<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🔬 ${eq} (Diaria)</div><div class="status-grid">`;
-  cobasDiarias.forEach(act=>{
-    const done=cobasHoy.some(r=>r.equipo===eq&&r.actividad===act);
-    const shortName=act.replace('Limpieza ','Limp. ');
-    html+=`<div class="status-item ${done?'done':'miss'}"><span class="status-dot ${done?'green':'red'}"></span>${shortName}</div>`;
-  });
-  html+='</div></div>';
+  const done=cobasHoy.some(r=>r.equipo===eq);
+  html+=`<div class="status-item ${done?'done':'miss'}"><span class="status-dot ${done?'green':'red'}"></span>${eq}</div>`;
 });
+html+='</div></div>';
+// Eliminación de Muestras
+const elimHoy=(reg.elimMuestras||[]).filter(r=>parseInt(r.dia)===hoy);
+html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🗑️ Eliminación de Muestras</div><div class="status-grid">';
+const doneElim = elimHoy.length > 0;
+html+=`<div class="status-item ${doneElim?'done':'miss'}"><span class="status-dot ${doneElim?'green':'red'}"></span>${doneElim ? 'Registrado (' + elimHoy[0].responsable + ')' : 'Pendiente del día'}</div>`;
+html+='</div></div>';
 document.getElementById('dash-daily-view').innerHTML=html}
 
 function renderMonthlyView(reg){const dh=getDiasHasta(state.dashMes,state.dashAnio);const m=state.dashMaestros||{areas:[],centrifugas:[],salas:[],refrigeradores:[]};let html='';
@@ -303,7 +337,7 @@ html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-
   let chips='';
   for(let d=1;d<=dh;d++){
     const completedToday=(reg.cobas||[]).filter(r=>r.equipo===eq&&parseInt(r.dia)===d&&r.frecuencia==='Diaria');
-    const ok=completedToday.length>=4;
+    const ok=completedToday.length>=1;
     if(!ok)miss++;
     chips+=`<span class="day-chip ${ok?'chip-ok':'chip-missing'}">${d}</span>`;
   }
@@ -550,6 +584,14 @@ function switchQrTab(tab){
     // Conductividad: unique QR, no selector needed
     selGroup.style.display='none';
     generateQR(); // auto-generate
+  } else if(tab==='dxh900'){
+    // DxH 900: unique QR, no selector needed
+    selGroup.style.display='none';
+    generateQR(); // auto-generate
+  } else if(tab==='elim-muestras'){
+    // Eliminación de muestras: unique QR, no selector needed
+    selGroup.style.display='none';
+    generateQR(); // auto-generate
   } else {
     selGroup.style.display='';
     if(tab==='areas'){lbl.textContent='Selecciona Área';populateSelect('admin-select',state.areas,'— Seleccionar —')}
@@ -575,6 +617,12 @@ function generateQR(){
   if(state.qrTab==='conductividad'){
     url=`${base}?modulo=conductividad`;
     val='Conductividad del Agua';
+  } else if(state.qrTab==='dxh900'){
+    url=`${base}?modulo=dxh900`;
+    val='Registro de reparaciones DxH 900 Urgencias';
+  } else if(state.qrTab==='elim-muestras'){
+    url=`${base}?modulo=elim-muestras`;
+    val='Registro de eliminación de muestras';
   } else {
     const rawVal=document.getElementById('admin-select').value;
     if(!rawVal)return;
@@ -1030,15 +1078,31 @@ async function loadEtiquetadoraBitacora(name) {
     if (!data || data.length === 0) {
       empty.style.display = 'block';
     } else {
-      list.innerHTML = data.map(r => `
+      list.innerHTML = data.map(r => {
+        let fechaFormateada = r.fecha;
+        if (fechaFormateada) {
+          const strVal = String(fechaFormateada).trim();
+          if (!/^\d{2}\/\d{2}\/\d{4}$/.test(strVal)) {
+            const cleaned = strVal.replace(/\s*\(.*\)\s*/g, '').trim();
+            const d = new Date(cleaned);
+            if (!isNaN(d.getTime())) {
+              const dia = String(d.getDate()).padStart(2, '0');
+              const mes = String(d.getMonth() + 1).padStart(2, '0');
+              const anio = d.getFullYear();
+              fechaFormateada = `${dia}/${mes}/${anio}`;
+            }
+          }
+        }
+        return `
         <div style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.04); font-size:13px; line-height:1.4;">
           <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-weight:700;">
             <span style="color:var(--primary-color);">${r.accion}</span>
-            <span style="color:var(--text-dim); font-size:11px;">📅 ${r.fecha} — 👤 ${r.responsable}</span>
+            <span style="color:var(--text-dim); font-size:11px;">📅 ${fechaFormateada} — 👤 ${r.responsable}</span>
           </div>
           <div style="color:var(--text-color); font-weight:400; font-size:12.5px;">${r.descripcion}</div>
         </div>
-      `).join('');
+      `;
+      }).join('');
       list.style.display = 'block';
     }
   } catch (e) {
@@ -1086,6 +1150,19 @@ async function saveEtiquetadoraMaster(e) {
   const name = document.getElementById('etiquetadora-select').value;
   const password = document.getElementById('edit-et-password').value;
   
+  const et = state.etiquetadoras.find(x => x.nombreReal === name);
+  const oldPractico = et ? (et.nombrePractico || '') : '';
+  const newPractico = document.getElementById('edit-et-practico').value.trim();
+  
+  let responsable = '';
+  if (oldPractico !== newPractico) {
+    responsable = prompt('Se detectó un cambio en el Nombre Práctico.\nPor favor, ingrese sus iniciales o usuario responsable:');
+    if (!responsable) {
+      showToast('Modificación cancelada. Se requiere usuario responsable.', 'error');
+      return;
+    }
+  }
+  
   const spinner = document.getElementById('spinner-save-et-master');
   const btnText = document.getElementById('btn-save-et-master-text');
   
@@ -1103,7 +1180,8 @@ async function saveEtiquetadoraMaster(e) {
     piso: document.getElementById('edit-et-piso').value,
     ubicacion: document.getElementById('edit-et-ubicacion').value,
     comentario: document.getElementById('edit-et-comentario').value,
-    password: password
+    password: password,
+    responsable: responsable
   };
   
   try {
@@ -1149,14 +1227,14 @@ function onBitacoraAccionChange() {
   const descGroup = document.getElementById('et-bitacora-desc-group');
   const descInput = document.getElementById('et-bitacora-desc');
   
-  if (val === 'Cambio de Papel') {
+  if (val === 'Cambio de papel') {
     descGroup.style.display = 'none';
     descInput.required = false;
-    descInput.value = 'Cambio de papel estándar realizado';
+    descInput.value = 'Recambio de papel realizado';
   } else if (val) {
     descGroup.style.display = '';
     descInput.required = true;
-    if (descInput.value === 'Cambio de papel estándar realizado') {
+    if (descInput.value === 'Recambio de papel realizado') {
       descInput.value = '';
     }
   } else {
@@ -1219,6 +1297,110 @@ async function saveEtiquetadoraBitacora(e) {
   }
 }
 
+// ── Eliminación de Muestras ──────────────────────────────────
+
+function updateMuestrasEliminadasText() {
+  const cutoffInput = document.getElementById('elim-fecha-corte');
+  if (!cutoffInput) return;
+  const cutoff = cutoffInput.value;
+  if (!cutoff) return;
+  const parts = cutoff.split('-');
+  if (parts.length === 3) {
+    const yearShort = parts[0].substring(2);
+    const formatted = `${parts[2]}/${parts[1]}/${yearShort}`;
+    document.getElementById('elim-muestras-texto').value = `Se eliminan muestras anteriores al ${formatted}`;
+  }
+}
+
+async function loadElimMuestrasHistorialForm() {
+  if (document.getElementById('elim-fecha')) {
+    document.getElementById('elim-fecha').value = today();
+  }
+  if (document.getElementById('elim-fecha-corte') && !document.getElementById('elim-fecha-corte').value) {
+    document.getElementById('elim-fecha-corte').value = today();
+    updateMuestrasEliminadasText();
+  }
+  
+  const loading = document.getElementById('elim-loading');
+  const empty = document.getElementById('elim-history-empty');
+  const list = document.getElementById('elim-history-list');
+  if (!loading || !empty || !list) return;
+  
+  loading.style.display = 'block';
+  empty.style.display = 'none';
+  list.style.display = 'none';
+  
+  try {
+    const mes = state.dashMes || (new Date().getMonth() + 1);
+    const anio = state.dashAnio || new Date().getFullYear();
+    const regs = await apiGet({ action: 'getRegistros', mes: mes, anio: anio });
+    loading.style.display = 'none';
+    const data = regs.elimMuestras || [];
+    if (!data || data.length === 0) {
+      empty.style.display = 'block';
+    } else {
+      list.innerHTML = data.map(r => `
+        <div style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.04); font-size:13px; line-height:1.4;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-weight:700;">
+            <span style="color:var(--primary-color);">🗑️ ${r.muestras_eliminadas}</span>
+            <span style="color:var(--text-dim); font-size:11px;">📅 ${r.fecha} — 👤 ${r.responsable}</span>
+          </div>
+          ${r.revisado_por ? `<div style="font-size:11px; color:#10B981; margin-top:2px;">✓ Revisado por ${r.revisado_por} (${r.fecha_revision})</div>` : ''}
+        </div>
+      `).join('');
+      list.style.display = 'block';
+    }
+  } catch (e) {
+    loading.style.display = 'none';
+    empty.textContent = 'Error cargando historial.';
+    empty.style.display = 'block';
+  }
+}
+
+async function saveElimMuestrasForm(e) {
+  e.preventDefault();
+  const respInput = document.getElementById('elim-responsable');
+  const textInput = document.getElementById('elim-muestras-texto');
+  const fechaInput = document.getElementById('elim-fecha');
+  
+  const respVal = respInput.value.trim().toUpperCase();
+  if (!/^[A-Z]{3}$/.test(respVal)) {
+    showToast('El responsable debe constar de 3 siglas alfabéticas.', 'error');
+    return;
+  }
+
+  const spinner = document.getElementById('spinner-elim');
+  const btnText = document.getElementById('btn-elim-text');
+  
+  if (spinner) spinner.classList.add('visible');
+  if (btnText) btnText.style.display = 'none';
+  
+  const payload = {
+    action: 'saveElimMuestras',
+    fecha: fechaInput.value,
+    responsable: respVal,
+    muestras_eliminadas: textInput.value.trim()
+  };
+  
+  try {
+    const res = await apiPost(payload);
+    if (spinner) spinner.classList.remove('visible');
+    if (btnText) btnText.style.display = '';
+    
+    if (res.success) {
+      showToast('Registro de eliminación guardado con éxito ✓', 'success');
+      respInput.value = '';
+      loadElimMuestrasHistorialForm();
+    } else {
+      showToast(res.error || 'Error al guardar el registro.', 'error');
+    }
+  } catch (err) {
+    if (spinner) spinner.classList.remove('visible');
+    if (btnText) btnText.style.display = '';
+    showToast('Error de conexión con el servidor.', 'error');
+  }
+}
+
 // Init
 async function init(){
   document.getElementById('termo-fecha').value=today();
@@ -1232,6 +1414,13 @@ async function init(){
   }
   if(document.getElementById('cobas-fecha')) {
     document.getElementById('cobas-fecha').value=today();
+  }
+  if(document.getElementById('elim-fecha')) {
+    document.getElementById('elim-fecha').value=today();
+  }
+  if(document.getElementById('elim-fecha-corte')) {
+    document.getElementById('elim-fecha-corte').value=today();
+    updateMuestrasEliminadasText();
   }
   autoSetAmPm();
   updateInfoCentrifuga();

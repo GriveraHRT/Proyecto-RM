@@ -29,7 +29,7 @@ function toggleTheme(){const d=document.documentElement,dark=d.getAttribute('dat
 (function(){const t=localStorage.getItem('theme');if(t==='dark'){document.documentElement.setAttribute('data-theme','dark');document.getElementById('theme-toggle').textContent='🌙';document.querySelector('meta[name="theme-color"]').content='#0B1426'}})();
 
 // Navigation
-function navigateTo(s){document.querySelectorAll('.section').forEach(el=>el.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));document.getElementById('section-'+s).classList.add('active');document.querySelector(`[data-section="${s}"]`).classList.add('active');if(s==='dashboard')loadDashboard();if(s==='admin'){initRevAdminSelectors();loadNotificacionesAdmin()}}
+function navigateTo(s){document.querySelectorAll('.section').forEach(el=>el.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));const sec=document.getElementById('section-'+s);if(sec)sec.classList.add('active');const navBtn=document.querySelector(`[data-section="${s}"]`);if(navBtn)navBtn.classList.add('active');if(s==='dashboard')loadDashboard();if(s==='admin'){initRevAdminSelectors();loadNotificacionesAdmin()}if(s==='dxh900'){loadDxH900HistorialForm()}if(s==='elim-muestras'){loadElimMuestrasHistorialForm()}}
 
 // AM/PM — Termo (ambiental)
 function setAmPm(v){state.ampm=v;document.getElementById('btn-am').className='ampm-btn'+(v==='AM'?' selected-AM':'');document.getElementById('btn-pm').className='ampm-btn'+(v==='PM'?' selected-PM':'')}
@@ -399,6 +399,9 @@ function checkUrlParams(){
   }
   if(modulo==='cobas'){
     navigateTo('cobas');
+  }
+  if(modulo==='elim-muestras'){
+    navigateTo('elim-muestras');
   }
 }
 
