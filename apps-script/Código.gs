@@ -309,6 +309,7 @@ function getMaestros() {
   const cacheKey = 'maestros_all';
   let cached = getCachedJson(cacheKey);
   if (cached) {
+    cached.modulosActivos = getModulosActivos();
     return cached;
   }
   
@@ -2022,6 +2023,7 @@ function saveModulosActivos(data) {
   try {
     const jsonStr = JSON.stringify(data.modulos);
     PropertiesService.getScriptProperties().setProperty('MODULOS_ACTIVOS', jsonStr);
+    try { CacheService.getScriptCache().remove('maestros_all'); } catch(e) {}
     return { success: true, message: 'Configuración de módulos guardada con éxito.', modulos: data.modulos };
   } catch (e) {
     return { success: false, error: 'Error al guardar módulos: ' + e.toString() };
