@@ -1425,7 +1425,7 @@ function initializeSpreadsheet() {
     { name: SHEETS.DXH900_REG,  headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Usuario Responsable','Descripción Intervención','Nombre Especialista','Timestamp'],
       hideCols: [2,3,4] },
     { name: SHEETS.ELIM_MUESTRAS, headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Responsable','Muestras Eliminadas','Timestamp','Revisado Por','Fecha Revisión'],
-      hideCols: [2,3,4] },
+      hideCols: [2,3,4,7] },
     // Maestros al final
     { name: SHEETS.AREAS,       headers: ['Area'] },
     { name: SHEETS.CENTRIFUGAS, headers: ['Centrifuga'] },
@@ -1973,7 +1973,8 @@ function saveElimMuestras(data) {
   const f = parseFecha(data.fecha);
   const ts = new Date().toISOString();
 
-  insertRowAtTop(getSheet(SHEETS.ELIM_MUESTRAS), [
+  const sheet = getSheet(SHEETS.ELIM_MUESTRAS);
+  insertRowAtTop(sheet, [
     formatFechaDDMMYYYY(f),
     f.dia, f.mes, f.anio,
     resp,
@@ -1982,6 +1983,10 @@ function saveElimMuestras(data) {
     '',  // Revisado Por
     ''   // Fecha Revisión
   ]);
+
+  try {
+    sheet.hideColumns(7); // Ocultar columna Timestamp
+  } catch (e) {}
 
   clearSheetCache('elimMuestras', f.mes, f.anio);
   return { success: true, message: 'Registro de eliminación de muestras guardado con éxito.' };
