@@ -227,6 +227,7 @@ function doGet(e) {
       case 'getEtiquetadoraHistorial': return jsonResponse(getEtiquetadoraHistorial(e.parameter.etiquetadora));
       case 'getNotificaciones': return jsonResponse(getNotificaciones());
       case 'getDxH900Historial': return jsonResponse(getDxH900Historial());
+      case 'getModulosActivos': return jsonResponse(getModulosActivos());
       case 'SETUP_INIT_TA':     return jsonResponse(setup());
       case 'REINIT':            return jsonResponse(reinitialize());
       default:                  return jsonResponse({ error: 'Acción no reconocida: ' + action });
@@ -258,6 +259,7 @@ function doPost(e) {
       case 'saveNotificaciones':  return jsonResponse(saveNotificaciones(data));
       case 'saveDxH900Registro':  return jsonResponse(saveDxH900Registro(data));
       case 'saveElimMuestras':    return jsonResponse(saveElimMuestras(data));
+      case 'saveModulosActivos': return jsonResponse(saveModulosActivos(data));
       default:                    return jsonResponse({ error: 'Acción no reconocida: ' + data.action });
     }
   } catch (err) {
@@ -318,7 +320,8 @@ function getMaestros() {
     refrigeradores: getRefrigeradores(),
     refriLimpieza: getRefriLimpieza(),
     etiquetadoras: getEtiquetadoras(),
-    sugerencias: getSugerenciasHistoricas()
+    sugerencias: getSugerenciasHistoricas(),
+    modulosActivos: getModulosActivos()
   };
   
   setCachedJson(cacheKey, data, CACHE_TTL_MAESTROS);
@@ -1476,7 +1479,7 @@ function initializeSpreadsheet() {
 
   if (newlyCreated[SHEETS.CENTRIFUGAS]) {
     const centSheet = ss.getSheetByName(SHEETS.CENTRIFUGAS);
-    ['Centrífuga 1','Centrífuga 2','Centrífuga 3','Centrífuga 4','Centrífuga 5','Centrífuga 18'].forEach(c => centSheet.appendRow([c]));
+    ['Centrífuga 1','Centrífuga 2','Centrífuga 3','Centrífuga 4','Centrífuga 5','Centrífuga 18','Centrífuga 19'].forEach(c => centSheet.appendRow([c]));
   }
 
   if (newlyCreated[SHEETS.SALAS]) {
@@ -1982,4 +1985,47 @@ function saveElimMuestras(data) {
   clearSheetCache('elimMuestras', f.mes, f.anio);
   return { success: true, message: 'Registro de eliminación de muestras guardado con éxito.' };
 }
+
+// ── Configuración de Módulos Activos ──────────────────────────────
+const DEFAULT_MODULOS_ACTIVOS = {
+  'termo': true,
+  'centrifugas': true,
+  'mesones': true,
+  'refri-temp': true,
+  'limp-refri': true,
+  'conductividad': true,
+  'etiquetadoras': true,
+  'cobas': true,
+  'dxh900': true,
+  'elim-muestras': true
+};
+
+function getModulosActivos() {
+  try {
+    const raw = PropertiesService.getScriptProperties().getProperty('MODULOS_ACTIVOS');
+    if (!raw) return DEFAULT_MODULOS_ACTIVOS;
+    const parsed = JSON.parse(raw);
+    return Object.assign({}, DEFAULT_MODULOS_ACTIVOS, parsed);
+  } catch (e) {
+    Logger.log('Error al obtener módulos activos: ' + e.toString());
+    return DEFAULT_MODULOS_ACTIVOS;
+  }
+}
+
+function saveModulosActivos(data) {
+  if (data.password !== PASSWORD_REVISION) {
+    return { success: false, error: 'Contraseña incorrecta.' };
+  }
+  if (!data.modulos || typeof data.modulos !== 'object') {
+    return { success: false, error: 'Datos de módulos inválidos.' };
+  }
+  try {
+    const jsonStr = JSON.stringify(data.modulos);
+    PropertiesService.getScriptProperties().setProperty('MODULOS_ACTIVOS', jsonStr);
+    return { success: true, message: 'Configuración de módulos guardada con éxito.', modulos: data.modulos };
+  } catch (e) {
+    return { success: false, error: 'Error al guardar módulos: ' + e.toString() };
+  }
+}
+
 

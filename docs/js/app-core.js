@@ -1,5 +1,5 @@
 const API_URL='https://script.google.com/macros/s/AKfycbxuqcui0-hjJ721uMWZk3w-4l2fVCaBWQgdMJqVMb5Pno339Jqetq4r62p3-1gGBUvFOg/exec';
-const PREANALISIS=[1,2,3,4,5,18];
+const PREANALISIS=[1,2,3,4,5,18,19];
 const state={areas:[],centrifugas:[],salas:[],acciones:[],refrigeradores:[],refriLimpieza:[],cobasObs:[],ampm:'AM',ampmRefri:'AM',ampmConduct:'AM',qrInstance:null,qrTab:'areas',dashMes:new Date().getMonth()+1,dashAnio:new Date().getFullYear(),dashTab:'diario',dashData:null,dashMaestros:null,dashCache:null};
 
 function today(){return new Date().toISOString().split('T')[0]}
@@ -201,7 +201,7 @@ async function loadMaestros(){
     console.warn('Error cargando maestros de la API, cargando datos locales de prueba...', e);
     showToast('⚠️ Usando datos de prueba locales (Modo Offline/Pruebas)','info');
     state.areas = ["Área Química", "Área Hematología", "Área Preanálisis", "Área Microbiología"];
-    state.centrifugas = ["Centrífuga 1", "Centrífuga 2", "Centrífuga 3", "Centrífuga 4", "Centrífuga 5", "Centrífuga 18"];
+    state.centrifugas = ["Centrífuga 1", "Centrífuga 2", "Centrífuga 3", "Centrífuga 4", "Centrífuga 5", "Centrífuga 18", "Centrífuga 19"];
     state.salas = ["Sala Procesos", "Sala Recepción", "Sala Toma Muestras"];
     state.acciones = ["Avisar a Coordinador", "Llamar a Soporte", "Reiniciar Equipo"];
     state.refrigeradores = [
