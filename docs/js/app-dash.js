@@ -1301,14 +1301,18 @@ async function saveEtiquetadoraBitacora(e) {
 
 function updateMuestrasEliminadasText() {
   const cutoffInput = document.getElementById('elim-fecha-corte');
-  if (!cutoffInput) return;
+  const textInput = document.getElementById('elim-muestras-texto');
+  if (!cutoffInput || !textInput) return;
   const cutoff = cutoffInput.value;
-  if (!cutoff) return;
+  if (!cutoff) {
+    textInput.value = '';
+    return;
+  }
   const parts = cutoff.split('-');
   if (parts.length === 3) {
     const yearShort = parts[0].substring(2);
     const formatted = `${parts[2]}/${parts[1]}/${yearShort}`;
-    document.getElementById('elim-muestras-texto').value = `Se eliminan muestras anteriores al ${formatted}`;
+    textInput.value = `Se eliminan muestras anteriores al ${formatted}`;
   }
 }
 
@@ -1316,8 +1320,10 @@ async function loadElimMuestrasHistorialForm() {
   if (document.getElementById('elim-fecha')) {
     document.getElementById('elim-fecha').value = today();
   }
-  if (document.getElementById('elim-fecha-corte') && !document.getElementById('elim-fecha-corte').value) {
-    document.getElementById('elim-fecha-corte').value = today();
+  if (document.getElementById('elim-fecha-corte')) {
+    if (!document.getElementById('elim-fecha-corte').value) {
+      document.getElementById('elim-fecha-corte').value = today();
+    }
     updateMuestrasEliminadasText();
   }
   
@@ -1359,6 +1365,7 @@ async function loadElimMuestrasHistorialForm() {
 
 async function saveElimMuestrasForm(e) {
   e.preventDefault();
+  updateMuestrasEliminadasText();
   const respInput = document.getElementById('elim-responsable');
   const textInput = document.getElementById('elim-muestras-texto');
   const fechaInput = document.getElementById('elim-fecha');
@@ -1366,6 +1373,11 @@ async function saveElimMuestrasForm(e) {
   const respVal = respInput.value.trim().toUpperCase();
   if (!/^[A-Z]{3}$/.test(respVal)) {
     showToast('El responsable debe constar de 3 siglas alfabéticas.', 'error');
+    return;
+  }
+
+  if (!textInput.value.trim()) {
+    showToast('Debe seleccionar una fecha corte de muestras.', 'error');
     return;
   }
 
@@ -1390,6 +1402,10 @@ async function saveElimMuestrasForm(e) {
     if (res.success) {
       showToast('Registro de eliminación guardado con éxito ✓', 'success');
       respInput.value = '';
+      if (document.getElementById('elim-fecha-corte')) {
+        document.getElementById('elim-fecha-corte').value = today();
+        updateMuestrasEliminadasText();
+      }
       loadElimMuestrasHistorialForm();
     } else {
       showToast(res.error || 'Error al guardar el registro.', 'error');
