@@ -11,6 +11,7 @@
 // ============================================================
 
 const PASSWORD_REVISION = 'HRT123';
+const APP_URL        = 'https://script.google.com/macros/s/AKfycbxuqcui0-hjJ721uMWZk3w-4l2fVCaBWQgdMJqVMb5Pno339Jqetq4r62p3-1gGBUvFOg/exec';
 const SHEET_URL      = 'https://docs.google.com/spreadsheets/d/1HzHcRriBtPGQxTfFrZSntVeM8ujQHWnGFuyWrJo6KUQ';
 
 // Sistema de alertas multi-destinatario
@@ -857,7 +858,8 @@ function sendAlertaFueraDeRango(info) {
     detalles.join('\n') + '\n\n' +
     '🔧 Acción correctiva: ' + (info.accion_correctiva || 'No especificada') + '\n\n' +
     'Por favor, revisar y tomar las medidas necesarias.\n\n' +
-    'Puede revisar los registros en:\n' + SHEET_URL + '\n\n' +
+    'Enlace al aplicativo:\n' + APP_URL + '\n\n' +
+    'Enlace a los registros:\n' + SHEET_URL + '\n\n' +
     '---\n' +
     'Este mensaje fue enviado automáticamente.\n' +
     'Registros Mensuales — Laboratorio Clínico — Hospital de Talca\n';
@@ -883,7 +885,8 @@ function sendAlertaRefriTemp(info) {
     '• Rango aceptable: ' + info.tempMin + ' a ' + info.tempMax + ' °C\n\n' +
     '🔧 Acción correctiva: ' + (info.accion_correctiva || 'No especificada') + '\n\n' +
     'Nota: Avisar al Encargado de Turno o Encargado de Refrigeradores que las temperaturas se encuentran fuera de rango.\n\n' +
-    'Puede revisar los registros en:\n' + SHEET_URL + '\n\n' +
+    'Enlace al aplicativo:\n' + APP_URL + '\n\n' +
+    'Enlace a los registros:\n' + SHEET_URL + '\n\n' +
     '---\n' +
     'Este mensaje fue enviado automáticamente.\n' +
     'Registros Mensuales — Laboratorio Clínico — Hospital de Talca\n';
@@ -908,7 +911,8 @@ function sendAlertaConductividad(info) {
     (info.critico
       ? 'Valores de conductividad que sobrepasen los 0.8 µS/cm deben reportarse a Asistencia técnica Vigaflow 977070600.\n\n'
       : 'El valor supera los 0.5 µS/cm (advertencia). Rango permitido: 0–0.8 µS/cm.\n\n') +
-    'Puede revisar los registros en:\n' + SHEET_URL + '\n\n' +
+    'Enlace al aplicativo:\n' + APP_URL + '\n\n' +
+    'Enlace a los registros:\n' + SHEET_URL + '\n\n' +
     '---\n' +
     'Este mensaje fue enviado automáticamente.\n' +
     'Registros Mensuales — Laboratorio Clínico — Hospital de Talca\n';
@@ -975,7 +979,8 @@ function triggerRecordatorioMesAnterior() {
       ' bajo su responsabilidad aún no han sido marcados como revisados:\n\n' +
       detalleFaltantes + '\n\n' +
       'Por favor, ingrese al aplicativo y confirme la revisión del mes anterior.\n\n' +
-      'Enlace a los datos:\n' + SHEET_URL + '\n\n' +
+      'Enlace al aplicativo:\n' + APP_URL + '\n\n' +
+      'Enlace a los registros:\n' + SHEET_URL + '\n\n' +
       '---\n' +
       'Este mensaje fue enviado automáticamente.\n' +
       'Registros Mensuales — Laboratorio Clínico — Hospital de Talca\n';
@@ -1113,7 +1118,8 @@ function triggerDatosNoRellenados() {
       ' bajo su responsabilidad no han sido completados:\n' +
       detailText + '\n' +
       'Por favor, complete los registros pendientes a la brevedad.\n\n' +
-      'Enlace al aplicativo:\n' + SHEET_URL + '\n\n' +
+      'Enlace al aplicativo:\n' + APP_URL + '\n\n' +
+      'Enlace a los registros:\n' + SHEET_URL + '\n\n' +
       '---\n' +
       'Este mensaje fue enviado automáticamente.\n' +
       'Registros Mensuales — Laboratorio Clínico — Hospital de Talca\n';
@@ -1217,7 +1223,8 @@ function triggerMantencionSemanal() {
       'Las siguientes mantenciones semanales bajo su responsabilidad llevan más de 7 días sin registrarse:\n\n' +
       detail + '\n\n' +
       'Por favor, realice las mantenciones pendientes a la brevedad.\n\n' +
-      'Enlace al aplicativo:\n' + SHEET_URL + '\n\n' +
+      'Enlace al aplicativo:\n' + APP_URL + '\n\n' +
+      'Enlace a los registros:\n' + SHEET_URL + '\n\n' +
       '---\n' +
       'Este mensaje fue enviado automáticamente.\n' +
       'Registros Mensuales — Laboratorio Clínico — Hospital de Talca\n';
@@ -1366,7 +1373,8 @@ function triggerAlertaMantencionesCobas() {
     'Se ha detectado que las siguientes mantenciones periódicas de los equipos Cobas 1 y 2 están vencidas en el sistema:\n\n' +
     detailsList.join('\n\n') + '\n\n' +
     'Por favor, realice las mantenciones pendientes y regístrelas en el aplicativo a la brevedad.\n\n' +
-    'Enlace al aplicativo:\n' + SHEET_URL + '\n\n' +
+    'Enlace al aplicativo:\n' + APP_URL + '\n\n' +
+    'Enlace a los registros:\n' + SHEET_URL + '\n\n' +
     '---\n' +
     'Este mensaje fue enviado automáticamente.\n' +
     'Registros Mensuales — Laboratorio Clínico — Hospital de Talca\n';
@@ -1929,6 +1937,8 @@ function sendTestNotificacion(data) {
     '🔑 Clave interna: ' + (data.clave || 'n/a') + '\n' +
     '📅 Fecha y Hora de Envío: ' + new Date().toLocaleString('es-CL') + '\n\n' +
     'Si ha recibido este correo, la configuración de destinatarios para este registro funciona correctamente.\n\n' +
+    'Enlace al aplicativo:\n' + APP_URL + '\n\n' +
+    'Enlace a los registros:\n' + SHEET_URL + '\n\n' +
     '---\n' +
     'Mensaje generado de forma automática para verificación del sistema.\n' +
     'Registros Mensuales — Laboratorio Clínico — Hospital de Talca\n';
@@ -2045,7 +2055,8 @@ function sendAlertaDxH900(info) {
     '👤 Usuario Responsable: ' + info.usuario_responsable + '\n' +
     '🔧 Especialista: ' + info.especialista + '\n\n' +
     '📝 Descripción de la intervención:\n' + info.descripcion + '\n\n' +
-    'Puede revisar los registros en:\n' + SHEET_URL + '\n\n' +
+    'Enlace al aplicativo:\n' + APP_URL + '\n\n' +
+    'Enlace a los registros:\n' + SHEET_URL + '\n\n' +
     '---\n' +
     'Este mensaje fue enviado automáticamente.\n' +
     'Registros Mensuales — Laboratorio Clínico — Hospital de Talca\n';
