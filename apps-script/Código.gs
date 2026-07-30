@@ -224,7 +224,8 @@ function doGet(e) {
     const tmp = HtmlService.createTemplateFromFile('index');
     tmp.parameter = e.parameter || {};
     return tmp.evaluate()
-      .setTitle('Registros Mensuales — Lab Clínico HRT')
+      .setTitle('Registros Mensuales — HRT LAB')
+      .setFaviconUrl('https://griverahrt.github.io/Proyecto-RM/img/logo-icon-1.png')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
   }
