@@ -439,9 +439,10 @@ async function loadNotificacionesAdmin(){
           <thead>
             <tr style="border-bottom:2px solid var(--border-color); color:var(--text-muted-color);">
               <th style="padding:10px 8px; font-weight:600;">Tipo de Registro</th>
-              <th style="padding:10px 8px; font-weight:600; width:45%;">Destinatarios (correos separados por coma)</th>
-              <th style="padding:10px 8px; font-weight:600; width:20%;">Hora de Envío</th>
-              <th style="padding:10px 8px; font-weight:600; text-align:center; width:15%;">Pausar</th>
+              <th style="padding:10px 8px; font-weight:600; width:40%;">Destinatarios (correos separados por coma)</th>
+              <th style="padding:10px 8px; font-weight:600; width:18%;">Hora de Envío</th>
+              <th style="padding:10px 8px; font-weight:600; text-align:center; width:12%;">Pausar</th>
+              <th style="padding:10px 8px; font-weight:600; text-align:center; width:15%;">Acción</th>
             </tr>
           </thead>
           <tbody>
@@ -474,6 +475,14 @@ async function loadNotificacionesAdmin(){
                    style="width:20px; height:20px; cursor:pointer; accent-color:var(--primary-color);" 
                    ${n.pausado ? 'checked' : ''} />
           </td>
+          <td style="padding:12px 8px; text-align:center;">
+            <button class="btn btn-outline" 
+                    id="btn-test-notif-${n.clave}" 
+                    style="font-size:12px; padding:4px 8px; cursor:pointer;" 
+                    onclick="sendTestNotificacionAdmin('${n.clave}', '${n.registro}')">
+              🧪 Probar
+            </button>
+          </td>
         </tr>
       `;
     });
@@ -488,6 +497,65 @@ async function loadNotificacionesAdmin(){
   } catch (e) {
     console.error(e);
     container.innerHTML = `<div class="alert-banner alert-danger visible">Error de conexión al cargar las notificaciones.</div>`;
+  }
+}
+
+async function sendTestNotificacionAdmin(clave, registro) {
+  const pwd = document.getElementById('notif-admin-pwd').value;
+  const err = document.getElementById('notif-admin-error');
+  const succ = document.getElementById('notif-admin-success');
+  
+  if (err) err.style.display = 'none';
+  if (succ) succ.style.display = 'none';
+  
+  if (!pwd) {
+    if (err) {
+      err.textContent = 'Ingrese la contraseña de administrador para realizar la prueba.';
+      err.style.display = 'block';
+    }
+    return;
+  }
+  
+  const recipientsInput = document.getElementById(`notif-recipients-${clave}`);
+  const destinatarios = recipientsInput ? recipientsInput.value.trim() : '';
+  const btn = document.getElementById(`btn-test-notif-${clave}`);
+  const origText = btn ? btn.innerHTML : '🧪 Probar';
+  
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Enviando...';
+  }
+  
+  try {
+    const response = await apiPost({
+      action: 'sendTestNotificacion',
+      password: pwd,
+      clave: clave,
+      registro: registro,
+      destinatarios: destinatarios
+    });
+    
+    if (response.success) {
+      if (succ) {
+        succ.textContent = response.message;
+        succ.style.display = 'block';
+      }
+    } else {
+      if (err) {
+        err.textContent = response.error;
+        err.style.display = 'block';
+      }
+    }
+  } catch (e) {
+    if (err) {
+      err.textContent = 'Error de conexión al enviar el correo de prueba.';
+      err.style.display = 'block';
+    }
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = origText;
+    }
   }
 }
 

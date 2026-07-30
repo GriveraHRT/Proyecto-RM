@@ -273,6 +273,7 @@ function doPost(e) {
       case 'updateEtiquetadoraMaestro': return jsonResponse(updateEtiquetadoraMaestro(data));
       case 'marcarRevisado':      return jsonResponse(marcarRevisado(data));
       case 'saveNotificaciones':  return jsonResponse(saveNotificaciones(data));
+      case 'sendTestNotificacion': return jsonResponse(sendTestNotificacion(data));
       case 'saveDxH900Registro':  return jsonResponse(saveDxH900Registro(data));
       case 'saveElimMuestras':    return jsonResponse(saveElimMuestras(data));
       case 'saveModulosActivos': return jsonResponse(saveModulosActivos(data));
@@ -1904,6 +1905,41 @@ function saveNotificaciones(data) {
   }
   
   return { success: true, message: 'Configuración de notificaciones guardada con éxito.' };
+}
+
+function sendTestNotificacion(data) {
+  if (data.password !== PASSWORD_REVISION) {
+    return { success: false, error: 'Contraseña incorrecta.' };
+  }
+  
+  let to = data.destinatarios ? String(data.destinatarios).trim() : '';
+  if (!to && data.clave) {
+    to = getEmailRecipients(data.clave) || '';
+  }
+  
+  if (!to) {
+    return { success: false, error: 'No hay destinatarios configurados para enviar el correo de prueba o las alertas están pausadas.' };
+  }
+  
+  const nombreRegistro = data.registro || data.clave || 'General';
+  const subject = '🧪 [Registros Lab] Correo de Prueba — ' + nombreRegistro;
+  const body = 'Estimado/a,\n\n' +
+    'Esta es una notificación de PRUEBA generada desde el panel de Administración del sistema de Registros Mensuales.\n\n' +
+    '📍 Tipo de Registro: ' + nombreRegistro + '\n' +
+    '🔑 Clave interna: ' + (data.clave || 'n/a') + '\n' +
+    '📅 Fecha y Hora de Envío: ' + new Date().toLocaleString('es-CL') + '\n\n' +
+    'Si ha recibido este correo, la configuración de destinatarios para este registro funciona correctamente.\n\n' +
+    '---\n' +
+    'Mensaje generado de forma automática para verificación del sistema.\n' +
+    'Registros Mensuales — Laboratorio Clínico — Hospital de Talca\n';
+    
+  try {
+    MailApp.sendEmail({ to: to, subject: subject, body: body });
+    return { success: true, message: 'Correo de prueba enviado con éxito a: ' + to };
+  } catch (e) {
+    Logger.log('Error enviando correo de prueba: ' + e.toString());
+    return { success: false, error: 'Error al enviar correo de prueba: ' + e.toString() };
+  }
 }
 
 function getEmailRecipients(clave) {
