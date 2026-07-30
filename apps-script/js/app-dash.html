@@ -507,8 +507,9 @@ async function loadNotificacionesAdmin(){
           <thead>
             <tr style="border-bottom:2px solid var(--border-color); color:var(--text-muted-color);">
               <th style="padding:10px 8px; font-weight:600;">Tipo de Registro</th>
-              <th style="padding:10px 8px; font-weight:600; width:60%;">Destinatarios (correos separados por coma)</th>
-              <th style="padding:10px 8px; font-weight:600; text-align:center; width:20%;">Pausar</th>
+              <th style="padding:10px 8px; font-weight:600; width:45%;">Destinatarios (correos separados por coma)</th>
+              <th style="padding:10px 8px; font-weight:600; width:20%;">Hora de Envío</th>
+              <th style="padding:10px 8px; font-weight:600; text-align:center; width:15%;">Pausar</th>
             </tr>
           </thead>
           <tbody>
@@ -527,6 +528,13 @@ async function loadNotificacionesAdmin(){
                    value="${n.destinatarios || ''}" 
                    placeholder="correo1@hrt.cl, correo2@hrt.cl"
                    style="font-size:13px; padding:6px 10px; margin:0;" />
+          </td>
+          <td style="padding:12px 8px;">
+            <input type="time" 
+                   id="notif-hour-${n.clave}" 
+                   class="form-control" 
+                   value="${n.hora || '08:00'}" 
+                   style="font-size:13px; padding:6px 10px; margin:0; width:110px;" />
           </td>
           <td style="padding:12px 8px; text-align:center;">
             <input type="checkbox" 
@@ -577,6 +585,7 @@ async function submitNotificacionesAdmin() {
     const clave = row.dataset.clave;
     const registro = row.dataset.registro;
     const recipientsInput = document.getElementById(`notif-recipients-${clave}`);
+    const hourInput = document.getElementById(`notif-hour-${clave}`);
     const pausedCheckbox = document.getElementById(`notif-paused-${clave}`);
     
     if (recipientsInput && pausedCheckbox) {
@@ -584,7 +593,8 @@ async function submitNotificacionesAdmin() {
         registro: registro,
         clave: clave,
         destinatarios: recipientsInput.value.trim(),
-        pausado: pausedCheckbox.checked
+        pausado: pausedCheckbox.checked,
+        hora: hourInput ? hourInput.value : '08:00'
       });
     }
   });

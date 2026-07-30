@@ -184,6 +184,21 @@ function formatFechaDDMMYYYY(f) {
   return String(f.dia).padStart(2,'0') + '/' + String(f.mes).padStart(2,'0') + '/' + f.anio;
 }
 
+function getFechaRegistroFormatted(d) {
+  const date = d || new Date();
+  try {
+    const tz = Session.getScriptTimeZone() || 'America/Santiago';
+    return Utilities.formatDate(date, tz, 'dd/MM/yy HH:mm');
+  } catch(e) {
+    const dia = String(date.getDate()).padStart(2, '0');
+    const mes = String(date.getMonth() + 1).padStart(2, '0');
+    const anio = String(date.getFullYear()).substring(2);
+    const hora = String(date.getHours()).padStart(2, '0');
+    const min = String(date.getMinutes()).padStart(2, '0');
+    return `${dia}/${mes}/${anio} ${hora}:${min}`;
+  }
+}
+
 function jsonResponse(obj) {
   return ContentService
     .createTextOutput(JSON.stringify(obj))
@@ -191,6 +206,7 @@ function jsonResponse(obj) {
 }
 
 function insertRowAtTop(sheet, values) {
+  ensureSheetHeadersAndVisibility(sheet);
   sheet.insertRowAfter(1);
   const range = sheet.getRange(2, 1, 1, values.length);
   range.setValues([values]);
@@ -378,14 +394,14 @@ function getSugerenciasHistoricas() {
 }
 
 // ── Guardar Registros ─────────────────────────────────────────
-// Termo: Responsable | Temperatura (°C) | Humedad (%) | Fecha (dd/mm/aaaa) | Día | Mes | Año | Turno | Area | Acción Correctiva | Observaciones | Timestamp | Revisado_Por | Fecha_Revisión
+// Termo: Responsable | Temperatura (°C) | Humedad (%) | Fecha (dd/mm/aaaa) | Día | Mes | Año | Turno | Area | Acción Correctiva | Observaciones | Fecha de registro | Revisado_Por | Fecha_Revisión
 
 function saveTermo(data) {
   if (!data.responsable || !data.temperatura || !data.humedad || !data.fecha || !data.area) {
     return { success: false, error: 'Faltan campos obligatorios.' };
   }
   const f = parseFecha(data.fecha);
-  const ts = new Date().toISOString();
+  const ts = getFechaRegistroFormatted();
   const ampm = data.ampm || (new Date().getHours() < 12 ? 'AM' : 'PM');
   const turno = ampm === 'AM' ? 'Mañana' : 'Tarde';
   const accion = data.accion_correctiva || '';
@@ -436,7 +452,7 @@ function saveTermo(data) {
   return { success: true, message: 'Registro de Temperatura/Humedad guardado.' };
 }
 
-// Centrifugas: Fecha | Día | Mes | Año | Centrifuga | Responsable | Tipo_Mantencion | Observaciones | Timestamp | Revisado_Por | Fecha_Revisión
+// Centrifugas: Fecha | Día | Mes | Año | Centrifuga | Responsable | Tipo_Mantencion | Observaciones | Fecha de registro | Revisado_Por | Fecha_Revisión
 function saveCentrifuga(data) {
   if (!data.responsable || !data.fecha) {
     return { success: false, error: 'Faltan campos obligatorios.' };
@@ -446,7 +462,7 @@ function saveCentrifuga(data) {
     return { success: false, error: 'Seleccione al menos una centrífuga.' };
   }
   const f = parseFecha(data.fecha);
-  const ts = new Date().toISOString();
+  const ts = getFechaRegistroFormatted();
   const sheet = getSheet(SHEETS.CENT_REG);
   centrifugas.forEach(cent => {
     insertRowAtTop(sheet, [
@@ -464,7 +480,7 @@ function saveCentrifuga(data) {
   return { success: true, message: centrifugas.length + ' registro(s) de Centrífuga guardado(s).' };
 }
 
-// Mesones: Fecha | Día | Mes | Año | Sala | Responsable | Observaciones | Timestamp | Revisado_Por | Fecha_Revisión
+// Mesones: Fecha | Día | Mes | Año | Sala | Responsable | Observaciones | Fecha de registro | Revisado_Por | Fecha_Revisión
 function saveMesones(data) {
   if (!data.responsable || !data.fecha) {
     return { success: false, error: 'Faltan campos obligatorios.' };
@@ -474,7 +490,7 @@ function saveMesones(data) {
     return { success: false, error: 'Seleccione al menos una sala.' };
   }
   const f = parseFecha(data.fecha);
-  const ts = new Date().toISOString();
+  const ts = getFechaRegistroFormatted();
   const sheet = getSheet(SHEETS.MESONES);
   salas.forEach(sala => {
     insertRowAtTop(sheet, [
@@ -491,13 +507,13 @@ function saveMesones(data) {
   return { success: true, message: salas.length + ' registro(s) de Mesones guardado(s).' };
 }
 
-// RefriTemp: Responsable | Temperatura (°C) | Fecha | Día | Mes | Año | Turno | Equipo | Tipo | Acción Correctiva | Observaciones | Timestamp | Revisado_Por | Fecha_Revisión
+// RefriTemp: Responsable | Temperatura (°C) | Fecha | Día | Mes | Año | Turno | Equipo | Tipo | Acción Correctiva | Observaciones | Fecha de registro | Revisado_Por | Fecha_Revisión
 function saveRefriTemp(data) {
   if (!data.responsable || !data.temperatura || !data.fecha || !data.equipo) {
     return { success: false, error: 'Faltan campos obligatorios.' };
   }
   const f = parseFecha(data.fecha);
-  const ts = new Date().toISOString();
+  const ts = getFechaRegistroFormatted();
   const ampm = data.ampm || (new Date().getHours() < 12 ? 'AM' : 'PM');
   const turno = ampm === 'AM' ? 'Mañana' : 'Tarde';
   const accion = data.accion_correctiva || '';
@@ -544,7 +560,7 @@ function saveRefriTemp(data) {
   return { success: true, message: 'Registro de Temperatura de ' + (tipo || 'Equipo') + ' guardado.' };
 }
 
-// LimpiezaRefri: Fecha | Día | Mes | Año | Tipo Mantención | Equipos | Responsable | Observaciones | Timestamp | Revisado_Por | Fecha_Revisión
+// LimpiezaRefri: Fecha | Día | Mes | Año | Tipo Mantención | Equipos | Responsable | Observaciones | Fecha de registro | Revisado_Por | Fecha_Revisión
 function saveLimpiezaRefri(data) {
   if (!data.responsable || !data.fecha || !data.tipo_mantencion) {
     return { success: false, error: 'Faltan campos obligatorios.' };
@@ -554,7 +570,7 @@ function saveLimpiezaRefri(data) {
     return { success: false, error: 'Seleccione al menos un equipo.' };
   }
   const f = parseFecha(data.fecha);
-  const ts = new Date().toISOString();
+  const ts = getFechaRegistroFormatted();
   const sheet = getSheet(SHEETS.LIMP_REFRI);
   equipos.forEach(eq => {
     insertRowAtTop(sheet, [
@@ -572,13 +588,13 @@ function saveLimpiezaRefri(data) {
   return { success: true, message: equipos.length + ' registro(s) de Limpieza Refrigeradores guardado(s).' };
 }
 
-// Conductividad: Responsable | Conductividad (µS/cm) | Fecha | Día | Mes | Año | Turno | Observaciones | Timestamp | Revisado_Por | Fecha_Revisión
+// Conductividad: Responsable | Conductividad (µS/cm) | Fecha | Día | Mes | Año | Turno | Observaciones | Fecha de registro | Revisado_Por | Fecha_Revisión
 function saveConductividad(data) {
   if (!data.responsable || !data.fecha || data.conductividad === undefined || data.conductividad === '') {
     return { success: false, error: 'Faltan campos obligatorios.' };
   }
   const f = parseFecha(data.fecha);
-  const ts = new Date().toISOString();
+  const ts = getFechaRegistroFormatted();
   const ampm = data.ampm || (new Date().getHours() < 12 ? 'AM' : 'PM');
   const turno = ampm === 'AM' ? 'Mañana' : 'Tarde';
   const cond = parseFloat(data.conductividad);
@@ -614,13 +630,13 @@ function saveConductividad(data) {
   return { success: true, message: 'Registro de Conductividad guardado.' };
 }
 
-// Cobas: Fecha | Día | Mes | Año | Equipo | Responsable | Frecuencia | Actividad | Observaciones | Timestamp | Revisado_Por | Fecha_Revisión
+// Cobas: Fecha | Día | Mes | Año | Equipo | Responsable | Frecuencia | Actividad | Observaciones | Fecha de registro | Revisado_Por | Fecha_Revisión
 function saveCobas(data) {
   if (!data.responsable || !data.fecha || !data.equipo || !data.actividades || !data.actividades.length) {
     return { success: false, error: 'Faltan campos obligatorios.' };
   }
   const f = parseFecha(data.fecha);
-  const ts = new Date().toISOString();
+  const ts = getFechaRegistroFormatted();
   const sheet = getSheet(SHEETS.COBAS_REG);
   
   data.actividades.forEach(act => {
@@ -755,7 +771,7 @@ function marcarRevisado(data) {
   const mes  = parseInt(data.mes);
   const anio = parseInt(data.anio);
   const sheet = getSheet(SHEETS.REVISIONES);
-  const ts    = new Date().toISOString();
+  const ts    = getFechaRegistroFormatted();
   const fechaRev = new Date().toLocaleDateString('es-CL');
 
   // Agregar nueva fila de revisión (permite múltiples revisiones parciales)
@@ -1374,57 +1390,73 @@ function setupTriggers() {
     }
   });
 
-  // Trigger diario a las 08:00 para recordatorio de mes anterior (solo actúa el día 1)
+  const notifs = getNotificaciones();
+  const notifMap = {};
+  notifs.forEach(n => { notifMap[n.clave] = n; });
+
+  const parseHour = (clave, defaultHour) => {
+    const timeStr = notifMap[clave] ? notifMap[clave].hora : null;
+    if (!timeStr) return defaultHour;
+    const parts = timeStr.split(':');
+    const h = parseInt(parts[0], 10);
+    return isNaN(h) ? defaultHour : h;
+  };
+
+  const hourRecordatorio = parseHour('termo', 8);
+  const hourMantencion = parseHour('centrifugas', 9);
+  const hourDatosFaltantes = parseHour('termo', 20);
+
+  // Trigger diario para recordatorio de mes anterior (solo actúa el día 1)
   ScriptApp.newTrigger('triggerRecordatorioMesAnterior')
     .timeBased()
-    .atHour(8)
+    .atHour(hourRecordatorio)
     .everyDays(1)
     .create();
 
-  // Trigger diario a las 09:00 para mantenciones semanales vencidas
+  // Trigger diario para mantenciones semanales vencidas
   ScriptApp.newTrigger('triggerMantencionSemanal')
     .timeBased()
-    .atHour(9)
+    .atHour(hourMantencion)
     .everyDays(1)
     .create();
 
-  // Trigger diario a las 20:00 para datos no rellenados del día
+  // Trigger diario para datos no rellenados del día
   ScriptApp.newTrigger('triggerDatosNoRellenados')
     .timeBased()
-    .atHour(20)
+    .atHour(hourDatosFaltantes)
     .everyDays(1)
     .create();
 
   Logger.log('Triggers configurados correctamente.');
-  return 'Triggers configurados: triggerRecordatorioMesAnterior (08:00), triggerMantencionSemanal (09:00), triggerDatosNoRellenados (20:00)';
+  return 'Triggers configurados: triggerRecordatorioMesAnterior (' + String(hourRecordatorio).padStart(2,'0') + ':00), triggerMantencionSemanal (' + String(hourMantencion).padStart(2,'0') + ':00), triggerDatosNoRellenados (' + String(hourDatosFaltantes).padStart(2,'0') + ':00)';
 }
 
 // ── Inicialización del Spreadsheet ───────────────────────────
 
-function initializeSpreadsheet() {
-  const ss = getSpreadsheet();
-  const defs = [
+function getSheetDefs() {
+  return [
     // Registros primero
-    { name: SHEETS.TERMO,       headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Responsable','Temperatura (°C)','Humedad (%)','Turno','Area','Acción Correctiva','Observaciones','Timestamp','Revisado Por','Fecha Revisión'],
+    { name: SHEETS.TERMO,       headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Responsable','Temperatura (°C)','Humedad (%)','Turno','Area','Acción Correctiva','Observaciones','Fecha de registro','Revisado Por','Fecha Revisión'],
       hideCols: [2,3,4,12] },
-    { name: SHEETS.CENT_REG,    headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Centrifuga','Responsable','Tipo Mantención','Observaciones','Timestamp','Revisado Por','Fecha Revisión'],
+    { name: SHEETS.CENT_REG,    headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Centrifuga','Responsable','Tipo Mantención','Observaciones','Fecha de registro','Revisado Por','Fecha Revisión'],
       hideCols: [2,3,4,9] },
-    { name: SHEETS.MESONES,     headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Sala','Responsable','Observaciones','Timestamp','Revisado Por','Fecha Revisión'],
+    { name: SHEETS.MESONES,     headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Sala','Responsable','Observaciones','Fecha de registro','Revisado Por','Fecha Revisión'],
       hideCols: [2,3,4,8] },
-    { name: SHEETS.REFRI_REG,   headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Responsable','Temperatura (°C)','Turno','Equipo','Tipo','Acción Correctiva','Observaciones','Timestamp','Revisado Por','Fecha Revisión'],
+    { name: SHEETS.REFRI_REG,   headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Responsable','Temperatura (°C)','Turno','Equipo','Tipo','Acción Correctiva','Observaciones','Fecha de registro','Revisado Por','Fecha Revisión'],
       hideCols: [2,3,4,12] },
-    { name: SHEETS.LIMP_REFRI,  headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Tipo Mantención','Equipo','Responsable','Observaciones','Timestamp','Revisado Por','Fecha Revisión'],
+    { name: SHEETS.LIMP_REFRI,  headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Tipo Mantención','Equipo','Responsable','Observaciones','Fecha de registro','Revisado Por','Fecha Revisión'],
       hideCols: [2,3,4,9] },
-    { name: SHEETS.CONDUCT_REG, headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Responsable','Conductividad (µS/cm)','Turno','Observaciones','Timestamp','Revisado Por','Fecha Revisión'],
+    { name: SHEETS.CONDUCT_REG, headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Responsable','Conductividad (µS/cm)','Turno','Observaciones','Fecha de registro','Revisado Por','Fecha Revisión'],
       hideCols: [2,3,4,9] },
-    { name: SHEETS.COBAS_REG,   headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Equipo','Responsable','Frecuencia','Actividad','Observaciones','Timestamp','Revisado Por','Fecha Revisión'],
+    { name: SHEETS.COBAS_REG,   headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Equipo','Responsable','Frecuencia','Actividad','Observaciones','Fecha de registro','Revisado Por','Fecha Revisión'],
       hideCols: [2,3,4,10] },
-    { name: SHEETS.REVISIONES,  headers: ['Mes','Año','Registros','Revisor','Timestamp'] },
-    { name: SHEETS.ETIQUETADORAS_REG, headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Etiquetadora','Nombre Práctico','Accion','Descripcion','Responsable'],
-      hideCols: [2,3,4] },
-    { name: SHEETS.DXH900_REG,  headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Usuario Responsable','Descripción Intervención','Nombre Especialista','Timestamp'],
-      hideCols: [2,3,4] },
-    { name: SHEETS.ELIM_MUESTRAS, headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Responsable','Muestras Eliminadas','Timestamp','Revisado Por','Fecha Revisión'],
+    { name: SHEETS.REVISIONES,  headers: ['Mes','Año','Registros','Revisor','Fecha de registro'],
+      hideCols: [5] },
+    { name: SHEETS.ETIQUETADORAS_REG, headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Etiquetadora','Nombre Práctico','Accion','Descripcion','Responsable','Fecha de registro'],
+      hideCols: [2,3,4,10] },
+    { name: SHEETS.DXH900_REG,  headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Usuario Responsable','Descripción Intervención','Nombre Especialista','Fecha de registro'],
+      hideCols: [2,3,4,8] },
+    { name: SHEETS.ELIM_MUESTRAS, headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Responsable','Muestras Eliminadas','Fecha de registro','Revisado Por','Fecha Revisión'],
       hideCols: [2,3,4,7] },
     // Maestros al final
     { name: SHEETS.AREAS,       headers: ['Area'] },
@@ -1434,8 +1466,42 @@ function initializeSpreadsheet() {
     { name: SHEETS.REFRI_LIMP_MASTER, headers: ['Equipo'] },
     { name: SHEETS.ACCIONES,    headers: ['Acción'] },
     { name: SHEETS.ETIQUETADORAS_MASTER, headers: ['Nombre Real','ID','Nombre Práctico','Modelo','Tipo de Conexión','Dirección IP','Piso','Ubicación','Comentario'] },
-    { name: SHEETS.NOTIFICACIONES, headers: ['Registro','Clave','Destinatarios','Pausado'] }
+    { name: SHEETS.NOTIFICACIONES, headers: ['Registro','Clave','Destinatarios','Pausado','Hora'] }
   ];
+}
+
+function ensureSheetHeadersAndVisibility(sheet) {
+  if (!sheet) return;
+  try {
+    const name = sheet.getName();
+    const def = getSheetDefs().find(d => d.name === name);
+    if (!def) return;
+    
+    const needed = def.headers.length;
+    if (sheet.getMaxColumns() < needed) {
+      sheet.insertColumnsAfter(sheet.getMaxColumns(), needed - sheet.getMaxColumns());
+    }
+    
+    sheet.getRange(1, 1, 1, needed).setValues([def.headers]);
+    sheet.getRange(1, 1, 1, needed)
+      .setBackground('#0F172A').setFontColor('#FFFFFF').setFontWeight('bold');
+    sheet.setFrozenRows(1);
+    
+    if (def.hideCols) {
+      def.hideCols.forEach(col => {
+        if (col <= sheet.getMaxColumns()) {
+          try { sheet.hideColumns(col); } catch(e) {}
+        }
+      });
+    }
+  } catch(e) {
+    Logger.log('Error en ensureSheetHeadersAndVisibility: ' + e.toString());
+  }
+}
+
+function initializeSpreadsheet() {
+  const ss = getSpreadsheet();
+  const defs = getSheetDefs();
 
   const newlyCreated = {};
 
@@ -1445,31 +1511,7 @@ function initializeSpreadsheet() {
       sheet = ss.insertSheet(def.name);
       newlyCreated[def.name] = true;
     }
-    
-    // Ensure column count is sufficient
-    const needed = def.headers.length;
-    const current = sheet.getMaxColumns();
-    if (current < needed) {
-      sheet.insertColumnsAfter(current, needed - current);
-    }
-    
-    // Enforce headers on the first row
-    sheet.getRange(1, 1, 1, needed).setValues([def.headers]);
-    sheet.getRange(1, 1, 1, needed)
-      .setBackground('#0F172A').setFontColor('#FFFFFF').setFontWeight('bold');
-    sheet.setFrozenRows(1);
-    
-    // Enforce column visibility
-    if (sheet.getMaxColumns() > 0) {
-      sheet.showColumns(1, sheet.getMaxColumns());
-    }
-    if (def.hideCols) {
-      def.hideCols.forEach(col => {
-        if (col <= sheet.getMaxColumns()) {
-          sheet.hideColumns(col);
-        }
-      });
-    }
+    ensureSheetHeadersAndVisibility(sheet);
   });
 
   // Maestros iniciales (solo si se acaba de crear la hoja)
@@ -1596,7 +1638,7 @@ function resetRegistros() {
   // Update Revisiones headers to new format
   const revSheet = getSheet(SHEETS.REVISIONES);
   if (revSheet) {
-    revSheet.getRange(1, 1, 1, 5).setValues([['Mes','Año','Registros','Revisor','Timestamp']]);
+    revSheet.getRange(1, 1, 1, 5).setValues([['Mes','Año','Registros','Revisor','Fecha de registro']]);
     revSheet.getRange(1, 1, 1, 5).setBackground('#0F172A').setFontColor('#FFFFFF').setFontWeight('bold');
   }
   return { success: true, message: 'Registros limpiados', details: results };
@@ -1672,7 +1714,7 @@ function saveEtiquetadoraRegistro(data) {
     return { success: false, error: 'Faltan campos obligatorios.' };
   }
   const f = parseFecha(data.fecha || new Date().toISOString().split('T')[0]);
-  const ts = new Date().toISOString();
+  const ts = getFechaRegistroFormatted();
   
   let nombrePractico = data.nombrePractico || '';
   if (!nombrePractico) {
@@ -1692,7 +1734,8 @@ function saveEtiquetadoraRegistro(data) {
     nombrePractico,
     data.accion,
     data.descripcion,
-    data.responsable.toUpperCase().substring(0, 3)
+    data.responsable.toUpperCase().substring(0, 3),
+    ts
   ]);
   
   clearCacheKeys([getCacheKey('et_hist', data.etiquetadora)]);
@@ -1730,13 +1773,15 @@ function updateEtiquetadoraMaestro(data) {
     
     // Log the change in Reg. Etiquetadoras
     const f = parseFecha(new Date().toISOString().split('T')[0]);
+    const ts = getFechaRegistroFormatted();
     insertRowAtTop(getSheet(SHEETS.ETIQUETADORAS_REG), [
       formatFechaDDMMYYYY(f), f.dia, f.mes, f.anio,
       data.nombreReal,
       newPractico,
       'Cambio de ubicación',
       'Se cambia la ubicación y el nombre práctico de la etiquetadora',
-      data.responsable.toUpperCase().substring(0, 3)
+      data.responsable.toUpperCase().substring(0, 3),
+      ts
     ]);
     
     // Clear history cache for this label printer
@@ -1774,7 +1819,7 @@ function getNotificaciones() {
     try {
       const ss = getSpreadsheet();
       sheet = ss.insertSheet(SHEETS.NOTIFICACIONES);
-      sheet.appendRow(['Registro', 'Clave', 'Destinatarios', 'Pausado']);
+      sheet.appendRow(['Registro', 'Clave', 'Destinatarios', 'Pausado', 'Hora']);
     } catch (e) {
       Logger.log('Error al crear hoja de notificaciones: ' + e.toString());
       return [];
@@ -1785,15 +1830,15 @@ function getNotificaciones() {
   const existingClaves = data.slice(1).map(r => String(r[1]));
   
   const defaults = [
-    ['Temperatura Ambiental', 'termo', 'grivera@hospitaldetalca.cl', 'FALSE'],
-    ['Mantenimiento Centrífugas', 'centrifugas', 'grivera@hospitaldetalca.cl', 'FALSE'],
-    ['Limpieza Mesones', 'mesones', 'grivera@hospitaldetalca.cl', 'FALSE'],
-    ['Temperatura Refrigeradores', 'refriTemp', 'grivera@hospitaldetalca.cl', 'FALSE'],
-    ['Limpieza Refrigeradores', 'limpRefri', 'grivera@hospitaldetalca.cl', 'FALSE'],
-    ['Conductividad del Agua', 'conductividad', 'grivera@hospitaldetalca.cl', 'FALSE'],
-    ['Mantención Cobas', 'cobas', 'grivera@hospitaldetalca.cl', 'FALSE'],
-    ['Reparaciones DxH 900 Urgencias', 'dxh900', 'grivera@hospitaldetalca.cl', 'FALSE'],
-    ['Registro de eliminación de muestras', 'elimMuestras', 'grivera@hospitaldetalca.cl', 'FALSE']
+    ['Temperatura Ambiental', 'termo', 'grivera@hospitaldetalca.cl', 'FALSE', '20:00'],
+    ['Mantenimiento Centrífugas', 'centrifugas', 'grivera@hospitaldetalca.cl', 'FALSE', '09:00'],
+    ['Limpieza Mesones', 'mesones', 'grivera@hospitaldetalca.cl', 'FALSE', '20:00'],
+    ['Temperatura Refrigeradores', 'refriTemp', 'grivera@hospitaldetalca.cl', 'FALSE', '20:00'],
+    ['Limpieza Refrigeradores', 'limpRefri', 'grivera@hospitaldetalca.cl', 'FALSE', '09:00'],
+    ['Conductividad del Agua', 'conductividad', 'grivera@hospitaldetalca.cl', 'FALSE', '20:00'],
+    ['Mantención Cobas', 'cobas', 'grivera@hospitaldetalca.cl', 'FALSE', '09:00'],
+    ['Reparaciones DxH 900 Urgencias', 'dxh900', 'grivera@hospitaldetalca.cl', 'FALSE', '08:00'],
+    ['Registro de eliminación de muestras', 'elimMuestras', 'grivera@hospitaldetalca.cl', 'FALSE', '08:00']
   ];
   
   let changed = false;
@@ -1808,12 +1853,20 @@ function getNotificaciones() {
     data = sheet.getDataRange().getValues();
   }
   
-  return data.slice(1).map(r => ({
-    registro: String(r[0]),
-    clave: String(r[1]),
-    destinatarios: String(r[2]),
-    pausado: String(r[3]).toUpperCase() === 'TRUE'
-  }));
+  return data.slice(1).map(r => {
+    let horaStr = r[4] ? String(r[4]).trim() : '';
+    if (!horaStr || !/^\d{2}:\d{2}$/.test(horaStr)) {
+      const defItem = defaults.find(d => d[1] === String(r[1]));
+      horaStr = defItem ? defItem[4] : '08:00';
+    }
+    return {
+      registro: String(r[0]),
+      clave: String(r[1]),
+      destinatarios: String(r[2]),
+      pausado: String(r[3]).toUpperCase() === 'TRUE',
+      hora: horaStr
+    };
+  });
 }
 
 function saveNotificaciones(data) {
@@ -1839,9 +1892,16 @@ function saveNotificaciones(data) {
       n.registro,
       n.clave,
       n.destinatarios || '',
-      n.pausado ? 'TRUE' : 'FALSE'
+      n.pausado ? 'TRUE' : 'FALSE',
+      n.hora || '08:00'
     ]);
   });
+
+  try {
+    setupTriggers();
+  } catch (e) {
+    Logger.log('Error reconfigurando triggers tras guardar notificaciones: ' + e.toString());
+  }
   
   return { success: true, message: 'Configuración de notificaciones guardada con éxito.' };
 }
@@ -1916,7 +1976,7 @@ function saveDxH900Registro(data) {
     return { success: false, error: 'Faltan campos obligatorios.' };
   }
   const f = parseFecha(data.fecha || new Date().toISOString().split('T')[0]);
-  const ts = new Date().toISOString();
+  const ts = getFechaRegistroFormatted();
   
   insertRowAtTop(getSheet(SHEETS.DXH900_REG), [
     formatFechaDDMMYYYY(f), f.dia, f.mes, f.anio,
@@ -1971,7 +2031,7 @@ function saveElimMuestras(data) {
     return { success: false, error: 'El responsable debe constar de 3 siglas alfabéticas.' };
   }
   const f = parseFecha(data.fecha);
-  const ts = new Date().toISOString();
+  const ts = getFechaRegistroFormatted();
 
   const sheet = getSheet(SHEETS.ELIM_MUESTRAS);
   insertRowAtTop(sheet, [
@@ -1985,7 +2045,7 @@ function saveElimMuestras(data) {
   ]);
 
   try {
-    sheet.hideColumns(7); // Ocultar columna Timestamp
+    sheet.hideColumns(7); // Ocultar columna Fecha de registro
   } catch (e) {}
 
   clearSheetCache('elimMuestras', f.mes, f.anio);
