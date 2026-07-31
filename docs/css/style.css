@@ -1265,54 +1265,99 @@ body {
   box-shadow: 0 0 0 3px var(--primary-dim);
 }
 
-/* ── Configuración Notificaciones (Email Table & Chips) ────── */
-.notif-table-wrap {
-  width: 100%;
-  overflow-x: auto;
+/* ── Configuración Notificaciones (Modern Settings Cards) ── */
+.notif-cards-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 8px;
+}
+.notif-card-item {
+  background: var(--bg-card2);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: var(--bg-card2);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.05);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
-.notif-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13.5px;
-  text-align: left;
+.notif-card-item:hover {
+  border-color: rgba(0, 102, 255, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 102, 255, 0.08);
 }
-.notif-table th {
-  padding: 12px 10px;
-  font-weight: 600;
-  color: var(--text-dim);
-  background: rgba(0, 0, 0, 0.02);
-  border-bottom: 2px solid var(--border);
-  font-size: 12.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-}
-[data-theme="dark"] .notif-table th {
-  background: rgba(255, 255, 255, 0.03);
-}
-.notif-table td {
-  padding: 12px 10px;
+.notif-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
   border-bottom: 1px solid var(--border);
-  vertical-align: top;
 }
-.notif-table tr:last-child td {
-  border-bottom: none;
+.notif-card-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.notif-pause-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 20px;
+  background: var(--bg-dark);
+  border: 1px solid var(--border);
+  transition: all 0.2s ease;
+}
+.notif-pause-label:hover {
+  border-color: var(--primary);
+}
+.notif-pause-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--primary);
+}
+.notif-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.notif-field-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.notif-field-hint {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-dim);
 }
 .notif-email-textarea {
   width: 100%;
-  min-height: 54px;
+  min-height: 56px;
   font-size: 13px;
-  line-height: 1.4;
-  padding: 8px 10px;
+  line-height: 1.45;
+  padding: 10px 12px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--bg-dark);
   color: var(--text);
   resize: vertical;
-  transition: border-color 0.2s, box-shadow 0.2s;
   font-family: inherit;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 .notif-email-textarea:focus {
   outline: none;
@@ -1320,24 +1365,59 @@ body {
   box-shadow: 0 0 0 3px var(--primary-dim);
 }
 .notif-chips-container {
-  margin-top: 6px;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  margin-top: 4px;
 }
 .notif-email-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   background: var(--primary-dim);
   color: var(--primary);
   border: 1px solid rgba(0, 102, 255, 0.25);
-  padding: 3px 9px;
-  border-radius: 12px;
-  font-size: 11.5px;
+  padding: 4px 10px;
+  border-radius: 14px;
+  font-size: 12px;
   font-weight: 500;
   word-break: break-all;
 }
 [data-theme="dark"] .notif-email-chip {
   border-color: rgba(0, 212, 255, 0.3);
+}
+.notif-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.notif-time-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.notif-time-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.notif-time-input {
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-dark);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+}
+.notif-test-btn {
+  font-size: 12.5px;
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  cursor: pointer;
 }

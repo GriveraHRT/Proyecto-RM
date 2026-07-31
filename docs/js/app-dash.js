@@ -445,11 +445,18 @@ function renderEmailChips(clave) {
   `).join('');
 }
 
+function updatePauseText(clave) {
+  const cb = document.getElementById(`notif-paused-${clave}`);
+  const txt = document.getElementById(`notif-pause-txt-${clave}`);
+  if (cb && txt) {
+    txt.textContent = cb.checked ? '⏸️ Pausado' : '▶️ Activo';
+  }
+}
+
 async function loadNotificacionesAdmin(){
   const container = document.getElementById('notif-config-container');
   if(!container) return;
   
-  // Show spinner
   container.innerHTML = `
     <div style="text-align: center; padding: 20px; color: var(--text-dim);">
       <div class="spinner visible" style="display:inline-block; margin-bottom: 8px;"></div>
@@ -464,65 +471,59 @@ async function loadNotificacionesAdmin(){
       return;
     }
     
-    let html = `
-      <div class="notif-table-wrap">
-        <table class="notif-table">
-          <thead>
-            <tr>
-              <th style="width:22%;">Tipo de Registro</th>
-              <th style="width:48%;">Destinatarios (correos separados por coma)</th>
-              <th style="width:14%;">Hora de Envío</th>
-              <th style="width:8%; text-align:center;">Pausar</th>
-              <th style="width:8%; text-align:center;">Acción</th>
-            </tr>
-          </thead>
-          <tbody>
-    `;
+    let html = `<div class="notif-cards-wrapper">`;
     
     list.forEach((n) => {
+      const isPaused = !!n.pausado;
       html += `
-        <tr data-clave="${n.clave}" data-registro="${n.registro}">
-          <td style="font-weight:600; color:var(--text); vertical-align:top; padding-top:14px;">
-            ${n.registro}
-          </td>
-          <td>
+        <div class="notif-card-item" data-clave="${n.clave}" data-registro="${escapeHtml(n.registro)}">
+          <div class="notif-card-header">
+            <div class="notif-card-title">
+              <span>🔔</span>
+              <span>${escapeHtml(n.registro)}</span>
+            </div>
+            <label class="notif-pause-label" title="Pausar o activar el envío de alertas automáticamente">
+              <input type="checkbox" 
+                     id="notif-paused-${n.clave}" 
+                     class="notif-pause-checkbox" 
+                     ${isPaused ? 'checked' : ''} 
+                     onchange="updatePauseText('${n.clave}')" />
+              <span id="notif-pause-txt-${n.clave}">${isPaused ? '⏸️ Pausado' : '▶️ Activo'}</span>
+            </label>
+          </div>
+          
+          <div class="notif-card-body">
+            <label class="notif-field-label" for="notif-recipients-${n.clave}">
+              <span>✉️ Destinatarios</span>
+              <span class="notif-field-hint">(correos separados por coma o salto de línea)</span>
+            </label>
             <textarea id="notif-recipients-${n.clave}" 
                       class="notif-email-textarea" 
                       rows="2" 
-                      placeholder="correo1@hrt.cl, correo2@hrt.cl"
-                      oninput="renderEmailChips('${n.clave}')">${n.destinatarios || ''}</textarea>
+                      placeholder="ej: grivera@hospitaldetalca.cl, laboratorio@hospitaldetalca.cl"
+                      oninput="renderEmailChips('${n.clave}')">${escapeHtml(n.destinatarios || '')}</textarea>
             <div id="notif-chips-${n.clave}" class="notif-chips-container"></div>
-          </td>
-          <td style="vertical-align:top; padding-top:12px;">
-            <input type="time" 
-                   id="notif-hour-${n.clave}" 
-                   class="form-control" 
-                   value="${n.hora || '08:00'}" 
-                   style="font-size:13px; padding:6px 8px; margin:0; width:100%; min-width:90px;" />
-          </td>
-          <td style="text-align:center; vertical-align:top; padding-top:16px;">
-            <input type="checkbox" 
-                   id="notif-paused-${n.clave}" 
-                   style="width:20px; height:20px; cursor:pointer; accent-color:var(--primary);" 
-                   ${n.pausado ? 'checked' : ''} />
-          </td>
-          <td style="text-align:center; vertical-align:top; padding-top:12px;">
-            <button class="btn btn-outline" 
+          </div>
+          
+          <div class="notif-card-footer">
+            <div class="notif-time-group">
+              <label class="notif-time-label" for="notif-hour-${n.clave}">⏰ Hora de Envío:</label>
+              <input type="time" 
+                     id="notif-hour-${n.clave}" 
+                     class="notif-time-input" 
+                     value="${n.hora || '08:00'}" />
+            </div>
+            <button class="btn btn-outline notif-test-btn" 
                     id="btn-test-notif-${n.clave}" 
-                    style="font-size:12px; padding:6px 10px; cursor:pointer; white-space:nowrap;" 
-                    onclick="sendTestNotificacionAdmin('${n.clave}', '${n.registro}')">
-              🧪 Probar
+                    onclick="sendTestNotificacionAdmin('${n.clave}', '${escapeHtml(n.registro)}')">
+              🧪 Enviar Correo de Prueba
             </button>
-          </td>
-        </tr>
+          </div>
+        </div>
       `;
     });
     
-    html += `
-          </tbody>
-        </table>
-      </div>
-    `;
+    html += `</div>`;
     
     container.innerHTML = html;
     
@@ -544,7 +545,7 @@ async function sendTestNotificacionAdmin(clave, registro) {
   
   if (!pwd) {
     if (err) {
-      err.textContent = 'Ingrese la contraseña de administrador para realizar la prueba.';
+      err.textContent = 'Ingrese la contraseña de administrador para enviar prueba.';
       err.style.display = 'block';
     }
     return;
@@ -552,12 +553,20 @@ async function sendTestNotificacionAdmin(clave, registro) {
   
   const recipientsInput = document.getElementById(`notif-recipients-${clave}`);
   const destinatarios = recipientsInput ? recipientsInput.value.trim() : '';
-  const btn = document.getElementById(`btn-test-notif-${clave}`);
-  const origText = btn ? btn.innerHTML : '🧪 Probar';
   
+  if (!destinatarios) {
+    if (err) {
+      err.textContent = 'Ingrese al menos un correo destinatario para enviar la prueba.';
+      err.style.display = 'block';
+    }
+    return;
+  }
+  
+  const btn = document.getElementById(`btn-test-notif-${clave}`);
+  const origText = btn ? btn.innerHTML : '';
   if (btn) {
     btn.disabled = true;
-    btn.innerHTML = '⏳ Enviando...';
+    btn.innerHTML = '<div class="spinner visible" style="display:inline-block; width:12px; height:12px;"></div> Enviando...';
   }
   
   try {
@@ -612,7 +621,7 @@ async function submitNotificacionesAdmin() {
   const container = document.getElementById('notif-config-container');
   if (!container) return;
   
-  const rows = container.querySelectorAll('tbody tr');
+  const rows = container.querySelectorAll('.notif-card-item');
   const notificaciones = [];
   
   rows.forEach(row => {
