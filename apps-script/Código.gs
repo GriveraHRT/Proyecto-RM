@@ -1821,7 +1821,44 @@ function updateEtiquetadoraMaestro(data) {
   }
 }
 
-// ── Configuración de Notificaciones por Correo ──────────────────
+function parseHoraNotificacion(val) {
+  if (val === null || val === undefined || val === '') return '';
+  
+  if (val instanceof Date) {
+    const hh = String(val.getHours()).padStart(2, '0');
+    const mm = String(val.getMinutes()).padStart(2, '0');
+    return `${hh}:${mm}`;
+  }
+  
+  const str = String(val).trim();
+  if (!str) return '';
+  
+  const match24 = str.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (match24) {
+    const h = String(parseInt(match24[1], 10)).padStart(2, '0');
+    const m = match24[2];
+    return `${h}:${m}`;
+  }
+  
+  const match12 = str.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM|a\.?\s*m\.?|p\.?\s*m\.?)$/i);
+  if (match12) {
+    let h12 = parseInt(match12[1], 10);
+    const m12 = match12[2];
+    const ampm = match12[3].toLowerCase().replace(/\s/g, '');
+    if (ampm.startsWith('p') && h12 < 12) h12 += 12;
+    if (ampm.startsWith('a') && h12 === 12) h12 = 0;
+    return `${String(h12).padStart(2, '0')}:${m12}`;
+  }
+  
+  const d = new Date(val);
+  if (!isNaN(d.getTime())) {
+    const hh2 = String(d.getHours()).padStart(2, '0');
+    const mm2 = String(d.getMinutes()).padStart(2, '0');
+    return `${hh2}:${mm2}`;
+  }
+  
+  return '';
+}
 
 function getNotificaciones() {
   let sheet = getSheet(SHEETS.NOTIFICACIONES);
@@ -1837,6 +1874,7 @@ function getNotificaciones() {
   }
   
   let data = sheet.getDataRange().getValues();
+  let displayData = sheet.getDataRange().getDisplayValues();
   const existingClaves = data.slice(1).map(r => String(r[1]));
   
   const defaults = [
@@ -1854,17 +1892,21 @@ function getNotificaciones() {
   let changed = false;
   defaults.forEach(def => {
     if (existingClaves.indexOf(def[1]) === -1) {
-      sheet.appendRow(def);
+      sheet.appendRow([def[0], def[1], def[2], def[3], "'" + def[4]]);
       changed = true;
     }
   });
   
   if (changed) {
     data = sheet.getDataRange().getValues();
+    displayData = sheet.getDataRange().getDisplayValues();
   }
   
-  return data.slice(1).map(r => {
-    let horaStr = r[4] ? String(r[4]).trim() : '';
+  return data.slice(1).map((r, idx) => {
+    const rawVal = r[4];
+    const dispVal = displayData && displayData[idx + 1] ? displayData[idx + 1][4] : '';
+    let horaStr = parseHoraNotificacion(dispVal) || parseHoraNotificacion(rawVal);
+    
     if (!horaStr || !/^\d{2}:\d{2}$/.test(horaStr)) {
       const defItem = defaults.find(d => d[1] === String(r[1]));
       horaStr = defItem ? defItem[4] : '08:00';
@@ -1896,14 +1938,21 @@ function saveNotificaciones(data) {
     sheet.deleteRows(2, lastRow - 1);
   }
   
+  // Formatear columna 5 como texto plano
+  sheet.getRange(1, 5, Math.max(data.notificaciones.length + 1, 100), 1).setNumberFormat('@');
+  
   // Guardar nuevos datos
   data.notificaciones.forEach(n => {
+    let horaVal = n.hora ? String(n.hora).trim() : '08:00';
+    if (!/^\d{2}:\d{2}$/.test(horaVal)) {
+      horaVal = parseHoraNotificacion(horaVal) || '08:00';
+    }
     sheet.appendRow([
       n.registro,
       n.clave,
       n.destinatarios || '',
       n.pausado ? 'TRUE' : 'FALSE',
-      n.hora || '08:00'
+      "'" + horaVal
     ]);
   });
 
