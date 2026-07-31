@@ -414,13 +414,44 @@ async function submitRevisadoAdmin(){
   document.getElementById('btn-rev-admin-text').style.display='';
 }
 
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function renderEmailChips(clave) {
+  const input = document.getElementById(`notif-recipients-${clave}`);
+  const container = document.getElementById(`notif-chips-${clave}`);
+  if (!input || !container) return;
+  
+  const val = input.value || '';
+  const rawList = val.split(/[,;\n]/).map(s => s.trim()).filter(s => s.length > 0);
+  
+  if (rawList.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+  
+  container.innerHTML = rawList.map(email => `
+    <span class="notif-email-chip">
+      <span>✉️</span>
+      <span>${escapeHtml(email)}</span>
+    </span>
+  `).join('');
+}
+
 async function loadNotificacionesAdmin(){
   const container = document.getElementById('notif-config-container');
   if(!container) return;
   
   // Show spinner
   container.innerHTML = `
-    <div style="text-align: center; padding: 20px; color: var(--text-muted-color);">
+    <div style="text-align: center; padding: 20px; color: var(--text-dim);">
       <div class="spinner visible" style="display:inline-block; margin-bottom: 8px;"></div>
       <div>Cargando configuración de notificaciones...</div>
     </div>
@@ -434,51 +465,51 @@ async function loadNotificacionesAdmin(){
     }
     
     let html = `
-      <div class="notif-table-wrap" style="overflow-x:auto;">
-        <table style="width:100%; border-collapse:collapse; font-size:14px; text-align:left;">
+      <div class="notif-table-wrap">
+        <table class="notif-table">
           <thead>
-            <tr style="border-bottom:2px solid var(--border-color); color:var(--text-muted-color);">
-              <th style="padding:10px 8px; font-weight:600;">Tipo de Registro</th>
-              <th style="padding:10px 8px; font-weight:600; width:40%;">Destinatarios (correos separados por coma)</th>
-              <th style="padding:10px 8px; font-weight:600; width:18%;">Hora de Envío</th>
-              <th style="padding:10px 8px; font-weight:600; text-align:center; width:12%;">Pausar</th>
-              <th style="padding:10px 8px; font-weight:600; text-align:center; width:15%;">Acción</th>
+            <tr>
+              <th style="width:22%;">Tipo de Registro</th>
+              <th style="width:48%;">Destinatarios (correos separados por coma)</th>
+              <th style="width:14%;">Hora de Envío</th>
+              <th style="width:8%; text-align:center;">Pausar</th>
+              <th style="width:8%; text-align:center;">Acción</th>
             </tr>
           </thead>
           <tbody>
     `;
     
-    list.forEach((n, index) => {
+    list.forEach((n) => {
       html += `
-        <tr style="border-bottom:1px solid var(--border-color);" data-clave="${n.clave}" data-registro="${n.registro}">
-          <td style="padding:12px 8px; font-weight:500; color:var(--text-color);">
+        <tr data-clave="${n.clave}" data-registro="${n.registro}">
+          <td style="font-weight:600; color:var(--text); vertical-align:top; padding-top:14px;">
             ${n.registro}
           </td>
-          <td style="padding:12px 8px;">
-            <input type="text" 
-                   id="notif-recipients-${n.clave}" 
-                   class="form-control" 
-                   value="${n.destinatarios || ''}" 
-                   placeholder="correo1@hrt.cl, correo2@hrt.cl"
-                   style="font-size:13px; padding:6px 10px; margin:0;" />
+          <td>
+            <textarea id="notif-recipients-${n.clave}" 
+                      class="notif-email-textarea" 
+                      rows="2" 
+                      placeholder="correo1@hrt.cl, correo2@hrt.cl"
+                      oninput="renderEmailChips('${n.clave}')">${n.destinatarios || ''}</textarea>
+            <div id="notif-chips-${n.clave}" class="notif-chips-container"></div>
           </td>
-          <td style="padding:12px 8px;">
+          <td style="vertical-align:top; padding-top:12px;">
             <input type="time" 
                    id="notif-hour-${n.clave}" 
                    class="form-control" 
                    value="${n.hora || '08:00'}" 
-                   style="font-size:13px; padding:6px 10px; margin:0; width:110px;" />
+                   style="font-size:13px; padding:6px 8px; margin:0; width:100%; min-width:90px;" />
           </td>
-          <td style="padding:12px 8px; text-align:center;">
+          <td style="text-align:center; vertical-align:top; padding-top:16px;">
             <input type="checkbox" 
                    id="notif-paused-${n.clave}" 
-                   style="width:20px; height:20px; cursor:pointer; accent-color:var(--primary-color);" 
+                   style="width:20px; height:20px; cursor:pointer; accent-color:var(--primary);" 
                    ${n.pausado ? 'checked' : ''} />
           </td>
-          <td style="padding:12px 8px; text-align:center;">
+          <td style="text-align:center; vertical-align:top; padding-top:12px;">
             <button class="btn btn-outline" 
                     id="btn-test-notif-${n.clave}" 
-                    style="font-size:12px; padding:4px 8px; cursor:pointer;" 
+                    style="font-size:12px; padding:6px 10px; cursor:pointer; white-space:nowrap;" 
                     onclick="sendTestNotificacionAdmin('${n.clave}', '${n.registro}')">
               🧪 Probar
             </button>
@@ -494,6 +525,9 @@ async function loadNotificacionesAdmin(){
     `;
     
     container.innerHTML = html;
+    
+    // Render chips for initial load
+    list.forEach(n => renderEmailChips(n.clave));
   } catch (e) {
     console.error(e);
     container.innerHTML = `<div class="alert-banner alert-danger visible">Error de conexión al cargar las notificaciones.</div>`;
@@ -1492,6 +1526,115 @@ async function saveElimMuestrasForm(e) {
     if (spinner) spinner.classList.remove('visible');
     if (btnText) btnText.style.display = '';
     showToast('Error de conexión con el servidor.', 'error');
+  }
+}
+
+// Admin — Configuración de Módulos Activos
+const MODULOS_LIST = [
+  { key: 'termo', label: 'Ambiental (Temperatura / Humedad)', icon: '🌡️' },
+  { key: 'centrifugas', label: 'Centrífugas', icon: '⚙️' },
+  { key: 'mesones', label: 'Limpieza de Mesones', icon: '🧽' },
+  { key: 'refri-temp', label: 'Temp. Refrigeradores', icon: '🧊' },
+  { key: 'limp-refri', label: 'Limpieza Refrigeradores', icon: '🧹' },
+  { key: 'conductividad', label: 'Conductividad del Agua', icon: '💧' },
+  { key: 'etiquetadoras', label: 'Etiquetadoras (Bitácora)', icon: '🏷️' },
+  { key: 'cobas', label: 'Mantención Cobas', icon: '🔬' },
+  { key: 'dxh900', label: 'Reparaciones DxH 900', icon: '🛠️' },
+  { key: 'elim-muestras', label: 'Eliminación de Muestras', icon: '🗑️' }
+];
+
+async function loadModulosAdmin() {
+  const container = document.getElementById('modulos-config-container');
+  if (!container) return;
+
+  container.innerHTML = `
+    <div style="text-align: center; padding: 20px; color: var(--text-dim);">
+      <div class="spinner visible" style="display:inline-block; margin-bottom: 8px;"></div>
+      <div>Cargando configuración de módulos...</div>
+    </div>
+  `;
+
+  try {
+    const modulos = await apiGet({ action: 'getModulosActivos' });
+    state.modulosActivos = modulos || {};
+    applyModulosVisibilidad();
+
+    let html = '<div style="border:1px solid var(--border); border-radius:var(--radius-sm); overflow:hidden;">';
+    MODULOS_LIST.forEach(m => {
+      const active = isModuloActivo(m.key);
+      html += `
+        <div class="toggle-item">
+          <div class="toggle-label-group">
+            <span style="font-size:18px;">${m.icon}</span>
+            <span style="color:var(--text); font-size:14px; font-weight:500;">${m.label}</span>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="modulo-toggle-${m.key}" ${active ? 'checked' : ''} />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      `;
+    });
+    html += '</div>';
+    container.innerHTML = html;
+  } catch (e) {
+    console.error(e);
+    container.innerHTML = `<div class="alert-banner alert-danger visible">Error de conexión al cargar módulos.</div>`;
+  }
+}
+
+async function submitModulosAdmin() {
+  const pwd = document.getElementById('modulos-admin-pwd').value;
+  const err = document.getElementById('modulos-admin-error');
+  const succ = document.getElementById('modulos-admin-success');
+
+  if (err) err.style.display = 'none';
+  if (succ) succ.style.display = 'none';
+
+  if (!pwd) {
+    if (err) {
+      err.textContent = 'Ingrese la contraseña de administrador.';
+      err.style.display = 'block';
+    }
+    return;
+  }
+
+  const modulosObj = {};
+  MODULOS_LIST.forEach(m => {
+    const toggle = document.getElementById(`modulo-toggle-${m.key}`);
+    modulosObj[m.key] = toggle ? toggle.checked : true;
+  });
+
+  setLoading('btn-save-modulos', 'spinner-modulos-admin', 'btn-modulos-admin-text', true);
+
+  try {
+    const response = await apiPost({
+      action: 'saveModulosActivos',
+      password: pwd,
+      modulos: modulosObj
+    });
+
+    if (response.success) {
+      state.modulosActivos = response.modulos || modulosObj;
+      applyModulosVisibilidad();
+      if (succ) {
+        succ.textContent = '✅ ' + response.message;
+        succ.style.display = 'block';
+      }
+      document.getElementById('modulos-admin-pwd').value = '';
+    } else {
+      if (err) {
+        err.textContent = '❌ ' + (response.error || 'Error al guardar.');
+        err.style.display = 'block';
+      }
+    }
+  } catch (e) {
+    if (err) {
+      err.textContent = 'Error de conexión al guardar.';
+      err.style.display = 'block';
+    }
+  } finally {
+    setLoading('btn-save-modulos', 'spinner-modulos-admin', 'btn-modulos-admin-text', false);
   }
 }
 
