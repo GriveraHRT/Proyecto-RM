@@ -2,23 +2,74 @@
 // Forms — Termo
 document.getElementById('form-termo').addEventListener('submit',async e=>{
   e.preventDefault();
+  const dup = await checkDuplicateTermo();
+  if (dup) {
+    if (!confirm(dup.message)) return;
+  }
   const obsVal = document.getElementById('termo-obs').value;
   const issues=isOutOfRange();
   if(issues){const ac=document.getElementById('termo-accion').value;if(!ac){showOutOfRangePopup(issues);return}}
   setLoading('btn-termo-submit','spinner-termo','btn-termo-text',true);
   try{
     const r=await apiPost({action:'saveTermo',fecha:document.getElementById('termo-fecha').value,ampm:state.ampm,area:document.getElementById('termo-area').value,temperatura:document.getElementById('termo-temp').value,humedad:document.getElementById('termo-hum').value,responsable:document.getElementById('termo-resp').value,observaciones:obsVal,accion_correctiva:document.getElementById('termo-accion').value||''});
-    if(r.success){addDatalistOption('list-termo-obs', obsVal);showToast('✅ '+r.message);e.target.reset();document.getElementById('termo-fecha').value=today();resetRangos();autoSetAmPm();checkUrlParams();prefetchDashboard()}
+    if(r.success){
+      addDatalistOption('list-termo-obs', obsVal);showToast('✅ '+r.message);e.target.reset();document.getElementById('termo-fecha').value=today();resetRangos();autoSetAmPm();checkUrlParams();
+      clearRecordsMonthCache();
+      prefetchDashboard();
+      checkDuplicateTermo();
+    }
     else showToast('❌ '+r.error,'error');
   }catch(err){showToast('❌ Error de conexión','error')}
   setLoading('btn-termo-submit','spinner-termo','btn-termo-text',false);
 });
 
 // Forms — Centrífugas
-document.getElementById('form-centrifugas').addEventListener('submit',async e=>{e.preventDefault();const obsVal=document.getElementById('cent-obs').value;const sel=getSelectedChips('cent-chips');if(!sel.length){showToast('Seleccione al menos una centrífuga','error');return}setLoading('btn-cent-submit','spinner-cent','btn-cent-text',true);try{const r=await apiPost({action:'saveCentrifuga',fecha:document.getElementById('cent-fecha').value,centrifugas:sel,responsable:document.getElementById('cent-resp').value,tipo_mantencion:document.getElementById('cent-tipo').value,observaciones:obsVal});if(r.success){addDatalistOption('list-cent-obs',obsVal);showToast('✅ '+r.message);e.target.reset();document.getElementById('cent-fecha').value=today();document.getElementById('cent-tipo').value='Diaria';updateInfoCentrifuga();document.querySelectorAll('#cent-chips .chip-item').forEach(c=>c.classList.remove('selected'));document.getElementById('btn-grupo-preanalisis').classList.remove('active');prefetchDashboard()}else showToast('❌ '+r.error,'error')}catch(err){showToast('❌ Error de conexión','error')}setLoading('btn-cent-submit','spinner-cent','btn-cent-text',false)});
+document.getElementById('form-centrifugas').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const obsVal=document.getElementById('cent-obs').value;
+  const sel=getSelectedChips('cent-chips');
+  if(!sel.length){showToast('Seleccione al menos una centrífuga','error');return}
+  const dup = await checkDuplicateCentrifugas();
+  if (dup) {
+    if (!confirm(dup.message)) return;
+  }
+  setLoading('btn-cent-submit','spinner-cent','btn-cent-text',true);
+  try{
+    const r=await apiPost({action:'saveCentrifuga',fecha:document.getElementById('cent-fecha').value,centrifugas:sel,responsable:document.getElementById('cent-resp').value,tipo_mantencion:document.getElementById('cent-tipo').value,observaciones:obsVal});
+    if(r.success){
+      addDatalistOption('list-cent-obs',obsVal);showToast('✅ '+r.message);e.target.reset();document.getElementById('cent-fecha').value=today();document.getElementById('cent-tipo').value='Diaria';updateInfoCentrifuga();document.querySelectorAll('#cent-chips .chip-item').forEach(c=>c.classList.remove('selected'));document.getElementById('btn-grupo-preanalisis').classList.remove('active');
+      clearRecordsMonthCache();
+      prefetchDashboard();
+      checkDuplicateCentrifugas();
+    }
+    else showToast('❌ '+r.error,'error')
+  }catch(err){showToast('❌ Error de conexión','error')}
+  setLoading('btn-cent-submit','spinner-cent','btn-cent-text',false)
+});
 
 // Forms — Mesones
-document.getElementById('form-mesones').addEventListener('submit',async e=>{e.preventDefault();const obsVal=document.getElementById('meson-obs').value;const sel=getSelectedChips('meson-chips');if(!sel.length){showToast('Seleccione al menos una sala','error');return}setLoading('btn-meson-submit','spinner-meson','btn-meson-text',true);try{const r=await apiPost({action:'saveMesones',fecha:document.getElementById('meson-fecha').value,salas:sel,responsable:document.getElementById('meson-resp').value,observaciones:obsVal});if(r.success){addDatalistOption('list-meson-obs',obsVal);showToast('✅ '+r.message);e.target.reset();document.getElementById('meson-fecha').value=today();document.querySelectorAll('#meson-chips .chip-item').forEach(c=>c.classList.remove('selected'));prefetchDashboard()}else showToast('❌ '+r.error,'error')}catch(err){showToast('❌ Error de conexión','error')}setLoading('btn-meson-submit','spinner-meson','btn-meson-text',false)});
+document.getElementById('form-mesones').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const obsVal=document.getElementById('meson-obs').value;
+  const sel=getSelectedChips('meson-chips');
+  if(!sel.length){showToast('Seleccione al menos una sala','error');return}
+  const dup = await checkDuplicateMesones();
+  if (dup) {
+    if (!confirm(dup.message)) return;
+  }
+  setLoading('btn-meson-submit','spinner-meson','btn-meson-text',true);
+  try{
+    const r=await apiPost({action:'saveMesones',fecha:document.getElementById('meson-fecha').value,salas:sel,responsable:document.getElementById('meson-resp').value,observaciones:obsVal});
+    if(r.success){
+      addDatalistOption('list-meson-obs',obsVal);showToast('✅ '+r.message);e.target.reset();document.getElementById('meson-fecha').value=today();document.querySelectorAll('#meson-chips .chip-item').forEach(c=>c.classList.remove('selected'));
+      clearRecordsMonthCache();
+      prefetchDashboard();
+      checkDuplicateMesones();
+    }
+    else showToast('❌ '+r.error,'error')
+  }catch(err){showToast('❌ Error de conexión','error')}
+  setLoading('btn-meson-submit','spinner-meson','btn-meson-text',false)
+});
 
 // Forms — Temp Refrigeradores
 document.getElementById('form-refri-temp').addEventListener('submit',async e=>{
@@ -1838,7 +1889,9 @@ async function saveElimMuestrasForm(e) {
         document.getElementById('elim-fecha-corte').value = today();
         updateMuestrasEliminadasText();
       }
+      clearRecordsMonthCache();
       loadElimMuestrasHistorialForm();
+      checkDuplicateElimMuestras();
     } else {
       showToast(res.error || 'Error al guardar el registro.', 'error');
     }
@@ -1847,4 +1900,303 @@ async function saveElimMuestrasForm(e) {
     if (btnText) btnText.style.display = '';
     showToast('Error de conexión con el servidor.', 'error');
   }
+}
+
+// ══ COMPROBACIÓN DE REGISTROS DUPLICADOS ═════════════════════════════════════
+
+async function getRegistrosForMonth(mes, anio) {
+  mes = parseInt(mes);
+  anio = parseInt(anio);
+  const cacheKey = `${mes}-${anio}`;
+
+  if (state.dashData && state.dashMes === mes && state.dashAnio === anio) {
+    return state.dashData;
+  }
+  if (state.dashCache && state.dashCache.key === cacheKey && state.dashCache.data) {
+    return state.dashCache.data;
+  }
+  if (!state.recordsMonthCache) state.recordsMonthCache = {};
+  if (state.recordsMonthCache[cacheKey]) {
+    return state.recordsMonthCache[cacheKey];
+  }
+
+  try {
+    const reg = await apiGet({ action: 'getRegistros', mes: mes, anio: anio });
+    state.recordsMonthCache[cacheKey] = reg;
+    if (mes === state.dashMes && anio === state.dashAnio) {
+      state.dashData = reg;
+    }
+    return reg;
+  } catch (e) {
+    console.error('Error fetching registros:', e);
+    return null;
+  }
+}
+
+function clearRecordsMonthCache(mes, anio) {
+  if (state.recordsMonthCache) {
+    if (mes && anio) {
+      delete state.recordsMonthCache[`${parseInt(mes)}-${parseInt(anio)}`];
+    } else {
+      state.recordsMonthCache = {};
+    }
+  }
+}
+
+// 1. Check Ambient (Termo)
+async function checkDuplicateTermo() {
+  const alertEl = document.getElementById('alert-duplicate-termo');
+  if (!alertEl) return null;
+
+  const fechaVal = document.getElementById('termo-fecha') ? document.getElementById('termo-fecha').value : today();
+  const areaVal = document.getElementById('termo-area') ? document.getElementById('termo-area').value : '';
+  const ampmVal = state.ampm || (new Date().getHours() < 12 ? 'AM' : 'PM');
+
+  if (!areaVal || !fechaVal) {
+    alertEl.classList.remove('visible');
+    alertEl.style.display = 'none';
+    alertEl.innerHTML = '';
+    return null;
+  }
+
+  const parts = fechaVal.split('-');
+  const dia = parseInt(parts[2]);
+  const mes = parseInt(parts[1]);
+  const anio = parseInt(parts[0]);
+
+  const regs = await getRegistrosForMonth(mes, anio);
+  if (!regs || !regs.termo) {
+    alertEl.classList.remove('visible');
+    alertEl.style.display = 'none';
+    return null;
+  }
+
+  const targetTurnos = ampmVal === 'AM' ? ['AM', 'Mañana'] : ['PM', 'Tarde'];
+
+  const existing = regs.termo.find(r => 
+    parseInt(r.dia) === dia &&
+    parseInt(r.mes) === mes &&
+    parseInt(r.anio) === anio &&
+    String(r.area || '').trim().toLowerCase() === String(areaVal || '').trim().toLowerCase() &&
+    targetTurnos.some(t => String(r.turno || '').trim().toUpperCase() === t.toUpperCase())
+  );
+
+  if (existing) {
+    const respUser = existing.responsable || 'Desconocido';
+    const fechaFmt = `${String(dia).padStart(2,'0')}/${String(mes).padStart(2,'0')}/${anio}`;
+    const htmlMsg = `⚠️ <strong>Aviso de Duplicidad:</strong> Este registro para el área <strong>${areaVal}</strong> en el turno <strong>${ampmVal}</strong> del día <strong>${fechaFmt}</strong> ya fue realizado por el usuario <strong>"${respUser}"</strong>.<br>¿Está seguro que desea continuar?`;
+    alertEl.innerHTML = htmlMsg;
+    alertEl.classList.add('visible');
+    alertEl.style.display = 'block';
+    return {
+      existing,
+      message: `El registro de Temperatura Ambiental para el área "${areaVal}" en el turno ${ampmVal} del día ${fechaFmt} ya fue ingresado por el usuario "${respUser}".\n\n¿Está seguro que desea continuar?`
+    };
+  } else {
+    alertEl.classList.remove('visible');
+    alertEl.style.display = 'none';
+    alertEl.innerHTML = '';
+    return null;
+  }
+}
+
+// 2. Check Centrífugas
+async function checkDuplicateCentrifugas() {
+  const alertEl = document.getElementById('alert-duplicate-cent');
+  if (!alertEl) return null;
+
+  const fechaVal = document.getElementById('cent-fecha') ? document.getElementById('cent-fecha').value : today();
+  const tipoVal = document.getElementById('cent-tipo') ? document.getElementById('cent-tipo').value : 'Diaria';
+  const selChips = getSelectedChips('cent-chips');
+
+  if (tipoVal !== 'Diaria' || !selChips.length || !fechaVal) {
+    alertEl.classList.remove('visible');
+    alertEl.style.display = 'none';
+    alertEl.innerHTML = '';
+    return null;
+  }
+
+  const parts = fechaVal.split('-');
+  const dia = parseInt(parts[2]);
+  const mes = parseInt(parts[1]);
+  const anio = parseInt(parts[0]);
+
+  const regs = await getRegistrosForMonth(mes, anio);
+  if (!regs || !regs.centrifugas) {
+    alertEl.classList.remove('visible');
+    alertEl.style.display = 'none';
+    return null;
+  }
+
+  const duplicates = [];
+  selChips.forEach(chipName => {
+    const found = regs.centrifugas.find(r => 
+      parseInt(r.dia) === dia &&
+      parseInt(r.mes) === mes &&
+      parseInt(r.anio) === anio &&
+      String(r.tipo_mantencion || '').trim().toLowerCase() === 'diaria' &&
+      String(r.centrifuga || '').trim().toLowerCase() === String(chipName || '').trim().toLowerCase()
+    );
+    if (found) {
+      duplicates.push({ name: chipName, resp: found.responsable || 'Desconocido' });
+    }
+  });
+
+  if (duplicates.length > 0) {
+    const fechaFmt = `${String(dia).padStart(2,'0')}/${String(mes).padStart(2,'0')}/${anio}`;
+    const dupListStr = duplicates.map(d => `<strong>${d.name}</strong> (por <strong>"${d.resp}"</strong>)`).join(', ');
+    const dupListPlain = duplicates.map(d => `"${d.name}" (por "${d.resp}")`).join(', ');
+
+    const htmlMsg = `⚠️ <strong>Aviso de Duplicidad:</strong> Registro(s) de mantención diaria para el día <strong>${fechaFmt}</strong> ya realizado(s): ${dupListStr}.<br>¿Está seguro que desea continuar?`;
+    alertEl.innerHTML = htmlMsg;
+    alertEl.classList.add('visible');
+    alertEl.style.display = 'block';
+
+    return {
+      duplicates,
+      message: `El/los registro(s) de mantención diaria de centrífuga para el día ${fechaFmt} ya fue(ron) ingresado(s):\n${dupListPlain}\n\n¿Está seguro que desea continuar?`
+    };
+  } else {
+    alertEl.classList.remove('visible');
+    alertEl.style.display = 'none';
+    alertEl.innerHTML = '';
+    return null;
+  }
+}
+
+// 3. Check Mesones
+async function checkDuplicateMesones() {
+  const alertEl = document.getElementById('alert-duplicate-meson');
+  if (!alertEl) return null;
+
+  const fechaVal = document.getElementById('meson-fecha') ? document.getElementById('meson-fecha').value : today();
+  const selChips = getSelectedChips('meson-chips');
+
+  if (!selChips.length || !fechaVal) {
+    alertEl.classList.remove('visible');
+    alertEl.style.display = 'none';
+    alertEl.innerHTML = '';
+    return null;
+  }
+
+  const parts = fechaVal.split('-');
+  const dia = parseInt(parts[2]);
+  const mes = parseInt(parts[1]);
+  const anio = parseInt(parts[0]);
+
+  const regs = await getRegistrosForMonth(mes, anio);
+  if (!regs || !regs.mesones) {
+    alertEl.classList.remove('visible');
+    alertEl.style.display = 'none';
+    return null;
+  }
+
+  const duplicates = [];
+  selChips.forEach(chipName => {
+    const found = regs.mesones.find(r => 
+      parseInt(r.dia) === dia &&
+      parseInt(r.mes) === mes &&
+      parseInt(r.anio) === anio &&
+      String(r.sala || '').trim().toLowerCase() === String(chipName || '').trim().toLowerCase()
+    );
+    if (found) {
+      duplicates.push({ name: chipName, resp: found.responsable || 'Desconocido' });
+    }
+  });
+
+  if (duplicates.length > 0) {
+    const fechaFmt = `${String(dia).padStart(2,'0')}/${String(mes).padStart(2,'0')}/${anio}`;
+    const dupListStr = duplicates.map(d => `<strong>${d.name}</strong> (por <strong>"${d.resp}"</strong>)`).join(', ');
+    const dupListPlain = duplicates.map(d => `"${d.name}" (por "${d.resp}")`).join(', ');
+
+    const htmlMsg = `⚠️ <strong>Aviso de Duplicidad:</strong> Registro(s) de limpieza de mesones para el día <strong>${fechaFmt}</strong> ya realizado(s): ${dupListStr}.<br>¿Está seguro que desea continuar?`;
+    alertEl.innerHTML = htmlMsg;
+    alertEl.classList.add('visible');
+    alertEl.style.display = 'block';
+
+    return {
+      duplicates,
+      message: `El/los registro(s) de limpieza de mesones para el día ${fechaFmt} ya fue(ron) ingresado(s):\n${dupListPlain}\n\n¿Está seguro que desea continuar?`
+    };
+  } else {
+    alertEl.classList.remove('visible');
+    alertEl.style.display = 'none';
+    alertEl.innerHTML = '';
+    return null;
+  }
+}
+
+// 4. Check Eliminación de Muestras
+async function checkDuplicateElimMuestras() {
+  const alertEl = document.getElementById('alert-duplicate-elim');
+  if (!alertEl) return null;
+
+  const fechaVal = document.getElementById('elim-fecha') ? document.getElementById('elim-fecha').value : today();
+  if (!fechaVal) {
+    alertEl.classList.remove('visible');
+    alertEl.style.display = 'none';
+    alertEl.innerHTML = '';
+    return null;
+  }
+
+  const parts = fechaVal.split('-');
+  const dia = parseInt(parts[2]);
+  const mes = parseInt(parts[1]);
+  const anio = parseInt(parts[0]);
+
+  const regs = await getRegistrosForMonth(mes, anio);
+  if (!regs || !regs.elimMuestras) {
+    alertEl.classList.remove('visible');
+    alertEl.style.display = 'none';
+    return null;
+  }
+
+  const existing = regs.elimMuestras.find(r => 
+    parseInt(r.dia) === dia &&
+    parseInt(r.mes) === mes &&
+    parseInt(r.anio) === anio
+  );
+
+  if (existing) {
+    const respUser = existing.responsable || 'Desconocido';
+    const fechaFmt = `${String(dia).padStart(2,'0')}/${String(mes).padStart(2,'0')}/${anio}`;
+    const htmlMsg = `⚠️ <strong>Aviso de Duplicidad:</strong> El registro de eliminación de muestras para el día <strong>${fechaFmt}</strong> ya fue realizado por el usuario <strong>"${respUser}"</strong>.<br>¿Está seguro que desea continuar?`;
+    alertEl.innerHTML = htmlMsg;
+    alertEl.classList.add('visible');
+    alertEl.style.display = 'block';
+
+    return {
+      existing,
+      message: `El registro de eliminación de muestras para el día ${fechaFmt} ya fue realizado por el usuario "${respUser}".\n\n¿Está seguro que desea continuar?`
+    };
+  } else {
+    alertEl.classList.remove('visible');
+    alertEl.style.display = 'none';
+    alertEl.innerHTML = '';
+    return null;
+  }
+}
+
+function initDuplicateCheckListeners() {
+  const termoFecha = document.getElementById('termo-fecha');
+  const termoArea = document.getElementById('termo-area');
+  if (termoFecha) { termoFecha.addEventListener('change', checkDuplicateTermo); termoFecha.addEventListener('input', checkDuplicateTermo); }
+  if (termoArea) termoArea.addEventListener('change', checkDuplicateTermo);
+
+  const centFecha = document.getElementById('cent-fecha');
+  const centTipo = document.getElementById('cent-tipo');
+  if (centFecha) { centFecha.addEventListener('change', checkDuplicateCentrifugas); centFecha.addEventListener('input', checkDuplicateCentrifugas); }
+  if (centTipo) centTipo.addEventListener('change', checkDuplicateCentrifugas);
+
+  const mesonFecha = document.getElementById('meson-fecha');
+  if (mesonFecha) { mesonFecha.addEventListener('change', checkDuplicateMesones); mesonFecha.addEventListener('input', checkDuplicateMesones); }
+
+  const elimFecha = document.getElementById('elim-fecha');
+  if (elimFecha) { elimFecha.addEventListener('change', checkDuplicateElimMuestras); elimFecha.addEventListener('input', checkDuplicateElimMuestras); }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initDuplicateCheckListeners);
+} else {
+  initDuplicateCheckListeners();
 }
