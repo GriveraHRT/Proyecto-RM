@@ -160,9 +160,19 @@ function clearSheetCache(keyPrefix, mes, anio) {
   clearCacheKeys([cacheKey]);
 }
 
+const SPREADSHEET_ID_DEFAULT = '1HzHcRriBtPGQxTfFrZSntVeM8ujQHWnGFuyWrJo6KUQ';
+
 function getSpreadsheet() {
-  const id = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');
-  return SpreadsheetApp.openById(id);
+  let id = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');
+  if (!id) {
+    id = SPREADSHEET_ID_DEFAULT;
+  }
+  try {
+    return SpreadsheetApp.openById(id);
+  } catch (e) {
+    Logger.log('Error abriendo spreadsheet con ID (' + id + '), utilizando ID por defecto: ' + e.toString());
+    return SpreadsheetApp.openById(SPREADSHEET_ID_DEFAULT);
+  }
 }
 
 function getSheet(name) {
@@ -432,25 +442,7 @@ function saveTermo(data) {
 
   clearSheetCache('termo', f.mes, f.anio);
 
-  // Send alert email if out of range
-  if (tempOOR || humOOR) {
-    try {
-      sendAlertaFueraDeRango({
-        area: data.area,
-        turno: turno,
-        temperatura: temp,
-        humedad: hum,
-        tempOOR: tempOOR,
-        humOOR: humOOR,
-        responsable: data.responsable.toUpperCase().substring(0, 3),
-        accion_correctiva: accion,
-        fecha: formatFechaDDMMYYYY(f)
-      });
-    } catch (emailErr) {
-      // Don't fail the save if email fails
-      Logger.log('Error enviando alerta: ' + emailErr.toString());
-    }
-  }
+  // Las alertas de temperatura/humedad fuera de rango ahora se envían consolidadas a las 08:30 mediante triggerAlertaConsolidadaTermo.
 
   return { success: true, message: 'Registro de Temperatura/Humedad guardado.' };
 }
@@ -868,6 +860,106 @@ function sendAlertaFueraDeRango(info) {
   const to = getEmailRecipients('termo');
   if (to) {
     MailApp.sendEmail({ to: to, subject: subject, body: body });
+  }
+}
+
+// ── Email — Alerta Consolidada Temperatura/Humedad (Trigger Diario 08:30) ──
+
+function triggerAlertaConsolidadaTermo() {
+  const hoy = new Date();
+  // Obtener la fecha del día anterior
+  const ayer = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 1);
+  const diaAyer = ayer.getDate();
+  const mesAyer = ayer.getMonth() + 1;
+  const anioAyer = ayer.getFullYear();
+
+  const fechaAyerStr = String(diaAyer).padStart(2, '0') + '/' + String(mesAyer).padStart(2, '0') + '/' + anioAyer;
+
+  // Obtener registros de temperatura y humedad del mes/año de ayer
+  const reg = getRegistros(mesAyer, anioAyer);
+  if (!reg || !reg.termo) {
+    Logger.log('No se encontraron registros de temperatura/humedad para ' + mesAyer + '/' + anioAyer);
+    return;
+  }
+
+  // Filtrar únicamente los registros del día de ayer
+  const registrosAyer = reg.termo.filter(r => parseInt(r.dia, 10) === diaAyer);
+
+  // Filtrar los registros que tengan al menos un valor fuera de rango
+  // Temp fuera de rango: < 18 °C o > 24 °C
+  // Humedad fuera de rango: < 20 % o > 70 %
+  const alarmas = [];
+  registrosAyer.forEach(r => {
+    const temp = parseFloat(r.temperatura);
+    const hum = parseFloat(r.humedad);
+    const tempOOR = !isNaN(temp) && (temp < 18 || temp > 24);
+    const humOOR = !isNaN(hum) && (hum < 20 || hum > 70);
+
+    if (tempOOR || humOOR) {
+      alarmas.push({
+        fecha: r.fecha || fechaAyerStr,
+        area: r.area || 'Sin especificar',
+        responsable: r.responsable || 'Sin especificar',
+        turno: r.turno || 'Sin especificar',
+        temperatura: r.temperatura,
+        humedad: r.humedad,
+        tempOOR: tempOOR,
+        humOOR: humOOR,
+        accion_correctiva: r.accion_correctiva || '',
+        observaciones: r.observaciones || ''
+      });
+    }
+  });
+
+  if (alarmas.length === 0) {
+    Logger.log('No se registraron medidas fuera de rango en Temperatura/Humedad para el día ' + fechaAyerStr);
+    return;
+  }
+
+  const recipients = getEmailRecipients('termo');
+  if (!recipients) {
+    Logger.log('Alertas de temperatura/humedad pausadas o sin destinatarios configurados.');
+    return;
+  }
+
+  const subject = '⚠️ [Registros Lab] Consolidado de Alertas: Temperatura y Humedad fuera de rango (' + fechaAyerStr + ')';
+
+  let detallesText = '';
+  alarmas.forEach((item, index) => {
+    const afecciones = [];
+    if (item.tempOOR) afecciones.push('Temperatura: ' + item.temperatura + ' °C (Rango aceptable: 18–24 °C)');
+    if (item.humOOR) afecciones.push('Humedad: ' + item.humedad + '% (Rango aceptable: 20–70%)');
+
+    detallesText += '──────────────────────────────────────────────────\n';
+    detallesText += 'Alarma #' + (index + 1) + '\n';
+    detallesText += '📍 Área: ' + item.area + '\n';
+    detallesText += '🕐 Jornada / Turno: ' + item.turno + '\n';
+    detallesText += '👤 Usuario / Responsable: ' + item.responsable + '\n';
+    detallesText += '📅 Fecha: ' + item.fecha + '\n';
+    detallesText += '🌡️ Temperatura registrada: ' + item.temperatura + ' °C' + (item.tempOOR ? ' ⚠️ [FUERA DE RANGO]' : '') + '\n';
+    detallesText += '💧 Humedad registrada: ' + item.humedad + '%' + (item.humOOR ? ' ⚠️ [FUERA DE RANGO]' : '') + '\n';
+    detallesText += '⚠️ Detalle fuera de rango:\n  • ' + afecciones.join('\n  • ') + '\n';
+    detallesText += '🔧 Acción Correctiva: ' + (item.accion_correctiva ? item.accion_correctiva : 'No especificada') + '\n';
+    detallesText += '📝 Observaciones: ' + (item.observaciones ? item.observaciones : 'Sin observaciones') + '\n\n';
+  });
+
+  const body = 'Estimado/a,\n\n' +
+    'Se adjunta el reporte consolidado de medidas fuera de rango registradas en el formulario de Temperatura y Humedad Ambiental correspondientes al día de ayer (' + fechaAyerStr + ').\n\n' +
+    '📊 Total de alarmas del día anterior: ' + alarmas.length + '\n\n' +
+    'DETALLE DE MEDIDAS FUERA DE RANGO:\n' +
+    detallesText +
+    'Por favor, revisar los registros y verificar que se hayan tomado las acciones necesarias.\n\n' +
+    'Enlace al aplicativo:\n' + APP_URL + '\n\n' +
+    'Enlace a los registros:\n' + SHEET_URL + '\n\n' +
+    '---\n' +
+    'Este mensaje consolidado fue enviado automáticamente a las 08:30.\n' +
+    'Registros Mensuales — Laboratorio Clínico — Hospital de Talca\n';
+
+  try {
+    MailApp.sendEmail({ to: recipients, subject: subject, body: body });
+    Logger.log('Correo consolidado de alertas de temperatura/humedad enviado a: ' + recipients + ' (' + alarmas.length + ' alarmas)');
+  } catch (e) {
+    Logger.log('Error enviando correo consolidado de temperatura/humedad: ' + e.toString());
   }
 }
 
@@ -1395,7 +1487,7 @@ function setupTriggers() {
   const existingTriggers = ScriptApp.getProjectTriggers();
   existingTriggers.forEach(t => {
     const fn = t.getHandlerFunction();
-    if (fn === 'triggerRecordatorioMesAnterior' || fn === 'triggerDatosNoRellenados' || fn === 'triggerMantencionSemanal') {
+    if (fn === 'triggerRecordatorioMesAnterior' || fn === 'triggerDatosNoRellenados' || fn === 'triggerMantencionSemanal' || fn === 'triggerAlertaConsolidadaTermo') {
       ScriptApp.deleteTrigger(t);
     }
   });
@@ -1414,7 +1506,8 @@ function setupTriggers() {
 
   const hourRecordatorio = parseHour('termo', 8);
   const hourMantencion = parseHour('centrifugas', 9);
-  const hourDatosFaltantes = parseHour('termo', 20);
+  const hourDatosFaltantes = 20;
+  const hourAlertaTermo = parseHour('termo', 8);
 
   // Trigger diario para recordatorio de mes anterior (solo actúa el día 1)
   ScriptApp.newTrigger('triggerRecordatorioMesAnterior')
@@ -1437,8 +1530,15 @@ function setupTriggers() {
     .everyDays(1)
     .create();
 
+  // Trigger diario para alerta consolidada de temperatura/humedad fuera de rango del día anterior (08:30)
+  ScriptApp.newTrigger('triggerAlertaConsolidadaTermo')
+    .timeBased()
+    .atHour(hourAlertaTermo)
+    .everyDays(1)
+    .create();
+
   Logger.log('Triggers configurados correctamente.');
-  return 'Triggers configurados: triggerRecordatorioMesAnterior (' + String(hourRecordatorio).padStart(2,'0') + ':00), triggerMantencionSemanal (' + String(hourMantencion).padStart(2,'0') + ':00), triggerDatosNoRellenados (' + String(hourDatosFaltantes).padStart(2,'0') + ':00)';
+  return 'Triggers configurados: triggerRecordatorioMesAnterior (' + String(hourRecordatorio).padStart(2,'0') + ':00), triggerMantencionSemanal (' + String(hourMantencion).padStart(2,'0') + ':00), triggerDatosNoRellenados (' + String(hourDatosFaltantes).padStart(2,'0') + ':00), triggerAlertaConsolidadaTermo (' + String(hourAlertaTermo).padStart(2,'0') + ':30)';
 }
 
 // ── Inicialización del Spreadsheet ───────────────────────────
@@ -1878,7 +1978,7 @@ function getNotificaciones() {
   const existingClaves = data.slice(1).map(r => String(r[1]));
   
   const defaults = [
-    ['Temperatura Ambiental', 'termo', 'grivera@hospitaldetalca.cl', 'FALSE', '20:00'],
+    ['Temperatura Ambiental', 'termo', 'grivera@hospitaldetalca.cl', 'FALSE', '08:30'],
     ['Mantenimiento Centrífugas', 'centrifugas', 'grivera@hospitaldetalca.cl', 'FALSE', '09:00'],
     ['Limpieza Mesones', 'mesones', 'grivera@hospitaldetalca.cl', 'FALSE', '20:00'],
     ['Temperatura Refrigeradores', 'refriTemp', 'grivera@hospitaldetalca.cl', 'FALSE', '20:00'],
