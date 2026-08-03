@@ -438,6 +438,13 @@ function renderDailyView(reg){
   document.getElementById('dash-daily-view').innerHTML=html;
 }
 
+function isNonWorkingDay(d, mes, anio, diasNoHabilesSet) {
+  if (diasNoHabilesSet && diasNoHabilesSet.has(d)) return true;
+  const dt = new Date(anio, mes - 1, d);
+  const day = dt.getDay();
+  return day === 0 || day === 6;
+}
+
 function renderMonthlyView(reg){
   if(!reg) return;
   const dh=getDiasHasta(state.dashMes,state.dashAnio);
@@ -450,7 +457,7 @@ function renderMonthlyView(reg){
     const list = m.areasDetailed || (m.areas||[]).map(a=>({nombre:a, horarioTurno:'si'}));
     list.forEach(item => {
       const a = item.nombre;
-      const esSoloHabil = item.horarioTurno === 'no';
+      const esSoloHabil = (item.horarioTurno || '').toString().trim().toLowerCase() === 'no';
       html+=`<div style="font-size:12px;font-weight:600;margin:8px 0 4px;">${a} ${esSoloHabil ? '<span style="font-weight:normal; font-size:11px; color:var(--text-dim);">(Solo días hábiles)</span>' : ''}</div>`;
       ['Mañana','Tarde'].forEach(turno=>{
         const diasDone = new Set((reg.termo||[]).filter(r=>r.area===a&&r.turno===turno).map(r=>parseInt(r.dia)));
@@ -458,7 +465,7 @@ function renderMonthlyView(reg){
         let chips='';
         for(let d=1; d<=dh; d++){
           const ok = diasDone.has(d);
-          const isNonWorking = esSoloHabil && diasNoHabilesSet.has(d);
+          const isNonWorking = esSoloHabil && isNonWorkingDay(d, state.dashMes, state.dashAnio, diasNoHabilesSet);
           if (ok) {
             chips += `<span class="day-chip chip-ok">${d}</span>`;
           } else if (isNonWorking) {
@@ -479,13 +486,13 @@ function renderMonthlyView(reg){
     const list = m.centrifugasDetailed || (m.centrifugas||[]).map(c=>({nombre:c, horarioTurno:'si'}));
     list.forEach(item => {
       const c = item.nombre;
-      const esSoloHabil = item.horarioTurno === 'no';
+      const esSoloHabil = (item.horarioTurno || '').toString().trim().toLowerCase() === 'no';
       const diasDone = new Set((reg.centrifugas||[]).filter(r=>r.centrifuga===c&&r.tipo_mantencion==='Diaria').map(r=>parseInt(r.dia)));
       let miss=0;
       let chips='';
       for(let d=1; d<=dh; d++){
         const ok = diasDone.has(d);
-        const isNonWorking = esSoloHabil && diasNoHabilesSet.has(d);
+        const isNonWorking = esSoloHabil && isNonWorkingDay(d, state.dashMes, state.dashAnio, diasNoHabilesSet);
         if (ok) {
           chips += `<span class="day-chip chip-ok">${d}</span>`;
         } else if (isNonWorking) {
@@ -505,13 +512,13 @@ function renderMonthlyView(reg){
     const list = m.salasDetailed || (m.salas||[]).map(s=>({nombre:s, horarioTurno:'si'}));
     list.forEach(item => {
       const s = item.nombre;
-      const esSoloHabil = item.horarioTurno === 'no';
+      const esSoloHabil = (item.horarioTurno || '').toString().trim().toLowerCase() === 'no';
       const diasDone = new Set((reg.mesones||[]).filter(r=>r.sala===s).map(r=>parseInt(r.dia)));
       let miss=0;
       let chips='';
       for(let d=1; d<=dh; d++){
         const ok = diasDone.has(d);
-        const isNonWorking = esSoloHabil && diasNoHabilesSet.has(d);
+        const isNonWorking = esSoloHabil && isNonWorkingDay(d, state.dashMes, state.dashAnio, diasNoHabilesSet);
         if (ok) {
           chips += `<span class="day-chip chip-ok">${d}</span>`;
         } else if (isNonWorking) {

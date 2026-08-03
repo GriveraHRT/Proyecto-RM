@@ -494,9 +494,9 @@ function deleteDiaNoHabilHRT(data) {
 
 /** Devuelve todos los maestros en una sola llamada para optimizar carga */
 function getMaestros() {
-  const cacheKey = 'maestros_all';
+  const cacheKey = 'maestros_all_v3';
   let cached = getCachedJson(cacheKey);
-  if (cached) {
+  if (cached && cached.centrifugasDetailed && cached.areasDetailed && cached.salasDetailed) {
     cached.modulosActivos = getModulosActivos();
     cached.isTodayHabit = esDiaHabil(new Date());
     return cached;
