@@ -17,6 +17,7 @@ document.getElementById('form-termo').addEventListener('submit',async e=>{
       clearRecordsMonthCache();
       prefetchDashboard();
       checkDuplicateTermo();
+      if(typeof loadRecentTermo==='function')loadRecentTermo();
     }
     else showToast('❌ '+r.error,'error');
   }catch(err){showToast('❌ Error de conexión','error')}
@@ -2199,5 +2200,221 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initDuplicateCheckListeners);
 } else {
   initDuplicateCheckListeners();
+}
+
+// ── Recent Termo Records (Últimos 20 Registros) ───────────────
+let recentTermoCache = [];
+
+async function loadRecentTermo() {
+  const tbody = document.getElementById('tbody-recent-termo');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 16px; color: #94a3b8;">🔄 Cargando registros recientes...</td></tr>';
+  try {
+    const res = await apiGet({ action: 'getRecentTermo', limit: 20 });
+    if (res && res.success && Array.isArray(res.records)) {
+      recentTermoCache = res.records;
+      renderRecentTermoTable(recentTermoCache);
+    } else {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${res.error || 'Error al cargar registros.'}</td></tr>`;
+    }
+  } catch (err) {
+    console.error('Error cargando últimos 20 termo:', err);
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 16px; color: #ef4444;">❌ Error de conexión al cargar registros.</td></tr>';
+  }
+}
+
+function renderRecentTermoTable(records) {
+  const tbody = document.getElementById('tbody-recent-termo');
+  if (!tbody) return;
+  if (!records || records.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 16px; color: #94a3b8;">No hay registros recientes.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = records.map((r, idx) => {
+    const temp = parseFloat(r.temperatura);
+    const hum = parseFloat(r.humedad);
+    const tempOOR = !isNaN(temp) && (temp < 18 || temp > 24);
+    const humOOR = !isNaN(hum) && (hum < 20 || hum > 70);
+
+    const tempBadge = tempOOR
+      ? `<span style="color:#dc2626; font-weight:700; background:#fee2e2; padding:2px 6px; border-radius:4px;">⚠️ ${r.temperatura} °C</span>`
+      : `<span style="font-weight:600; color:#16a34a;">${r.temperatura} °C</span>`;
+
+    const humBadge = humOOR
+      ? `<span style="color:#dc2626; font-weight:700; background:#fee2e2; padding:2px 6px; border-radius:4px;">⚠️ ${r.humedad} %</span>`
+      : `<span style="font-weight:600; color:#0284c7;">${r.humedad} %</span>`;
+
+    const turnoBadge = r.turno === 'Mañana' ? '☀️ AM' : '🌙 PM';
+    const accObs = [r.accion_correctiva, r.observaciones].filter(Boolean).join(' | ') || '-';
+
+    return `
+      <tr style="border-bottom: 1px solid #f1f5f9;">
+        <td style="padding: 10px 8px;"><strong>${r.fecha}</strong> <span style="font-size:0.75rem; color:#64748b; margin-left:4px;">(${turnoBadge})</span></td>
+        <td style="padding: 10px 8px;">${r.area || '-'}</td>
+        <td style="padding: 10px 8px;">${tempBadge}</td>
+        <td style="padding: 10px 8px;">${humBadge}</td>
+        <td style="padding: 10px 8px; font-weight:700; letter-spacing:1px;">${r.responsable}</td>
+        <td style="padding: 10px 8px; font-size:0.82rem; color:#475569; max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${accObs.replace(/"/g, '&quot;')}">${accObs}</td>
+        <td style="padding: 10px 8px; text-align: center; white-space: nowrap;">
+          <button type="button" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.78rem;" onclick="openEditTermoModal(${idx})">✏️ Editar</button>
+          <button type="button" class="btn btn-danger" style="padding: 4px 8px; font-size: 0.78rem; margin-left: 4px;" onclick="confirmDeleteTermo(${idx})">🗑️ Eliminar</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function parseFechaToInput(fechaStr) {
+  if (!fechaStr) return '';
+  if (fechaStr.includes('-')) return fechaStr;
+  const parts = fechaStr.split('/');
+  if (parts.length === 3) {
+    const day = parts[0].padStart(2, '0');
+    const month = parts[1].padStart(2, '0');
+    const year = parts[2].length === 2 ? '20' + parts[2] : parts[2];
+    return `${year}-${month}-${day}`;
+  }
+  return fechaStr;
+}
+
+function openEditTermoModal(index) {
+  const rec = recentTermoCache[index];
+  if (!rec) return;
+
+  document.getElementById('edit-termo-rowindex').value = rec.rowIndex;
+  document.getElementById('edit-termo-fecha-reg').value = rec.fecha_registro || '';
+  document.getElementById('edit-termo-old-mes').value = rec.mes || '';
+  document.getElementById('edit-termo-old-anio').value = rec.anio || '';
+
+  document.getElementById('edit-termo-fecha').value = parseFechaToInput(rec.fecha);
+  document.getElementById('edit-termo-turno').value = rec.turno === 'Tarde' ? 'Tarde' : 'Mañana';
+  
+  // Populate area dropdown
+  const areaSelect = document.getElementById('edit-termo-area');
+  if (areaSelect && Array.isArray(state.areas)) {
+    areaSelect.innerHTML = state.areas.map(a => `<option value="${a}" ${a === rec.area ? 'selected' : ''}>${a}</option>`).join('');
+  }
+
+  // Populate accion dropdown
+  const accSelect = document.getElementById('edit-termo-accion');
+  if (accSelect && Array.isArray(state.acciones)) {
+    accSelect.innerHTML = '<option value="">Seleccionar acción…</option>' +
+      state.acciones.map(a => `<option value="${a}" ${a === rec.accion_correctiva ? 'selected' : ''}>${a}</option>`).join('');
+  }
+
+  document.getElementById('edit-termo-temp').value = rec.temperatura;
+  document.getElementById('edit-termo-hum').value = rec.humedad;
+  document.getElementById('edit-termo-resp').value = rec.responsable;
+  document.getElementById('edit-termo-obs').value = rec.observaciones || '';
+
+  checkEditTermoRangos();
+
+  // Show modal
+  document.querySelectorAll('.modal-card').forEach(m => m.style.display = 'none');
+  const modalCard = document.getElementById('modal-edit-termo');
+  if (modalCard) modalCard.style.display = 'block';
+  const overlay = document.getElementById('modal-overlay');
+  if (overlay) overlay.classList.add('active');
+}
+
+function checkEditTermoRangos() {
+  const t = parseFloat(document.getElementById('edit-termo-temp').value);
+  const h = parseFloat(document.getElementById('edit-termo-hum').value);
+  const alertBanner = document.getElementById('edit-alert-rangos');
+  const accGroup = document.getElementById('edit-accion-correctiva-group');
+  const accSelect = document.getElementById('edit-termo-accion');
+
+  let out = false;
+  if (!isNaN(t) && (t < 18 || t > 24)) out = true;
+  if (!isNaN(h) && (h < 20 || h > 70)) out = true;
+
+  if (alertBanner) alertBanner.style.display = out ? 'block' : 'none';
+  if (accGroup) accGroup.style.display = out ? 'block' : 'none';
+  if (accSelect) accSelect.required = out;
+}
+
+async function submitEditTermo(e) {
+  e.preventDefault();
+  const rowIndex = parseInt(document.getElementById('edit-termo-rowindex').value);
+  const fechaReg = document.getElementById('edit-termo-fecha-reg').value;
+  const fechaVal = document.getElementById('edit-termo-fecha').value;
+  const turnoVal = document.getElementById('edit-termo-turno').value;
+  const areaVal = document.getElementById('edit-termo-area').value;
+  const tempVal = document.getElementById('edit-termo-temp').value;
+  const humVal = document.getElementById('edit-termo-hum').value;
+  const respVal = document.getElementById('edit-termo-resp').value;
+  const accVal = document.getElementById('edit-termo-accion').value;
+  const obsVal = document.getElementById('edit-termo-obs').value;
+
+  const t = parseFloat(tempVal);
+  const h = parseFloat(humVal);
+  const out = (!isNaN(t) && (t < 18 || t > 24)) || (!isNaN(h) && (h < 20 || h > 70));
+  if (out && !accVal) {
+    showToast('Debe seleccionar una Acción Correctiva para valores fuera de rango', 'error');
+    return;
+  }
+
+  setLoading('btn-edit-termo-submit', 'spinner-edit-termo', 'btn-edit-termo-text', true);
+  try {
+    const res = await apiPost({
+      action: 'updateTermo',
+      rowIndex: rowIndex,
+      fecha_registro: fechaReg,
+      fecha: fechaVal,
+      turno: turnoVal,
+      area: areaVal,
+      temperatura: tempVal,
+      humedad: humVal,
+      responsable: respVal,
+      accion_correctiva: accVal,
+      observaciones: obsVal
+    });
+
+    if (res && res.success) {
+      showToast('✅ ' + res.message);
+      closeModal({ target: document.getElementById('modal-overlay') });
+      if (typeof clearRecordsMonthCache === 'function') clearRecordsMonthCache();
+      if (typeof prefetchDashboard === 'function') prefetchDashboard();
+      loadRecentTermo();
+    } else {
+      showToast('❌ ' + (res.error || 'Error al actualizar registro'), 'error');
+    }
+  } catch (err) {
+    console.error('Error submitEditTermo:', err);
+    showToast('❌ Error de conexión al actualizar', 'error');
+  }
+  setLoading('btn-edit-termo-submit', 'spinner-edit-termo', 'btn-edit-termo-text', false);
+}
+
+async function confirmDeleteTermo(index) {
+  const rec = recentTermoCache[index];
+  if (!rec) return;
+
+  if (!confirm(`¿Está seguro de eliminar el registro de Temperatura/Humedad de "${rec.area}" del día ${rec.fecha} (${rec.turno})?`)) {
+    return;
+  }
+
+  try {
+    const res = await apiPost({
+      action: 'deleteTermo',
+      rowIndex: rec.rowIndex,
+      fecha_registro: rec.fecha_registro,
+      mes: rec.mes,
+      anio: rec.anio
+    });
+
+    if (res && res.success) {
+      showToast('✅ ' + res.message);
+      if (typeof clearRecordsMonthCache === 'function') clearRecordsMonthCache();
+      if (typeof prefetchDashboard === 'function') prefetchDashboard();
+      loadRecentTermo();
+    } else {
+      showToast('❌ ' + (res.error || 'Error al eliminar registro'), 'error');
+    }
+  } catch (err) {
+    console.error('Error confirmDeleteTermo:', err);
+    showToast('❌ Error de conexión al eliminar', 'error');
+  }
 }
 </script>

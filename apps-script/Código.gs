@@ -256,6 +256,7 @@ function doGet(e) {
       case 'getNotificaciones': return jsonResponse(getNotificaciones());
       case 'getDxH900Historial': return jsonResponse(getDxH900Historial());
       case 'getModulosActivos': return jsonResponse(getModulosActivos());
+      case 'getRecentTermo':    return jsonResponse(getRecentTermo(e.parameter.limit));
       case 'SETUP_INIT_TA':     return jsonResponse(setup());
       case 'REINIT':            return jsonResponse(reinitialize());
       default:                  return jsonResponse({ error: 'Acción no reconocida: ' + action });
@@ -275,6 +276,8 @@ function doPost(e) {
   try {
     switch (data.action) {
       case 'saveTermo':           return jsonResponse(saveTermo(data));
+      case 'updateTermo':         return jsonResponse(updateTermo(data));
+      case 'deleteTermo':         return jsonResponse(deleteTermo(data));
       case 'saveCentrifuga':      return jsonResponse(saveCentrifuga(data));
       case 'saveMesones':         return jsonResponse(saveMesones(data));
       case 'saveRefriTemp':       return jsonResponse(saveRefriTemp(data));
@@ -445,6 +448,146 @@ function saveTermo(data) {
   // Las alertas de temperatura/humedad fuera de rango ahora se envían consolidadas a las 08:30 mediante triggerAlertaConsolidadaTermo.
 
   return { success: true, message: 'Registro de Temperatura/Humedad guardado.' };
+}
+
+function getRecentTermo(limit) {
+  limit = parseInt(limit) || 20;
+  const sheet = getSheet(SHEETS.TERMO);
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { success: true, records: [] };
+
+  const endRow = Math.min(lastRow, 1 + limit);
+  const numRows = endRow - 1;
+  const data = sheet.getRange(2, 1, numRows, 14).getValues();
+
+  const records = data.map((r, idx) => {
+    let fechaStr = '';
+    if (r[0] instanceof Date) {
+      const d = String(r[0].getDate()).padStart(2, '0');
+      const m = String(r[0].getMonth() + 1).padStart(2, '0');
+      const y = r[0].getFullYear();
+      fechaStr = `${d}/${m}/${y}`;
+    } else {
+      fechaStr = String(r[0] || '');
+    }
+
+    let tsStr = '';
+    if (r[11] instanceof Date) {
+      tsStr = getFechaRegistroFormatted(r[11]);
+    } else {
+      tsStr = String(r[11] || '');
+    }
+
+    return {
+      rowIndex: 2 + idx,
+      fecha: fechaStr,
+      dia: r[1],
+      mes: r[2],
+      anio: r[3],
+      responsable: r[4] ? String(r[4]) : '',
+      temperatura: r[5],
+      humedad: r[6],
+      turno: r[7] ? String(r[7]) : '',
+      area: r[8] ? String(r[8]) : '',
+      accion_correctiva: r[9] ? String(r[9]) : '',
+      observaciones: r[10] ? String(r[10]) : '',
+      fecha_registro: tsStr,
+      revisado_por: r[12] ? String(r[12]) : '',
+      fecha_revision: r[13] ? String(r[13]) : ''
+    };
+  });
+
+  return { success: true, records: records };
+}
+
+function findTermoRowIndex(rowIndex, fechaRegistro) {
+  const sheet = getSheet(SHEETS.TERMO);
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return -1;
+
+  rowIndex = parseInt(rowIndex);
+  if (rowIndex >= 2 && rowIndex <= lastRow) {
+    if (!fechaRegistro) return rowIndex;
+    const val = sheet.getRange(rowIndex, 12).getValue();
+    const tsStr = val instanceof Date ? getFechaRegistroFormatted(val) : String(val);
+    if (tsStr === String(fechaRegistro)) return rowIndex;
+  }
+
+  if (fechaRegistro) {
+    const colValues = sheet.getRange(2, 12, lastRow - 1, 1).getValues();
+    for (let i = 0; i < colValues.length; i++) {
+      const val = colValues[i][0];
+      const tsStr = val instanceof Date ? getFechaRegistroFormatted(val) : String(val);
+      if (tsStr === String(fechaRegistro)) {
+        return 2 + i;
+      }
+    }
+  }
+
+  return (rowIndex >= 2 && rowIndex <= lastRow) ? rowIndex : -1;
+}
+
+function updateTermo(data) {
+  if (!data.rowIndex || !data.responsable || data.temperatura === undefined || data.humedad === undefined || !data.fecha || !data.area) {
+    return { success: false, error: 'Faltan campos obligatorios para actualizar.' };
+  }
+
+  const targetRow = findTermoRowIndex(data.rowIndex, data.fecha_registro);
+  if (targetRow < 2) {
+    return { success: false, error: 'No se encontró el registro para actualizar.' };
+  }
+
+  const sheet = getSheet(SHEETS.TERMO);
+  const oldMes = sheet.getRange(targetRow, 3).getValue();
+  const oldAnio = sheet.getRange(targetRow, 4).getValue();
+
+  const f = parseFecha(data.fecha);
+  const ampm = data.ampm || (data.turno === 'Mañana' ? 'AM' : 'PM');
+  const turno = ampm === 'AM' ? 'Mañana' : 'Tarde';
+  const temp = parseFloat(data.temperatura);
+  const hum = parseFloat(data.humedad);
+
+  sheet.getRange(targetRow, 1, 1, 11).setValues([[
+    formatFechaDDMMYYYY(f),
+    f.dia, f.mes, f.anio,
+    data.responsable.toUpperCase().substring(0, 3),
+    temp,
+    hum,
+    turno,
+    data.area,
+    data.accion_correctiva || '',
+    data.observaciones || ''
+  ]]);
+
+  clearSheetCache('termo', f.mes, f.anio);
+  if (oldMes && oldAnio && (oldMes !== f.mes || oldAnio !== f.anio)) {
+    clearSheetCache('termo', oldMes, oldAnio);
+  }
+
+  return { success: true, message: 'Registro de Temperatura/Humedad actualizado.' };
+}
+
+function deleteTermo(data) {
+  if (!data.rowIndex) {
+    return { success: false, error: 'ID de registro no especificado.' };
+  }
+
+  const targetRow = findTermoRowIndex(data.rowIndex, data.fecha_registro);
+  if (targetRow < 2) {
+    return { success: false, error: 'No se encontró el registro a eliminar.' };
+  }
+
+  const sheet = getSheet(SHEETS.TERMO);
+  const mes = data.mes || sheet.getRange(targetRow, 3).getValue();
+  const anio = data.anio || sheet.getRange(targetRow, 4).getValue();
+
+  sheet.deleteRow(targetRow);
+
+  if (mes && anio) {
+    clearSheetCache('termo', mes, anio);
+  }
+
+  return { success: true, message: 'Registro de Temperatura/Humedad eliminado.' };
 }
 
 // Centrifugas: Fecha | Día | Mes | Año | Centrifuga | Responsable | Tipo_Mantencion | Observaciones | Fecha de registro | Revisado_Por | Fecha_Revisión
