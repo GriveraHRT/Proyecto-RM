@@ -177,7 +177,7 @@ async function loadMaestros(){
     state.etiquetadoras=data.etiquetadoras||[];
     if(data.modulosActivos){state.modulosActivos=data.modulosActivos}
     applyModulosVisibilidad();
-    state.dashMaestros={areas:state.areas,centrifugas:state.centrifugas,salas:state.salas,refrigeradores:state.refrigeradores,refriLimpieza:state.refriLimpieza};
+    state.dashMaestros = data;
     populateSelect('termo-area',state.areas,'Seleccionar área…');
     populateSelect('admin-select',state.areas,'— Seleccionar —');
     populateChips('cent-chips',state.centrifugas);
@@ -228,7 +228,12 @@ async function loadMaestros(){
       {id: "ZD421-222", nombreReal: "ZD421-1", nombrePractico: "Rotuladora Hematología", modelo: "ZD421", tipoConexion: "Ethernet", direccionIp: "10.10.1.50", piso: "Piso 1", ubicacion: "Hematología", comentario: "Zebra ZD421 Red"},
       {id: "ZD220-333", nombreReal: "ZD220-1", nombrePractico: "Rotuladora Microbiología", modelo: "ZD220", tipoConexion: "USB", direccionIp: "No aplica", piso: "Piso 2", ubicacion: "Microbiología", comentario: "Zebra ZD220 USB"}
     ];
-    state.dashMaestros={areas:state.areas,centrifugas:state.centrifugas,salas:state.salas,refrigeradores:state.refrigeradores,refriLimpieza:state.refriLimpieza};
+    state.dashMaestros={
+      areas:state.areas,centrifugas:state.centrifugas,salas:state.salas,refrigeradores:state.refrigeradores,refriLimpieza:state.refriLimpieza,
+      areasDetailed: state.areas.map(a=>({nombre:a, horarioTurno:'si'})),
+      centrifugasDetailed: state.centrifugas.map(c=>({nombre:c, horarioTurno:['Centrífuga 18','Centrífuga 14','Centrífuga 9','Centrífuga 6','Centrífuga 8','Centrífuga 12','Centrífuga 11'].includes(c)?'no':'si'})),
+      salasDetailed: state.salas.map(s=>({nombre:s, horarioTurno:'si'}))
+    };
     
     populateSelect('termo-area',state.areas,'Seleccionar área…');
     populateSelect('admin-select',state.areas,'— Seleccionar —');

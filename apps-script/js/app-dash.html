@@ -291,6 +291,7 @@ function switchDashTab(t){state.dashTab=t;document.getElementById('tab-diario').
 function getDiasHasta(m,a){const h=new Date();const d=new Date(a,m,0).getDate();return(a===h.getFullYear()&&m===(h.getMonth()+1))?h.getDate():d}
 
 async function loadDashboard(forceReload){
+  if(forceReload){ state.dashMaestros = null; state.maestrosPromise = null; }
   state.dashMes=parseInt(document.getElementById('dash-mes').value);
   state.dashAnio=parseInt(document.getElementById('dash-anio').value);
   const cacheKey=state.dashMes+'-'+state.dashAnio;
@@ -305,11 +306,12 @@ async function loadDashboard(forceReload){
   document.getElementById('dash-daily-view').innerHTML='';document.getElementById('dash-monthly-view').innerHTML='';
   try{
     const[reg,rev]=await Promise.all([apiGet({action:'getRegistros',mes:state.dashMes,anio:state.dashAnio}),apiGet({action:'getRevisiones',mes:state.dashMes,anio:state.dashAnio})]);
-    if(!state.dashMaestros){
+    if(!state.dashMaestros || !state.dashMaestros.centrifugasDetailed){
       if(state.maestrosPromise){
         await state.maestrosPromise;
-      } else {
-        try{state.dashMaestros=await apiGet({action:'getMaestros'})}catch(e){state.dashMaestros={areas:state.areas,centrifugas:state.centrifugas,salas:state.salas,refrigeradores:state.refrigeradores,refriLimpieza:state.refriLimpieza}}
+      }
+      if(!state.dashMaestros || !state.dashMaestros.centrifugasDetailed){
+        try{state.dashMaestros=await apiGet({action:'getMaestros'})}catch(e){}
       }
     }
     state.dashData=reg;
