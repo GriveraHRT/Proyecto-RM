@@ -2208,18 +2208,18 @@ let recentTermoCache = [];
 async function loadRecentTermo() {
   const tbody = document.getElementById('tbody-recent-termo');
   if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 16px; color: #94a3b8;">🔄 Cargando registros recientes...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 16px; color: #94a3b8;">🔄 Cargando registros recientes...</td></tr>';
   try {
     const res = await apiGet({ action: 'getRecentTermo', limit: 20 });
     if (res && res.success && Array.isArray(res.records)) {
       recentTermoCache = res.records;
       renderRecentTermoTable(recentTermoCache);
     } else {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${res.error || 'Error al cargar registros.'}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${res.error || 'Error al cargar registros.'}</td></tr>`;
     }
   } catch (err) {
     console.error('Error cargando últimos 20 termo:', err);
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 16px; color: #ef4444;">❌ Error de conexión al cargar registros.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 16px; color: #ef4444;">❌ Error de conexión al cargar registros.</td></tr>';
   }
 }
 
@@ -2227,7 +2227,7 @@ function renderRecentTermoTable(records) {
   const tbody = document.getElementById('tbody-recent-termo');
   if (!tbody) return;
   if (!records || records.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 16px; color: #94a3b8;">No hay registros recientes.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 16px; color: #94a3b8;">No hay registros recientes.</td></tr>';
     return;
   }
 
@@ -2238,27 +2238,25 @@ function renderRecentTermoTable(records) {
     const humOOR = !isNaN(hum) && (hum < 20 || hum > 70);
 
     const tempBadge = tempOOR
-      ? `<span style="color:#dc2626; font-weight:700; background:#fee2e2; padding:2px 6px; border-radius:4px;">⚠️ ${r.temperatura} °C</span>`
-      : `<span style="font-weight:600; color:#16a34a;">${r.temperatura} °C</span>`;
+      ? `<span style="color:#dc2626; font-weight:700; background:#fee2e2; padding:2px 5px; border-radius:4px; white-space:nowrap; display:inline-block;">⚠️ ${r.temperatura} °C</span>`
+      : `<span style="font-weight:600; color:#16a34a; white-space:nowrap; display:inline-block;">${r.temperatura} °C</span>`;
 
     const humBadge = humOOR
-      ? `<span style="color:#dc2626; font-weight:700; background:#fee2e2; padding:2px 6px; border-radius:4px;">⚠️ ${r.humedad} %</span>`
-      : `<span style="font-weight:600; color:#0284c7;">${r.humedad} %</span>`;
+      ? `<span style="color:#dc2626; font-weight:700; background:#fee2e2; padding:2px 5px; border-radius:4px; white-space:nowrap; display:inline-block;">⚠️ ${r.humedad} %</span>`
+      : `<span style="font-weight:600; color:#0284c7; white-space:nowrap; display:inline-block;">${r.humedad} %</span>`;
 
     const turnoBadge = r.turno === 'Mañana' ? '☀️ AM' : '🌙 PM';
-    const accObs = [r.accion_correctiva, r.observaciones].filter(Boolean).join(' | ') || '-';
 
     return `
       <tr style="border-bottom: 1px solid #f1f5f9;">
-        <td style="padding: 10px 8px;"><strong>${r.fecha}</strong> <span style="font-size:0.75rem; color:#64748b; margin-left:4px;">(${turnoBadge})</span></td>
-        <td style="padding: 10px 8px;">${r.area || '-'}</td>
-        <td style="padding: 10px 8px;">${tempBadge}</td>
-        <td style="padding: 10px 8px;">${humBadge}</td>
-        <td style="padding: 10px 8px; font-weight:700; letter-spacing:1px;">${r.responsable}</td>
-        <td style="padding: 10px 8px; font-size:0.82rem; color:#475569; max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${accObs.replace(/"/g, '&quot;')}">${accObs}</td>
-        <td style="padding: 10px 8px; text-align: center; white-space: nowrap;">
-          <button type="button" class="btn btn-secondary" style="padding: 4px 8px; font-size: 0.78rem;" onclick="openEditTermoModal(${idx})">✏️ Editar</button>
-          <button type="button" class="btn btn-danger" style="padding: 4px 8px; font-size: 0.78rem; margin-left: 4px;" onclick="confirmDeleteTermo(${idx})">🗑️ Eliminar</button>
+        <td style="padding: 8px 4px; white-space: nowrap;"><strong>${r.fecha}</strong> <span style="font-size:0.75rem; color:#64748b; margin-left:2px;">(${turnoBadge})</span></td>
+        <td style="padding: 8px 4px; font-size: 0.82rem;">${r.area || '-'}</td>
+        <td style="padding: 8px 4px; text-align: center; white-space: nowrap;">${tempBadge}</td>
+        <td style="padding: 8px 4px; text-align: center; white-space: nowrap;">${humBadge}</td>
+        <td style="padding: 8px 4px; text-align: center; font-weight:700; letter-spacing:1px; white-space: nowrap;">${r.responsable}</td>
+        <td style="padding: 8px 4px; text-align: center; white-space: nowrap;">
+          <button type="button" class="btn btn-secondary" style="padding: 4px 6px; font-size: 0.75rem;" onclick="openEditTermoModal(${idx})" title="Editar registro">✏️ Edit</button>
+          <button type="button" class="btn btn-danger" style="padding: 4px 6px; font-size: 0.75rem; margin-left: 2px;" onclick="confirmDeleteTermo(${idx})" title="Eliminar registro">🗑️ Elim</button>
         </td>
       </tr>
     `;
