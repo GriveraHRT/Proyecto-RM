@@ -340,6 +340,7 @@ function renderDashContent(reg){if(state.dashTab==='diario')renderDailyView(reg)
 function renderDailyView(reg){
   if(!reg) return;
   const hoy=new Date().getDate();
+  const m=state.dashMaestros||{areas:[],centrifugas:[],salas:[],refrigeradores:[],refriLimpieza:[],isTodayHabit:true};
   const isHabit = m.isTodayHabit !== false;
   let html=`<div class="card card-sm" style="margin-bottom:12px;"><strong style="font-size:14px;">📅 Estado del Día ${hoy} ${!isHabit ? '<span style="font-size:12px; font-weight:normal; color:#fbbf24; margin-left:8px;">(Día no hábil / Feriado)</span>' : ''}</strong></div>`;
 
@@ -2471,9 +2472,8 @@ async function loadDiasNoHabilesAdmin() {
         <table class="records-table" style="width:100%; font-size:13px;">
           <thead>
             <tr>
-              <th>Fecha</th>
-              <th>Motivo</th>
-              <th>Acción</th>
+              <th>Fecha No Hábil</th>
+              <th style="text-align:right;">Acción</th>
             </tr>
           </thead>
           <tbody>
@@ -2482,11 +2482,10 @@ async function loadDiasNoHabilesAdmin() {
     list.forEach(item => {
       html += `
         <tr>
-          <td><strong>${escapeHtml(item.fecha)}</strong></td>
-          <td>${escapeHtml(item.motivo)}</td>
-          <td>
-            <button class="btn btn-sm btn-danger" style="padding:2px 8px; font-size:12px;" onclick="deleteDiaNoHabilHRTAdmin('${escapeHtml(item.fecha)}')">
-              🗑️ Eliminar
+          <td><strong>📅 ${escapeHtml(item.fecha)}</strong></td>
+          <td style="text-align:right;">
+            <button class="btn btn-sm btn-danger" style="padding:4px 10px; font-size:12px;" onclick="deleteDiaNoHabilHRTAdmin('${escapeHtml(item.fecha)}')">
+              🗑️ Quitar
             </button>
           </td>
         </tr>
@@ -2503,7 +2502,6 @@ async function loadDiasNoHabilesAdmin() {
 
 async function addDiaNoHabilHRTAdmin() {
   const fechaInput = document.getElementById('hrt-fecha');
-  const motivoInput = document.getElementById('hrt-motivo');
   const pwdInput = document.getElementById('hrt-admin-pwd');
   const errDiv = document.getElementById('hrt-admin-error');
   const succDiv = document.getElementById('hrt-admin-success');
@@ -2512,16 +2510,10 @@ async function addDiaNoHabilHRTAdmin() {
   succDiv.style.display = 'none';
 
   const fecha = fechaInput.value;
-  const motivo = motivoInput.value.trim();
   const pwd = pwdInput.value;
 
   if (!fecha) {
     errDiv.textContent = 'Debe seleccionar una fecha.';
-    errDiv.style.display = 'block';
-    return;
-  }
-  if (!motivo) {
-    errDiv.textContent = 'Debe ingresar un motivo.';
     errDiv.style.display = 'block';
     return;
   }
@@ -2537,7 +2529,6 @@ async function addDiaNoHabilHRTAdmin() {
     const res = await apiPost({
       action: 'saveDiaNoHabilHRT',
       fecha: fecha,
-      motivo: motivo,
       pwd: pwd
     });
 
@@ -2545,9 +2536,9 @@ async function addDiaNoHabilHRTAdmin() {
       succDiv.textContent = '✅ ' + res.message;
       succDiv.style.display = 'block';
       fechaInput.value = '';
-      motivoInput.value = '';
       pwdInput.value = '';
       loadDiasNoHabilesAdmin();
+      if (typeof prefetchDashboard === 'function') prefetchDashboard();
     } else {
       errDiv.textContent = '❌ ' + (res.error || 'Error al guardar día no hábil');
       errDiv.style.display = 'block';
@@ -2562,7 +2553,7 @@ async function addDiaNoHabilHRTAdmin() {
 }
 
 async function deleteDiaNoHabilHRTAdmin(fechaStr) {
-  const pwd = prompt('Para eliminar esta fecha, ingrese la contraseña de administrador:');
+  const pwd = prompt(`Para quitar la fecha ${fechaStr}, ingrese la contraseña de administrador:`);
   if (!pwd) return;
 
   try {
@@ -2575,12 +2566,13 @@ async function deleteDiaNoHabilHRTAdmin(fechaStr) {
     if (res && res.success) {
       showToast('✅ ' + res.message);
       loadDiasNoHabilesAdmin();
+      if (typeof prefetchDashboard === 'function') prefetchDashboard();
     } else {
-      showToast('❌ ' + (res.error || 'Error al eliminar fecha'), 'error');
+      showToast('❌ ' + (res.error || 'Error al quitar fecha'), 'error');
     }
   } catch (err) {
     console.error('Error deleteDiaNoHabilHRTAdmin:', err);
-    showToast('❌ Error de conexión al eliminar', 'error');
+    showToast('❌ Error de conexión al quitar fecha', 'error');
   }
 }
 </script>
