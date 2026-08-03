@@ -1009,6 +1009,17 @@ function getRegistros(mes, anio) {
 
   const result = { mes, anio };
 
+  // Calculate non-working days for the requested month
+  const diasNoHabiles = [];
+  const daysInMonth = new Date(anio, mes, 0).getDate();
+  for (let d = 1; d <= daysInMonth; d++) {
+    const fTest = new Date(anio, mes - 1, d);
+    if (!esDiaHabil(fTest)) {
+      diasNoHabiles.push(d);
+    }
+  }
+  result.diasNoHabiles = diasNoHabiles;
+
   sheetsToFetch.forEach(cfg => {
     const cacheKey = getCacheKey('regs', cfg.key, mes, anio);
     let cached = getCachedJson(cacheKey);

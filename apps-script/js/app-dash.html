@@ -442,23 +442,87 @@ function renderMonthlyView(reg){
   if(!reg) return;
   const dh=getDiasHasta(state.dashMes,state.dashAnio);
   const m=state.dashMaestros||{areas:[],centrifugas:[],salas:[],refrigeradores:[]};
+  const diasNoHabilesSet = new Set(reg.diasNoHabiles || []);
   let html='';
 
   if(isModuloActivo('termo')){
     html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🌡️ Temp. Ambiental</div>';
-    (m.areas||[]).forEach(a=>{html+=`<div style="font-size:12px;font-weight:600;margin:8px 0 4px;">${a}</div>`;['Mañana','Tarde'].forEach(turno=>{const dias=new Set((reg.termo||[]).filter(r=>r.area===a&&r.turno===turno).map(r=>parseInt(r.dia)));let miss=0;let chips='';for(let d=1;d<=dh;d++){const ok=dias.has(d);if(!ok)miss++;chips+=`<span class="day-chip ${ok?'chip-ok':'chip-missing'}">${d}</span>`}html+=`<div style="font-size:11px;color:var(--text-dim);margin:4px 0 2px;">${turno} ${miss?'('+miss+' faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`})});
+    const list = m.areasDetailed || (m.areas||[]).map(a=>({nombre:a, horarioTurno:'si'}));
+    list.forEach(item => {
+      const a = item.nombre;
+      const esSoloHabil = item.horarioTurno === 'no';
+      html+=`<div style="font-size:12px;font-weight:600;margin:8px 0 4px;">${a} ${esSoloHabil ? '<span style="font-weight:normal; font-size:11px; color:var(--text-dim);">(Solo días hábiles)</span>' : ''}</div>`;
+      ['Mañana','Tarde'].forEach(turno=>{
+        const diasDone = new Set((reg.termo||[]).filter(r=>r.area===a&&r.turno===turno).map(r=>parseInt(r.dia)));
+        let miss=0;
+        let chips='';
+        for(let d=1; d<=dh; d++){
+          const ok = diasDone.has(d);
+          const isNonWorking = esSoloHabil && diasNoHabilesSet.has(d);
+          if (ok) {
+            chips += `<span class="day-chip chip-ok">${d}</span>`;
+          } else if (isNonWorking) {
+            chips += `<span class="day-chip chip-na" title="Día no hábil / No exigido">${d}</span>`;
+          } else {
+            miss++;
+            chips += `<span class="day-chip chip-missing">${d}</span>`;
+          }
+        }
+        html+=`<div style="font-size:11px;color:var(--text-dim);margin:4px 0 2px;">${turno} ${miss?'('+miss+' faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`;
+      });
+    });
     html+='</div>';
   }
 
   if(isModuloActivo('centrifugas')){
     html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">⚙️ Centrífugas</div>';
-    (m.centrifugas||[]).forEach(c=>{const diasD=new Set((reg.centrifugas||[]).filter(r=>r.centrifuga===c&&r.tipo_mantencion==='Diaria').map(r=>parseInt(r.dia)));let miss=0;let chips='';for(let d=1;d<=dh;d++){const ok=diasD.has(d);if(!ok)miss++;chips+=`<span class="day-chip ${ok?'chip-ok':'chip-missing'}">${d}</span>`}html+=`<div style="font-size:12px;font-weight:600;margin:8px 0 4px;">${c} ${miss?'('+miss+' faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`});
+    const list = m.centrifugasDetailed || (m.centrifugas||[]).map(c=>({nombre:c, horarioTurno:'si'}));
+    list.forEach(item => {
+      const c = item.nombre;
+      const esSoloHabil = item.horarioTurno === 'no';
+      const diasDone = new Set((reg.centrifugas||[]).filter(r=>r.centrifuga===c&&r.tipo_mantencion==='Diaria').map(r=>parseInt(r.dia)));
+      let miss=0;
+      let chips='';
+      for(let d=1; d<=dh; d++){
+        const ok = diasDone.has(d);
+        const isNonWorking = esSoloHabil && diasNoHabilesSet.has(d);
+        if (ok) {
+          chips += `<span class="day-chip chip-ok">${d}</span>`;
+        } else if (isNonWorking) {
+          chips += `<span class="day-chip chip-na" title="Día no hábil / No exigido">${d}</span>`;
+        } else {
+          miss++;
+          chips += `<span class="day-chip chip-missing">${d}</span>`;
+        }
+      }
+      html+=`<div style="font-size:12px;font-weight:600;margin:8px 0 4px;">${c} ${esSoloHabil ? '<span style="font-weight:normal; font-size:11px; color:var(--text-dim);">(Solo días hábiles)</span>' : ''} ${miss?'('+miss+' faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`;
+    });
     html+='</div>';
   }
 
   if(isModuloActivo('mesones')){
     html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🧽 Mesones</div>';
-    (m.salas||[]).forEach(s=>{const dias=new Set((reg.mesones||[]).filter(r=>r.sala===s).map(r=>parseInt(r.dia)));let miss=0;let chips='';for(let d=1;d<=dh;d++){const ok=dias.has(d);if(!ok)miss++;chips+=`<span class="day-chip ${ok?'chip-ok':'chip-missing'}">${d}</span>`}html+=`<div style="font-size:12px;font-weight:600;margin:8px 0 4px;">${s} ${miss?'('+miss+' faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`});
+    const list = m.salasDetailed || (m.salas||[]).map(s=>({nombre:s, horarioTurno:'si'}));
+    list.forEach(item => {
+      const s = item.nombre;
+      const esSoloHabil = item.horarioTurno === 'no';
+      const diasDone = new Set((reg.mesones||[]).filter(r=>r.sala===s).map(r=>parseInt(r.dia)));
+      let miss=0;
+      let chips='';
+      for(let d=1; d<=dh; d++){
+        const ok = diasDone.has(d);
+        const isNonWorking = esSoloHabil && diasNoHabilesSet.has(d);
+        if (ok) {
+          chips += `<span class="day-chip chip-ok">${d}</span>`;
+        } else if (isNonWorking) {
+          chips += `<span class="day-chip chip-na" title="Día no hábil / No exigido">${d}</span>`;
+        } else {
+          miss++;
+          chips += `<span class="day-chip chip-missing">${d}</span>`;
+        }
+      }
+      html+=`<div style="font-size:12px;font-weight:600;margin:8px 0 4px;">${s} ${esSoloHabil ? '<span style="font-weight:normal; font-size:11px; color:var(--text-dim);">(Solo días hábiles)</span>' : ''} ${miss?'('+miss+' faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`;
+    });
     html+='</div>';
   }
 
