@@ -1020,6 +1020,51 @@
         <span id="btn-notif-admin-text">💾 Guardar Configuración</span>
       </button>
     </div>
+
+    <!-- ── Sección: Configuración de Días No Hábiles HRT ── -->
+    <div class="card" style="margin-top:20px;" id="admin-dias-nohabiles-card">
+      <div class="revision-admin-header">
+        <span class="revision-admin-icon">📅</span>
+        <div>
+          <div class="revision-admin-title">Días No Hábiles Excepcionales (HRT)</div>
+          <div class="revision-admin-subtitle">Agregue feriados institucionales o días no hábiles específicos del Hospital de Talca</div>
+        </div>
+      </div>
+
+      <!-- Formulario para agregar día no hábil -->
+      <div style="margin-top:16px; background:var(--surface-color, #1e293b); padding:12px; border-radius:8px;">
+        <div class="form-row">
+          <div class="form-group" style="flex:1;">
+            <label class="form-label" for="hrt-fecha">Fecha No Hábil</label>
+            <input type="date" id="hrt-fecha" class="form-control" required />
+          </div>
+          <div class="form-group" style="flex:2;">
+            <label class="form-label" for="hrt-motivo">Motivo / Descripción</label>
+            <input type="text" id="hrt-motivo" class="form-control" placeholder="Ej: Aniversario Hospital / Festivo interno" required />
+          </div>
+        </div>
+        <div class="form-group" style="margin-top:8px;">
+          <label class="form-label" for="hrt-admin-pwd">Contraseña de Administrador</label>
+          <input type="password" id="hrt-admin-pwd" class="form-control" placeholder="••••••" />
+        </div>
+        <div id="hrt-admin-error" class="alert-banner alert-danger" style="display:none; margin-bottom:12px;"></div>
+        <div id="hrt-admin-success" class="alert-banner alert-success" style="display:none; margin-bottom:12px;"></div>
+        <button class="btn btn-primary" onclick="addDiaNoHabilHRTAdmin()" id="btn-add-hrt">
+          <div class="spinner" id="spinner-hrt-admin" style="display:none;"></div>
+          <span>➕ Agregar Día No Hábil</span>
+        </button>
+      </div>
+
+      <!-- Tabla de días agregados -->
+      <div style="margin-top:16px;">
+        <strong style="font-size:14px; display:block; margin-bottom:8px;">Fechas Registradas</strong>
+        <div id="hrt-list-container">
+          <div style="text-align: center; padding: 12px; color: var(--text-muted-color);">
+            Cargando fechas...
+          </div>
+        </div>
+      </div>
+    </div>
   </section>
 
   <!-- ── SECCIÓN: REGISTRO DE REPARACIONES DXH 900 URGENCIAS ───── -->

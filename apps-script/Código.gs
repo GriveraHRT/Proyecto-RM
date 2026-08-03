@@ -55,7 +55,8 @@ const SHEETS = {
   ETIQUETADORAS_REG:    'Reg. Etiquetadoras',
   NOTIFICACIONES:       'Maestro Notificaciones',
   DXH900_REG:       'Reg. Reparaciones DxH 900 Urgencias',
-  ELIM_MUESTRAS:    'Reg. Eliminación Muestras'
+  ELIM_MUESTRAS:    'Reg. Eliminación Muestras',
+  DIAS_NO_HABILES_HRT: 'Maestro Días No Hábiles HRT'
 };
 
 const COBAS_PERIODIC_TASKS = {
@@ -257,6 +258,7 @@ function doGet(e) {
       case 'getDxH900Historial': return jsonResponse(getDxH900Historial());
       case 'getModulosActivos': return jsonResponse(getModulosActivos());
       case 'getRecentTermo':    return jsonResponse(getRecentTermo(e.parameter.limit));
+      case 'getDiasNoHabilesHRT': return jsonResponse(getDiasNoHabilesHRT());
       case 'SETUP_INIT_TA':     return jsonResponse(setup());
       case 'REINIT':            return jsonResponse(reinitialize());
       default:                  return jsonResponse({ error: 'Acción no reconocida: ' + action });
@@ -292,6 +294,9 @@ function doPost(e) {
       case 'saveDxH900Registro':  return jsonResponse(saveDxH900Registro(data));
       case 'saveElimMuestras':    return jsonResponse(saveElimMuestras(data));
       case 'saveModulosActivos': return jsonResponse(saveModulosActivos(data));
+      case 'getDiasNoHabilesHRT': return jsonResponse(getDiasNoHabilesHRT());
+      case 'saveDiaNoHabilHRT':   return jsonResponse(saveDiaNoHabilHRT(data));
+      case 'deleteDiaNoHabilHRT': return jsonResponse(deleteDiaNoHabilHRT(data));
       default:                    return jsonResponse({ error: 'Acción no reconocida: ' + data.action });
     }
   } catch (err) {
@@ -306,14 +311,38 @@ function getAreas() {
   return data.slice(1).filter(r => r[0]).map(r => String(r[0]));
 }
 
+function getAreasDetailed() {
+  const data = getSheet(SHEETS.AREAS).getDataRange().getValues();
+  return data.slice(1).filter(r => r[0]).map(r => ({
+    nombre: String(r[0]).trim(),
+    horarioTurno: r[1] ? String(r[1]).trim().toLowerCase() : 'si'
+  }));
+}
+
 function getCentrifugas() {
   const data = getSheet(SHEETS.CENTRIFUGAS).getDataRange().getValues();
   return data.slice(1).filter(r => r[0]).map(r => String(r[0]));
 }
 
+function getCentrifugasDetailed() {
+  const data = getSheet(SHEETS.CENTRIFUGAS).getDataRange().getValues();
+  return data.slice(1).filter(r => r[0]).map(r => ({
+    nombre: String(r[0]).trim(),
+    horarioTurno: r[1] ? String(r[1]).trim().toLowerCase() : 'si'
+  }));
+}
+
 function getSalas() {
   const data = getSheet(SHEETS.SALAS).getDataRange().getValues();
   return data.slice(1).filter(r => r[0]).map(r => String(r[0]));
+}
+
+function getSalasDetailed() {
+  const data = getSheet(SHEETS.SALAS).getDataRange().getValues();
+  return data.slice(1).filter(r => r[0]).map(r => ({
+    nombre: String(r[0]).trim(),
+    horarioTurno: r[1] ? String(r[1]).trim().toLowerCase() : 'si'
+  }));
 }
 
 function getAcciones() {
@@ -336,12 +365,140 @@ function getRefriLimpieza() {
   return data.slice(1).filter(r => r[0]).map(r => String(r[0]));
 }
 
+/** Determina si una fecha dada es día hábil en Chile y HRT */
+function esDiaHabil(fecha) {
+  if (!fecha) fecha = new Date();
+  if (!(fecha instanceof Date)) fecha = new Date(fecha);
+
+  // 1. Fin de semana (Sábado = 6, Domingo = 0)
+  const day = fecha.getDay();
+  if (day === 0 || day === 6) return false;
+
+  // 2. Formatear dd/mm/yyyy para comparar con Maestro Días No Hábiles HRT
+  const d = String(fecha.getDate()).padStart(2, '0');
+  const m = String(fecha.getMonth() + 1).padStart(2, '0');
+  const y = fecha.getFullYear();
+  const fechaStr = `${d}/${m}/${y}`;
+
+  try {
+    const sheetHRT = getSheet(SHEETS.DIAS_NO_HABILES_HRT);
+    if (sheetHRT) {
+      const rows = sheetHRT.getDataRange().getValues();
+      for (let i = 1; i < rows.length; i++) {
+        const rFecha = rows[i][0];
+        let fStr = '';
+        if (rFecha instanceof Date) {
+          fStr = `${String(rFecha.getDate()).padStart(2, '0')}/${String(rFecha.getMonth() + 1).padStart(2, '0')}/${rFecha.getFullYear()}`;
+        } else {
+          fStr = String(rFecha).trim();
+        }
+        if (fStr === fechaStr) return false;
+      }
+    }
+  } catch (e) {
+    Logger.log('Error al consultar Maestro Días No Hábiles HRT: ' + e.toString());
+  }
+
+  // 3. Feriados Oficiales de Chile via Google Calendar API
+  try {
+    const cal = CalendarApp.getCalendarById('es.cl#holiday@group.v.calendar.google.com');
+    if (cal) {
+      const events = cal.getEventsForDay(fecha);
+      if (events && events.length > 0) return false;
+    }
+  } catch (e) {
+    Logger.log('Error al consultar calendario feriados Google: ' + e.toString());
+  }
+
+  return true;
+}
+
+function getDiasNoHabilesHRT() {
+  const sheet = getSheet(SHEETS.DIAS_NO_HABILES_HRT);
+  const rows = sheet.getDataRange().getValues();
+  if (rows.length <= 1) return [];
+
+  const items = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r[0]) continue;
+    let fechaStr = '';
+    if (r[0] instanceof Date) {
+      fechaStr = `${String(r[0].getDate()).padStart(2, '0')}/${String(r[0].getMonth() + 1).padStart(2, '0')}/${r[0].getFullYear()}`;
+    } else {
+      fechaStr = String(r[0]).trim();
+    }
+    items.push({
+      fecha: fechaStr,
+      motivo: String(r[1] || '').trim(),
+      registradoPor: String(r[2] || '').trim()
+    });
+  }
+  return items;
+}
+
+function saveDiaNoHabilHRT(data) {
+  if (data.pwd !== 'admin123') {
+    return { success: false, error: 'Contraseña de administrador incorrecta.' };
+  }
+  if (!data.fecha) {
+    return { success: false, error: 'Debe ingresar una fecha.' };
+  }
+  let fechaStr = data.fecha;
+  if (fechaStr.includes('-')) {
+    const parts = fechaStr.split('-');
+    if (parts.length === 3) {
+      fechaStr = `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+  }
+
+  const sheet = getSheet(SHEETS.DIAS_NO_HABILES_HRT);
+  sheet.appendRow([
+    fechaStr,
+    data.motivo || 'Feriado / Día no hábil HRT',
+    data.registradoPor || 'Admin'
+  ]);
+
+  clearSheetCache('maestros_all', 0, 0);
+  return { success: true, message: 'Día no hábil agregado correctamente.' };
+}
+
+function deleteDiaNoHabilHRT(data) {
+  if (data.pwd !== 'admin123') {
+    return { success: false, error: 'Contraseña de administrador incorrecta.' };
+  }
+  const sheet = getSheet(SHEETS.DIAS_NO_HABILES_HRT);
+  const rows = sheet.getDataRange().getValues();
+
+  let targetIndex = -1;
+  for (let i = 1; i < rows.length; i++) {
+    let fStr = rows[i][0];
+    if (fStr instanceof Date) {
+      fStr = `${String(fStr.getDate()).padStart(2, '0')}/${String(fStr.getMonth() + 1).padStart(2, '0')}/${fStr.getFullYear()}`;
+    } else {
+      fStr = String(fStr).trim();
+    }
+    if (fStr === String(data.fecha).trim()) {
+      targetIndex = i + 1;
+      break;
+    }
+  }
+
+  if (targetIndex !== -1) {
+    sheet.deleteRow(targetIndex);
+    clearSheetCache('maestros_all', 0, 0);
+    return { success: true, message: 'Día no hábil eliminado correctamente.' };
+  }
+  return { success: false, error: 'No se encontró la fecha especificada.' };
+}
+
 /** Devuelve todos los maestros en una sola llamada para optimizar carga */
 function getMaestros() {
   const cacheKey = 'maestros_all';
   let cached = getCachedJson(cacheKey);
   if (cached) {
     cached.modulosActivos = getModulosActivos();
+    cached.isTodayHabit = esDiaHabil(new Date());
     return cached;
   }
   
@@ -349,6 +506,10 @@ function getMaestros() {
     areas: getAreas(),
     centrifugas: getCentrifugas(),
     salas: getSalas(),
+    areasDetailed: getAreasDetailed(),
+    centrifugasDetailed: getCentrifugasDetailed(),
+    salasDetailed: getSalasDetailed(),
+    isTodayHabit: esDiaHabil(new Date()),
     acciones: getAcciones(),
     refrigeradores: getRefrigeradores(),
     refriLimpieza: getRefriLimpieza(),
@@ -1237,9 +1398,11 @@ function triggerDatosNoRellenados() {
   const mes = hoy.getMonth() + 1;
   const anio = hoy.getFullYear();
 
-  const areas = getAreas();
-  const centrifugas = getCentrifugas();
-  const salas = getSalas();
+  const esHab = esDiaHabil(hoy);
+
+  const areasDetailed = getAreasDetailed();
+  const centrifugasDetailed = getCentrifugasDetailed();
+  const salasDetailed = getSalasDetailed();
   const refrigeradores = getRefrigeradores();
 
   const reg = getRegistros(mes, anio);
@@ -1249,7 +1412,9 @@ function triggerDatosNoRellenados() {
 
   // Temperatura/Humedad faltantes
   const termoFaltantes = [];
-  areas.forEach(area => {
+  areasDetailed.forEach(item => {
+    if (!esHab && item.horarioTurno === 'no') return;
+    const area = item.nombre;
     ['Mañana', 'Tarde'].forEach(turno => {
       const existe = reg.termo.some(r => parseInt(r.dia) === dia && r.area === area && r.turno === turno);
       if (!existe) termoFaltantes.push(area + ' (' + turno + ')');
@@ -1261,7 +1426,9 @@ function triggerDatosNoRellenados() {
 
   // Centrífugas faltantes (solo mantenimiento Diario)
   const centFaltantes = [];
-  centrifugas.forEach(c => {
+  centrifugasDetailed.forEach(item => {
+    if (!esHab && item.horarioTurno === 'no') return;
+    const c = item.nombre;
     const existe = reg.centrifugas.some(r => parseInt(r.dia) === dia && r.centrifuga === c && r.tipo_mantencion === 'Diaria');
     if (!existe) centFaltantes.push(c);
   });
@@ -1271,7 +1438,9 @@ function triggerDatosNoRellenados() {
 
   // Mesones faltantes
   const mesonFaltantes = [];
-  salas.forEach(s => {
+  salasDetailed.forEach(item => {
+    if (!esHab && item.horarioTurno === 'no') return;
+    const s = item.nombre;
     const existe = reg.mesones.some(r => parseInt(r.dia) === dia && r.sala === s);
     if (!existe) mesonFaltantes.push(s);
   });
@@ -1712,14 +1881,15 @@ function getSheetDefs() {
     { name: SHEETS.ELIM_MUESTRAS, headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Responsable','Muestras Eliminadas','Fecha de registro','Revisado Por','Fecha Revisión'],
       hideCols: [2,3,4,7] },
     // Maestros al final
-    { name: SHEETS.AREAS,       headers: ['Area'] },
-    { name: SHEETS.CENTRIFUGAS, headers: ['Centrifuga'] },
-    { name: SHEETS.SALAS,       headers: ['Sala'] },
+    { name: SHEETS.AREAS,       headers: ['Area', 'Horario turno'] },
+    { name: SHEETS.CENTRIFUGAS, headers: ['Centrifuga', 'Horario turno'] },
+    { name: SHEETS.SALAS,       headers: ['Sala', 'Horario turno'] },
     { name: SHEETS.REFRI_MASTER, headers: ['Equipo','Tipo','Temp Min (°C)','Temp Max (°C)'] },
     { name: SHEETS.REFRI_LIMP_MASTER, headers: ['Equipo'] },
     { name: SHEETS.ACCIONES,    headers: ['Acción'] },
     { name: SHEETS.ETIQUETADORAS_MASTER, headers: ['Nombre Real','ID','Nombre Práctico','Modelo','Tipo de Conexión','Dirección IP','Piso','Ubicación','Comentario'] },
-    { name: SHEETS.NOTIFICACIONES, headers: ['Registro','Clave','Destinatarios','Pausado','Hora'] }
+    { name: SHEETS.NOTIFICACIONES, headers: ['Registro','Clave','Destinatarios','Pausado','Hora'] },
+    { name: SHEETS.DIAS_NO_HABILES_HRT, headers: ['Fecha (dd/mm/aaaa)','Motivo','Registrado Por'] }
   ];
 }
 

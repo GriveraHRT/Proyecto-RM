@@ -340,15 +340,25 @@ function renderDashContent(reg){if(state.dashTab==='diario')renderDailyView(reg)
 function renderDailyView(reg){
   if(!reg) return;
   const hoy=new Date().getDate();
-  const m=state.dashMaestros||{areas:[],centrifugas:[],salas:[],refrigeradores:[],refriLimpieza:[]};
-  let html='<div class="card card-sm" style="margin-bottom:12px;"><strong style="font-size:14px;">📅 Estado del Día '+hoy+'</strong></div>';
+  const isHabit = m.isTodayHabit !== false;
+  let html=`<div class="card card-sm" style="margin-bottom:12px;"><strong style="font-size:14px;">📅 Estado del Día ${hoy} ${!isHabit ? '<span style="font-size:12px; font-weight:normal; color:#fbbf24; margin-left:8px;">(Día no hábil / Feriado)</span>' : ''}</strong></div>`;
 
   if(isModuloActivo('termo')){
     const termoHoy=(reg.termo||[]).filter(r=>parseInt(r.dia)===hoy);
     html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🌡️ Temp. Ambiental</div>';
+    const list = m.areasDetailed || (m.areas||[]).map(a=>({nombre:a, horarioTurno:'si'}));
     ['Mañana','Tarde'].forEach(turno=>{
       html+=`<div style="font-size:11px;font-weight:600;color:var(--text-dim);margin:6px 0 4px;text-transform:uppercase;">${turno}</div><div class="status-grid">`;
-      (m.areas||[]).forEach(a=>{const done=termoHoy.some(r=>r.area===a&&r.turno===turno);html+=`<div class="status-item ${done?'done':'miss'}"><span class="status-dot ${done?'green':'red'}"></span>${a}</div>`});
+      list.forEach(item=>{
+        const a = item.nombre;
+        const isNoHabit = !isHabit && item.horarioTurno === 'no';
+        const done = termoHoy.some(r=>r.area===a&&r.turno===turno);
+        if (isNoHabit && !done) {
+          html+=`<div class="status-item opt" style="opacity:0.55;" title="No exigido en días no hábiles"><span class="status-dot gray" style="background:#64748b;"></span>${a} (N/A)</div>`;
+        } else {
+          html+=`<div class="status-item ${done?'done':'miss'}"><span class="status-dot ${done?'green':'red'}"></span>${a}</div>`;
+        }
+      });
       html+='</div>';
     });
     html+='</div>';
@@ -357,14 +367,34 @@ function renderDailyView(reg){
   if(isModuloActivo('centrifugas')){
     const centHoy=(reg.centrifugas||[]).filter(r=>parseInt(r.dia)===hoy&&r.tipo_mantencion==='Diaria');
     html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">⚙️ Centrífugas (Diaria)</div><div class="status-grid">';
-    (m.centrifugas||[]).forEach(c=>{const done=centHoy.some(r=>r.centrifuga===c);html+=`<div class="status-item ${done?'done':'miss'}"><span class="status-dot ${done?'green':'red'}"></span>${c.replace('Centrífuga ','C')}</div>`});
+    const list = m.centrifugasDetailed || (m.centrifugas||[]).map(c=>({nombre:c, horarioTurno:'si'}));
+    list.forEach(item=>{
+      const c = item.nombre;
+      const isNoHabit = !isHabit && item.horarioTurno === 'no';
+      const done = centHoy.some(r=>r.centrifuga===c);
+      if (isNoHabit && !done) {
+        html+=`<div class="status-item opt" style="opacity:0.55;" title="No exigido en días no hábiles"><span class="status-dot gray" style="background:#64748b;"></span>${c.replace('Centrífuga ','C')} (N/A)</div>`;
+      } else {
+        html+=`<div class="status-item ${done?'done':'miss'}"><span class="status-dot ${done?'green':'red'}"></span>${c.replace('Centrífuga ','C')}</div>`;
+      }
+    });
     html+='</div></div>';
   }
 
   if(isModuloActivo('mesones')){
     const mesoHoy=(reg.mesones||[]).filter(r=>parseInt(r.dia)===hoy);
     html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🧽 Mesones</div><div class="status-grid">';
-    (m.salas||[]).forEach(s=>{const done=mesoHoy.some(r=>r.sala===s);html+=`<div class="status-item ${done?'done':'miss'}"><span class="status-dot ${done?'green':'red'}"></span>${s}</div>`});
+    const list = m.salasDetailed || (m.salas||[]).map(s=>({nombre:s, horarioTurno:'si'}));
+    list.forEach(item=>{
+      const s = item.nombre;
+      const isNoHabit = !isHabit && item.horarioTurno === 'no';
+      const done = mesoHoy.some(r=>r.sala===s);
+      if (isNoHabit && !done) {
+        html+=`<div class="status-item opt" style="opacity:0.55;" title="No exigido en días no hábiles"><span class="status-dot gray" style="background:#64748b;"></span>${s} (N/A)</div>`;
+      } else {
+        html+=`<div class="status-item ${done?'done':'miss'}"><span class="status-dot ${done?'green':'red'}"></span>${s}</div>`;
+      }
+    });
     html+='</div></div>';
   }
 
@@ -2412,6 +2442,144 @@ async function confirmDeleteTermo(index) {
     }
   } catch (err) {
     console.error('Error confirmDeleteTermo:', err);
+    showToast('❌ Error de conexión al eliminar', 'error');
+  }
+}
+
+// ── Admin: Días No Hábiles Excepcionales (HRT) ──────────────
+
+async function loadDiasNoHabilesAdmin() {
+  const container = document.getElementById('hrt-list-container');
+  if (!container) return;
+  
+  container.innerHTML = `
+    <div style="text-align: center; padding: 12px; color: var(--text-dim);">
+      <div class="spinner visible" style="display:inline-block; margin-bottom: 8px;"></div>
+      <div>Cargando días no hábiles...</div>
+    </div>
+  `;
+
+  try {
+    const list = await apiGet({ action: 'getDiasNoHabilesHRT' });
+    if (!list || !list.length) {
+      container.innerHTML = `<div style="font-size:13px; color:var(--text-dim); text-align:center; padding:12px;">No hay fechas excepcionales registradas.</div>`;
+      return;
+    }
+
+    let html = `
+      <div style="overflow-x:auto;">
+        <table class="records-table" style="width:100%; font-size:13px;">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Motivo</th>
+              <th>Acción</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+
+    list.forEach(item => {
+      html += `
+        <tr>
+          <td><strong>${escapeHtml(item.fecha)}</strong></td>
+          <td>${escapeHtml(item.motivo)}</td>
+          <td>
+            <button class="btn btn-sm btn-danger" style="padding:2px 8px; font-size:12px;" onclick="deleteDiaNoHabilHRTAdmin('${escapeHtml(item.fecha)}')">
+              🗑️ Eliminar
+            </button>
+          </td>
+        </tr>
+      `;
+    });
+
+    html += `</tbody></table></div>`;
+    container.innerHTML = html;
+  } catch (err) {
+    console.error('Error loadDiasNoHabilesAdmin:', err);
+    container.innerHTML = `<div class="alert-banner alert-danger visible">Error al cargar fechas no hábiles.</div>`;
+  }
+}
+
+async function addDiaNoHabilHRTAdmin() {
+  const fechaInput = document.getElementById('hrt-fecha');
+  const motivoInput = document.getElementById('hrt-motivo');
+  const pwdInput = document.getElementById('hrt-admin-pwd');
+  const errDiv = document.getElementById('hrt-admin-error');
+  const succDiv = document.getElementById('hrt-admin-success');
+
+  errDiv.style.display = 'none';
+  succDiv.style.display = 'none';
+
+  const fecha = fechaInput.value;
+  const motivo = motivoInput.value.trim();
+  const pwd = pwdInput.value;
+
+  if (!fecha) {
+    errDiv.textContent = 'Debe seleccionar una fecha.';
+    errDiv.style.display = 'block';
+    return;
+  }
+  if (!motivo) {
+    errDiv.textContent = 'Debe ingresar un motivo.';
+    errDiv.style.display = 'block';
+    return;
+  }
+  if (!pwd) {
+    errDiv.textContent = 'Debe ingresar la contraseña de administrador.';
+    errDiv.style.display = 'block';
+    return;
+  }
+
+  setLoading('btn-add-hrt', 'spinner-hrt-admin', null, true);
+
+  try {
+    const res = await apiPost({
+      action: 'saveDiaNoHabilHRT',
+      fecha: fecha,
+      motivo: motivo,
+      pwd: pwd
+    });
+
+    if (res && res.success) {
+      succDiv.textContent = '✅ ' + res.message;
+      succDiv.style.display = 'block';
+      fechaInput.value = '';
+      motivoInput.value = '';
+      pwdInput.value = '';
+      loadDiasNoHabilesAdmin();
+    } else {
+      errDiv.textContent = '❌ ' + (res.error || 'Error al guardar día no hábil');
+      errDiv.style.display = 'block';
+    }
+  } catch (err) {
+    console.error('Error addDiaNoHabilHRTAdmin:', err);
+    errDiv.textContent = '❌ Error de conexión al guardar';
+    errDiv.style.display = 'block';
+  }
+
+  setLoading('btn-add-hrt', 'spinner-hrt-admin', null, false);
+}
+
+async function deleteDiaNoHabilHRTAdmin(fechaStr) {
+  const pwd = prompt('Para eliminar esta fecha, ingrese la contraseña de administrador:');
+  if (!pwd) return;
+
+  try {
+    const res = await apiPost({
+      action: 'deleteDiaNoHabilHRT',
+      fecha: fechaStr,
+      pwd: pwd
+    });
+
+    if (res && res.success) {
+      showToast('✅ ' + res.message);
+      loadDiasNoHabilesAdmin();
+    } else {
+      showToast('❌ ' + (res.error || 'Error al eliminar fecha'), 'error');
+    }
+  } catch (err) {
+    console.error('Error deleteDiaNoHabilHRTAdmin:', err);
     showToast('❌ Error de conexión al eliminar', 'error');
   }
 }
