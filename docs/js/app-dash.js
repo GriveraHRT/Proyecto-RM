@@ -1,3 +1,4 @@
+
 // Forms — Termo
 document.getElementById('form-termo').addEventListener('submit',async e=>{
   e.preventDefault();
@@ -252,7 +253,13 @@ async function loadDashboard(forceReload){
   document.getElementById('dash-daily-view').innerHTML='';document.getElementById('dash-monthly-view').innerHTML='';
   try{
     const[reg,rev]=await Promise.all([apiGet({action:'getRegistros',mes:state.dashMes,anio:state.dashAnio}),apiGet({action:'getRevisiones',mes:state.dashMes,anio:state.dashAnio})]);
-    if(!state.dashMaestros){try{state.dashMaestros=await apiGet({action:'getMaestros'})}catch(e){state.dashMaestros={areas:state.areas,centrifugas:state.centrifugas,salas:state.salas,refrigeradores:state.refrigeradores,refriLimpieza:state.refriLimpieza}}}
+    if(!state.dashMaestros){
+      if(state.maestrosPromise){
+        await state.maestrosPromise;
+      } else {
+        try{state.dashMaestros=await apiGet({action:'getMaestros'})}catch(e){state.dashMaestros={areas:state.areas,centrifugas:state.centrifugas,salas:state.salas,refrigeradores:state.refrigeradores,refriLimpieza:state.refriLimpieza}}
+      }
+    }
     state.dashData=reg;
     state.dashCache={key:cacheKey,data:reg,rev:rev,timestamp:Date.now()};
     applyDashData(reg);
@@ -265,88 +272,149 @@ async function loadDashboard(forceReload){
   document.getElementById('dash-loading').style.display='none';updateCacheIndicator();
 }
 function applyDashData(reg){
-  document.getElementById('stat-termo').textContent=reg.termo.length;
-  document.getElementById('stat-cent').textContent=reg.centrifugas.length;
-  document.getElementById('stat-limp').textContent=reg.mesones.length;
-  document.getElementById('stat-refri').textContent=(reg.refriTemp||[]).length;
-  document.getElementById('stat-limp-refri').textContent=(reg.limpiezaRefri||[]).length;
-  document.getElementById('stat-conduct').textContent=(reg.conductividad||[]).length;
-  if(document.getElementById('stat-cobas')){
-    document.getElementById('stat-cobas').textContent=(reg.cobas||[]).length;
-  }
+  if(!reg) return;
+  if(document.getElementById('stat-termo')) document.getElementById('stat-termo').textContent=(reg.termo||[]).length;
+  if(document.getElementById('stat-cent')) document.getElementById('stat-cent').textContent=(reg.centrifugas||[]).length;
+  if(document.getElementById('stat-limp')) document.getElementById('stat-limp').textContent=(reg.mesones||[]).length;
+  if(document.getElementById('stat-refri')) document.getElementById('stat-refri').textContent=(reg.refriTemp||[]).length;
+  if(document.getElementById('stat-limp-refri')) document.getElementById('stat-limp-refri').textContent=(reg.limpiezaRefri||[]).length;
+  if(document.getElementById('stat-conduct')) document.getElementById('stat-conduct').textContent=(reg.conductividad||[]).length;
+  if(document.getElementById('stat-cobas')) document.getElementById('stat-cobas').textContent=(reg.cobas||[]).length;
   renderDashContent(reg);renderTables(reg);
 }
 
 function renderDashContent(reg){if(state.dashTab==='diario')renderDailyView(reg);else renderMonthlyView(reg)}
 
-function renderDailyView(reg){const hoy=new Date().getDate();const m=state.dashMaestros||{areas:[],centrifugas:[],salas:[],refrigeradores:[],refriLimpieza:[]};let html='<div class="card card-sm" style="margin-bottom:12px;"><strong style="font-size:14px;">📅 Estado del Día '+hoy+'</strong></div>';
-// Temp/Hum by area
-const termoHoy=reg.termo.filter(r=>parseInt(r.dia)===hoy);html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🌡️ Temp. Ambiental</div>';
-['Mañana','Tarde'].forEach(turno=>{html+=`<div style="font-size:11px;font-weight:600;color:var(--text-dim);margin:6px 0 4px;text-transform:uppercase;">${turno}</div><div class="status-grid">`;m.areas.forEach(a=>{const done=termoHoy.some(r=>r.area===a&&r.turno===turno);html+=`<div class="status-item ${done?'done':'miss'}"><span class="status-dot ${done?'green':'red'}"></span>${a}</div>`});html+='</div>'});html+='</div>';
-// Centrífugas
-const centHoy=reg.centrifugas.filter(r=>parseInt(r.dia)===hoy&&r.tipo_mantencion==='Diaria');html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">⚙️ Centrífugas (Diaria)</div><div class="status-grid">';
-m.centrifugas.forEach(c=>{const done=centHoy.some(r=>r.centrifuga===c);html+=`<div class="status-item ${done?'done':'miss'}"><span class="status-dot ${done?'green':'red'}"></span>${c.replace('Centrífuga ','C')}</div>`});html+='</div></div>';
-// Mesones
-const mesoHoy=reg.mesones.filter(r=>parseInt(r.dia)===hoy);html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🧽 Mesones</div><div class="status-grid">';
-m.salas.forEach(s=>{const done=mesoHoy.some(r=>r.sala===s);html+=`<div class="status-item ${done?'done':'miss'}"><span class="status-dot ${done?'green':'red'}"></span>${s}</div>`});html+='</div></div>';
-// Refri Temp
-const refriHoy=(reg.refriTemp||[]).filter(r=>parseInt(r.dia)===hoy);const refris=m.refrigeradores||[];
-if(refris.length){html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🧊 Temp. Refrigeradores</div>';
-['Mañana','Tarde'].forEach(turno=>{html+=`<div style="font-size:11px;font-weight:600;color:var(--text-dim);margin:6px 0 4px;text-transform:uppercase;">${turno}</div><div class="status-grid">`;refris.forEach(r=>{const done=refriHoy.some(rt=>rt.equipo===(r.equipo||r)&&rt.turno===turno);const name=r.equipo||r;html+=`<div class="status-item ${done?'done':'miss'}"><span class="status-dot ${done?'green':'red'}"></span>${name}</div>`});html+='</div>'});html+='</div>'}
-// Conductividad
-const condHoy=(reg.conductividad||[]).filter(r=>parseInt(r.dia)===hoy);
-html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">💧 Conductividad</div><div class="status-grid">';
-['Mañana','Tarde'].forEach(turno=>{const done=condHoy.some(r=>r.turno===turno);html+=`<div class="status-item ${done?'done':'miss'}"><span class="status-dot ${done?'green':'red'}"></span>${turno}</div>`});html+='</div></div>';
-// Cobas Diarias
-const cobasHoy=(reg.cobas||[]).filter(r=>parseInt(r.dia)===hoy&&r.frecuencia==='Diaria');
-html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🔬 Mantención Cobas (Diaria)</div><div class="status-grid">';
-['Cobas 1','Cobas 2'].forEach(eq=>{
-  const done=cobasHoy.some(r=>r.equipo===eq);
-  html+=`<div class="status-item ${done?'done':'miss'}"><span class="status-dot ${done?'green':'red'}"></span>${eq}</div>`;
-});
-html+='</div></div>';
-// Eliminación de Muestras
-const elimHoy=(reg.elimMuestras||[]).filter(r=>parseInt(r.dia)===hoy);
-html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🗑️ Eliminación de Muestras</div><div class="status-grid">';
-const doneElim = elimHoy.length > 0;
-html+=`<div class="status-item ${doneElim?'done':'miss'}"><span class="status-dot ${doneElim?'green':'red'}"></span>${doneElim ? 'Registrado (' + elimHoy[0].responsable + ')' : 'Pendiente del día'}</div>`;
-html+='</div></div>';
-document.getElementById('dash-daily-view').innerHTML=html}
+function renderDailyView(reg){
+  if(!reg) return;
+  const hoy=new Date().getDate();
+  const m=state.dashMaestros||{areas:[],centrifugas:[],salas:[],refrigeradores:[],refriLimpieza:[]};
+  let html='<div class="card card-sm" style="margin-bottom:12px;"><strong style="font-size:14px;">📅 Estado del Día '+hoy+'</strong></div>';
 
-function renderMonthlyView(reg){const dh=getDiasHasta(state.dashMes,state.dashAnio);const m=state.dashMaestros||{areas:[],centrifugas:[],salas:[],refrigeradores:[]};let html='';
-// Temp/Hum monthly
-html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🌡️ Temp. Ambiental</div>';
-m.areas.forEach(a=>{html+=`<div style="font-size:12px;font-weight:600;margin:8px 0 4px;">${a}</div>`;['Mañana','Tarde'].forEach(turno=>{const dias=new Set(reg.termo.filter(r=>r.area===a&&r.turno===turno).map(r=>parseInt(r.dia)));let miss=0;let chips='';for(let d=1;d<=dh;d++){const ok=dias.has(d);if(!ok)miss++;chips+=`<span class="day-chip ${ok?'chip-ok':'chip-missing'}">${d}</span>`}html+=`<div style="font-size:11px;color:var(--text-dim);margin:4px 0 2px;">${turno} ${miss?'('+miss+' faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`})});html+='</div>';
-// Centrífugas monthly
-html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">⚙️ Centrífugas</div>';
-m.centrifugas.forEach(c=>{const diasD=new Set(reg.centrifugas.filter(r=>r.centrifuga===c&&r.tipo_mantencion==='Diaria').map(r=>parseInt(r.dia)));let miss=0;let chips='';for(let d=1;d<=dh;d++){const ok=diasD.has(d);if(!ok)miss++;chips+=`<span class="day-chip ${ok?'chip-ok':'chip-missing'}">${d}</span>`}html+=`<div style="font-size:12px;font-weight:600;margin:8px 0 4px;">${c} ${miss?'('+miss+' faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`});html+='</div>';
-// Mesones monthly
-html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🧽 Mesones</div>';
-m.salas.forEach(s=>{const dias=new Set(reg.mesones.filter(r=>r.sala===s).map(r=>parseInt(r.dia)));let miss=0;let chips='';for(let d=1;d<=dh;d++){const ok=dias.has(d);if(!ok)miss++;chips+=`<span class="day-chip ${ok?'chip-ok':'chip-missing'}">${d}</span>`}html+=`<div style="font-size:12px;font-weight:600;margin:8px 0 4px;">${s} ${miss?'('+miss+' faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`});html+='</div>';
-// Refri Temp monthly
-const refris=m.refrigeradores||[];
-if(refris.length){html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🧊 Temp. Refrigeradores</div>';
-refris.forEach(r=>{const name=r.equipo||r;html+=`<div style="font-size:12px;font-weight:600;margin:8px 0 4px;">${name}</div>`;['Mañana','Tarde'].forEach(turno=>{const dias=new Set((reg.refriTemp||[]).filter(rt=>rt.equipo===name&&rt.turno===turno).map(rt=>parseInt(rt.dia)));let miss=0;let chips='';for(let d=1;d<=dh;d++){const ok=dias.has(d);if(!ok)miss++;chips+=`<span class="day-chip ${ok?'chip-ok':'chip-missing'}">${d}</span>`}html+=`<div style="font-size:11px;color:var(--text-dim);margin:4px 0 2px;">${turno} ${miss?'('+miss+' faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`})});html+='</div>'}
-// Conductividad monthly
-html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">💧 Conductividad</div>';
-['Mañana','Tarde'].forEach(turno=>{const dias=new Set((reg.conductividad||[]).filter(r=>r.turno===turno).map(r=>parseInt(r.dia)));let miss=0;let chips='';for(let d=1;d<=dh;d++){const ok=dias.has(d);if(!ok)miss++;chips+=`<span class="day-chip ${ok?'chip-ok':'chip-missing'}">${d}</span>`}html+=`<div style="font-size:11px;color:var(--text-dim);margin:4px 0 2px;">${turno} ${miss?'('+miss+' faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`});html+='</div>';
-// Cobas monthly (diarias completas)
-html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🔬 Cobas (Días Completos)</div>';
-['Cobas 1','Cobas 2'].forEach(eq=>{
-  let miss=0;
-  let chips='';
-  for(let d=1;d<=dh;d++){
-    const completedToday=(reg.cobas||[]).filter(r=>r.equipo===eq&&parseInt(r.dia)===d&&r.frecuencia==='Diaria');
-    const ok=completedToday.length>=1;
-    if(!ok)miss++;
-    chips+=`<span class="day-chip ${ok?'chip-ok':'chip-missing'}">${d}</span>`;
+  if(isModuloActivo('termo')){
+    const termoHoy=(reg.termo||[]).filter(r=>parseInt(r.dia)===hoy);
+    html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🌡️ Temp. Ambiental</div>';
+    ['Mañana','Tarde'].forEach(turno=>{
+      html+=`<div style="font-size:11px;font-weight:600;color:var(--text-dim);margin:6px 0 4px;text-transform:uppercase;">${turno}</div><div class="status-grid">`;
+      (m.areas||[]).forEach(a=>{const done=termoHoy.some(r=>r.area===a&&r.turno===turno);html+=`<div class="status-item ${done?'done':'miss'}"><span class="status-dot ${done?'green':'red'}"></span>${a}</div>`});
+      html+='</div>';
+    });
+    html+='</div>';
   }
-  html+=`<div style="font-size:12px;font-weight:600;margin:8px 0 4px;">${eq} ${miss?'('+miss+' días con faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`;
-});
-html+='</div>';
-document.getElementById('dash-monthly-view').innerHTML=html}
 
-function renderTables(reg){const c=document.getElementById('dash-tables');c.innerHTML=renderTableCard('🌡️ Temp. Ambiental',reg.termo,['Día','Turno','Área','Temp°','Hum%','Resp','Acción','Obs'],r=>[r.dia,r.turno,r.area,r.temperatura,r.humedad,r.responsable,r.accion_correctiva||'',r.observaciones])+renderTableCard('⚙️ Centrífugas',reg.centrifugas,['Día','Centrífuga','Resp','Tipo','Obs'],r=>[r.dia,r.centrifuga,r.responsable,r.tipo_mantencion,r.observaciones])+renderTableCard('🧽 Mesones',reg.mesones,['Día','Sala','Resp','Obs'],r=>[r.dia,r.sala,r.responsable,r.observaciones])+renderTableCard('🧊 Temp. Refrigeradores',reg.refriTemp||[],['Día','Turno','Equipo','Temp°','Resp','Obs'],r=>[r.dia,r.turno,r.equipo,r.temperatura,r.responsable,r.observaciones])+renderTableCard('🧹 Limpieza Refrigeradores',reg.limpiezaRefri||[],['Día','Tipo','Equipo','Resp','Obs'],r=>[r.dia,r.tipo_mantencion,r.equipo,r.responsable,r.observaciones])+renderTableCard('💧 Conductividad',reg.conductividad||[],['Día','Turno','µS/cm','Resp','Obs'],r=>[r.dia,r.turno,r.conductividad,r.responsable,r.observaciones])+renderTableCard('🔬 Mantención Cobas',reg.cobas||[],['Día','Equipo','Resp','Frecuencia','Actividad','Obs'],r=>[r.dia,r.equipo,r.responsable,r.frecuencia,r.actividad,r.observaciones||''])}
+  if(isModuloActivo('centrifugas')){
+    const centHoy=(reg.centrifugas||[]).filter(r=>parseInt(r.dia)===hoy&&r.tipo_mantencion==='Diaria');
+    html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">⚙️ Centrífugas (Diaria)</div><div class="status-grid">';
+    (m.centrifugas||[]).forEach(c=>{const done=centHoy.some(r=>r.centrifuga===c);html+=`<div class="status-item ${done?'done':'miss'}"><span class="status-dot ${done?'green':'red'}"></span>${c.replace('Centrífuga ','C')}</div>`});
+    html+='</div></div>';
+  }
+
+  if(isModuloActivo('mesones')){
+    const mesoHoy=(reg.mesones||[]).filter(r=>parseInt(r.dia)===hoy);
+    html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🧽 Mesones</div><div class="status-grid">';
+    (m.salas||[]).forEach(s=>{const done=mesoHoy.some(r=>r.sala===s);html+=`<div class="status-item ${done?'done':'miss'}"><span class="status-dot ${done?'green':'red'}"></span>${s}</div>`});
+    html+='</div></div>';
+  }
+
+  if(isModuloActivo('refri-temp')){
+    const refriHoy=(reg.refriTemp||[]).filter(r=>parseInt(r.dia)===hoy);
+    const refris=m.refrigeradores||[];
+    if(refris.length){
+      html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🧊 Temp. Refrigeradores</div>';
+      ['Mañana','Tarde'].forEach(turno=>{
+        html+=`<div style="font-size:11px;font-weight:600;color:var(--text-dim);margin:6px 0 4px;text-transform:uppercase;">${turno}</div><div class="status-grid">`;
+        refris.forEach(r=>{const done=refriHoy.some(rt=>rt.equipo===(r.equipo||r)&&rt.turno===turno);const name=r.equipo||r;html+=`<div class="status-item ${done?'done':'miss'}"><span class="status-dot ${done?'green':'red'}"></span>${name}</div>`});
+        html+='</div>';
+      });
+      html+='</div>';
+    }
+  }
+
+  if(isModuloActivo('conductividad')){
+    const condHoy=(reg.conductividad||[]).filter(r=>parseInt(r.dia)===hoy);
+    html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">💧 Conductividad</div><div class="status-grid">';
+    ['Mañana','Tarde'].forEach(turno=>{const done=condHoy.some(r=>r.turno===turno);html+=`<div class="status-item ${done?'done':'miss'}"><span class="status-dot ${done?'green':'red'}"></span>${turno}</div>`});
+    html+='</div></div>';
+  }
+
+  if(isModuloActivo('cobas')){
+    const cobasHoy=(reg.cobas||[]).filter(r=>parseInt(r.dia)===hoy&&r.frecuencia==='Diaria');
+    html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🔬 Mantención Cobas (Diaria)</div><div class="status-grid">';
+    ['Cobas 1','Cobas 2'].forEach(eq=>{const done=cobasHoy.some(r=>r.equipo===eq);html+=`<div class="status-item ${done?'done':'miss'}"><span class="status-dot ${done?'green':'red'}"></span>${eq}</div>`});
+    html+='</div></div>';
+  }
+
+  if(isModuloActivo('elim-muestras')){
+    const elimHoy=(reg.elimMuestras||[]).filter(r=>parseInt(r.dia)===hoy);
+    html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🗑️ Eliminación de Muestras</div><div class="status-grid">';
+    const doneElim=elimHoy.length>0;
+    html+=`<div class="status-item ${doneElim?'done':'miss'}"><span class="status-dot ${doneElim?'green':'red'}"></span>${doneElim?'Registrado ('+elimHoy[0].responsable+')':'Pendiente del día'}</div>`;
+    html+='</div></div>';
+  }
+
+  document.getElementById('dash-daily-view').innerHTML=html;
+}
+
+function renderMonthlyView(reg){
+  if(!reg) return;
+  const dh=getDiasHasta(state.dashMes,state.dashAnio);
+  const m=state.dashMaestros||{areas:[],centrifugas:[],salas:[],refrigeradores:[]};
+  let html='';
+
+  if(isModuloActivo('termo')){
+    html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🌡️ Temp. Ambiental</div>';
+    (m.areas||[]).forEach(a=>{html+=`<div style="font-size:12px;font-weight:600;margin:8px 0 4px;">${a}</div>`;['Mañana','Tarde'].forEach(turno=>{const dias=new Set((reg.termo||[]).filter(r=>r.area===a&&r.turno===turno).map(r=>parseInt(r.dia)));let miss=0;let chips='';for(let d=1;d<=dh;d++){const ok=dias.has(d);if(!ok)miss++;chips+=`<span class="day-chip ${ok?'chip-ok':'chip-missing'}">${d}</span>`}html+=`<div style="font-size:11px;color:var(--text-dim);margin:4px 0 2px;">${turno} ${miss?'('+miss+' faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`})});
+    html+='</div>';
+  }
+
+  if(isModuloActivo('centrifugas')){
+    html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">⚙️ Centrífugas</div>';
+    (m.centrifugas||[]).forEach(c=>{const diasD=new Set((reg.centrifugas||[]).filter(r=>r.centrifuga===c&&r.tipo_mantencion==='Diaria').map(r=>parseInt(r.dia)));let miss=0;let chips='';for(let d=1;d<=dh;d++){const ok=diasD.has(d);if(!ok)miss++;chips+=`<span class="day-chip ${ok?'chip-ok':'chip-missing'}">${d}</span>`}html+=`<div style="font-size:12px;font-weight:600;margin:8px 0 4px;">${c} ${miss?'('+miss+' faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`});
+    html+='</div>';
+  }
+
+  if(isModuloActivo('mesones')){
+    html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🧽 Mesones</div>';
+    (m.salas||[]).forEach(s=>{const dias=new Set((reg.mesones||[]).filter(r=>r.sala===s).map(r=>parseInt(r.dia)));let miss=0;let chips='';for(let d=1;d<=dh;d++){const ok=dias.has(d);if(!ok)miss++;chips+=`<span class="day-chip ${ok?'chip-ok':'chip-missing'}">${d}</span>`}html+=`<div style="font-size:12px;font-weight:600;margin:8px 0 4px;">${s} ${miss?'('+miss+' faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`});
+    html+='</div>';
+  }
+
+  if(isModuloActivo('refri-temp')){
+    const refris=m.refrigeradores||[];
+    if(refris.length){
+      html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🧊 Temp. Refrigeradores</div>';
+      refris.forEach(r=>{const name=r.equipo||r;html+=`<div style="font-size:12px;font-weight:600;margin:8px 0 4px;">${name}</div>`;['Mañana','Tarde'].forEach(turno=>{const dias=new Set((reg.refriTemp||[]).filter(rt=>rt.equipo===name&&rt.turno===turno).map(rt=>parseInt(rt.dia)));let miss=0;let chips='';for(let d=1;d<=dh;d++){const ok=dias.has(d);if(!ok)miss++;chips+=`<span class="day-chip ${ok?'chip-ok':'chip-missing'}">${d}</span>`}html+=`<div style="font-size:11px;color:var(--text-dim);margin:4px 0 2px;">${turno} ${miss?'('+miss+' faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`})});
+      html+='</div>';
+    }
+  }
+
+  if(isModuloActivo('conductividad')){
+    html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">💧 Conductividad</div>';
+    ['Mañana','Tarde'].forEach(turno=>{const dias=new Set((reg.conductividad||[]).filter(r=>r.turno===turno).map(r=>parseInt(r.dia)));let miss=0;let chips='';for(let d=1;d<=dh;d++){const ok=dias.has(d);if(!ok)miss++;chips+=`<span class="day-chip ${ok?'chip-ok':'chip-missing'}">${d}</span>`}html+=`<div style="font-size:11px;color:var(--text-dim);margin:4px 0 2px;">${turno} ${miss?'('+miss+' faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`});
+    html+='</div>';
+  }
+
+  if(isModuloActivo('cobas')){
+    html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🔬 Cobas (Días Completos)</div>';
+    ['Cobas 1','Cobas 2'].forEach(eq=>{let miss=0;let chips='';for(let d=1;d<=dh;d++){const completedToday=(reg.cobas||[]).filter(r=>r.equipo===eq&&parseInt(r.dia)===d&&r.frecuencia==='Diaria');const ok=completedToday.length>=1;if(!ok)miss++;chips+=`<span class="day-chip ${ok?'chip-ok':'chip-missing'}">${d}</span>`}html+=`<div style="font-size:12px;font-weight:600;margin:8px 0 4px;">${eq} ${miss?'('+miss+' días con faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`});
+    html+='</div>';
+  }
+
+  document.getElementById('dash-monthly-view').innerHTML=html;
+}
+
+function renderTables(reg){
+  if(!reg) return;
+  const c=document.getElementById('dash-tables');let html='';
+  if(isModuloActivo('termo'))html+=renderTableCard('🌡️ Temp. Ambiental',reg.termo||[],['Día','Turno','Área','Temp°','Hum%','Resp','Acción','Obs'],r=>[r.dia,r.turno,r.area,r.temperatura,r.humedad,r.responsable,r.accion_correctiva||'',r.observaciones]);
+  if(isModuloActivo('centrifugas'))html+=renderTableCard('⚙️ Centrífugas',reg.centrifugas||[],['Día','Centrífuga','Resp','Tipo','Obs'],r=>[r.dia,r.centrifuga,r.responsable,r.tipo_mantencion,r.observaciones]);
+  if(isModuloActivo('mesones'))html+=renderTableCard('🧽 Mesones',reg.mesones||[],['Día','Sala','Resp','Obs'],r=>[r.dia,r.sala,r.responsable,r.observaciones]);
+  if(isModuloActivo('refri-temp'))html+=renderTableCard('🧊 Temp. Refrigeradores',reg.refriTemp||[],['Día','Turno','Equipo','Temp°','Resp','Obs'],r=>[r.dia,r.turno,r.equipo,r.temperatura,r.responsable,r.observaciones]);
+  if(isModuloActivo('limp-refri'))html+=renderTableCard('🧹 Limpieza Refrigeradores',reg.limpiezaRefri||[],['Día','Tipo','Equipo','Resp','Obs'],r=>[r.dia,r.tipo_mantencion,r.equipo,r.responsable,r.observaciones]);
+  if(isModuloActivo('conductividad'))html+=renderTableCard('💧 Conductividad',reg.conductividad||[],['Día','Turno','µS/cm','Resp','Obs'],r=>[r.dia,r.turno,r.conductividad,r.responsable,r.observaciones]);
+  if(isModuloActivo('cobas'))html+=renderTableCard('🔬 Mantención Cobas',reg.cobas||[],['Día','Equipo','Resp','Frecuencia','Actividad','Obs'],r=>[r.dia,r.equipo,r.responsable,r.frecuencia,r.actividad,r.observaciones||'']);
+  c.innerHTML=html;
+}
 function renderTableCard(title,rows,headers,mapper){if(!rows.length)return`<div class="card card-sm" style="margin-bottom:16px;"><strong>${title}</strong><div style="color:var(--text-dim);font-size:13px;margin-top:8px;">Sin registros en este período.</div></div>`;const thead=`<tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr>`;const tbody=rows.map(r=>`<tr>${mapper(r).map(v=>`<td>${v??''}</td>`).join('')}</tr>`).join('');return`<div class="card" style="margin-bottom:16px;padding:16px 12px;"><strong style="font-family:'Outfit';font-size:15px;">${title}</strong><span style="color:var(--text-dim);font-size:12px;margin-left:8px;">${rows.length} registros</span><div class="records-table-wrap" style="margin-top:12px;"><table class="records-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table></div></div>`}
 
 // Modals
@@ -457,6 +525,7 @@ async function loadNotificacionesAdmin(){
   const container = document.getElementById('notif-config-container');
   if(!container) return;
   
+  // Show spinner
   container.innerHTML = `
     <div style="text-align: center; padding: 20px; color: var(--text-dim);">
       <div class="spinner visible" style="display:inline-block; margin-bottom: 8px;"></div>
@@ -674,6 +743,115 @@ async function submitNotificacionesAdmin() {
   }
 }
 
+// Admin — Configuración de Módulos Activos
+const MODULOS_LIST = [
+  { key: 'termo', label: 'Ambiental (Temperatura / Humedad)', icon: '🌡️' },
+  { key: 'centrifugas', label: 'Centrífugas', icon: '⚙️' },
+  { key: 'mesones', label: 'Limpieza de Mesones', icon: '🧽' },
+  { key: 'refri-temp', label: 'Temp. Refrigeradores', icon: '🧊' },
+  { key: 'limp-refri', label: 'Limpieza Refrigeradores', icon: '🧹' },
+  { key: 'conductividad', label: 'Conductividad del Agua', icon: '💧' },
+  { key: 'etiquetadoras', label: 'Etiquetadoras (Bitácora)', icon: '🏷️' },
+  { key: 'cobas', label: 'Mantención Cobas', icon: '🔬' },
+  { key: 'dxh900', label: 'Reparaciones DxH 900', icon: '🛠️' },
+  { key: 'elim-muestras', label: 'Eliminación de Muestras', icon: '🗑️' }
+];
+
+async function loadModulosAdmin() {
+  const container = document.getElementById('modulos-config-container');
+  if (!container) return;
+
+  container.innerHTML = `
+    <div style="text-align: center; padding: 20px; color: var(--text-dim);">
+      <div class="spinner visible" style="display:inline-block; margin-bottom: 8px;"></div>
+      <div>Cargando configuración de módulos...</div>
+    </div>
+  `;
+
+  try {
+    const modulos = await apiGet({ action: 'getModulosActivos' });
+    state.modulosActivos = modulos || {};
+    applyModulosVisibilidad();
+
+    let html = '<div style="border:1px solid var(--border); border-radius:var(--radius-sm); overflow:hidden;">';
+    MODULOS_LIST.forEach(m => {
+      const active = isModuloActivo(m.key);
+      html += `
+        <div class="toggle-item">
+          <div class="toggle-label-group">
+            <span style="font-size:18px;">${m.icon}</span>
+            <span style="color:var(--text); font-size:14px;">${m.label}</span>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="modulo-toggle-${m.key}" ${active ? 'checked' : ''} />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      `;
+    });
+    html += '</div>';
+    container.innerHTML = html;
+  } catch (e) {
+    console.error(e);
+    container.innerHTML = `<div class="alert-banner alert-danger visible">Error de conexión al cargar módulos.</div>`;
+  }
+}
+
+async function submitModulosAdmin() {
+  const pwd = document.getElementById('modulos-admin-pwd').value;
+  const err = document.getElementById('modulos-admin-error');
+  const succ = document.getElementById('modulos-admin-success');
+
+  if (err) err.style.display = 'none';
+  if (succ) succ.style.display = 'none';
+
+  if (!pwd) {
+    if (err) {
+      err.textContent = 'Ingrese la contraseña de administrador.';
+      err.style.display = 'block';
+    }
+    return;
+  }
+
+  const modulosObj = {};
+  MODULOS_LIST.forEach(m => {
+    const toggle = document.getElementById(`modulo-toggle-${m.key}`);
+    modulosObj[m.key] = toggle ? toggle.checked : true;
+  });
+
+  setLoading('btn-save-modulos', 'spinner-modulos-admin', 'btn-modulos-admin-text', true);
+
+  try {
+    const response = await apiPost({
+      action: 'saveModulosActivos',
+      password: pwd,
+      modulos: modulosObj
+    });
+
+    if (response.success) {
+      state.modulosActivos = response.modulos || modulosObj;
+      applyModulosVisibilidad();
+      if (succ) {
+        succ.textContent = '✅ ' + response.message;
+        succ.style.display = 'block';
+      }
+      document.getElementById('modulos-admin-pwd').value = '';
+    } else {
+      if (err) {
+        err.textContent = '❌ ' + (response.error || 'Error al guardar.');
+        err.style.display = 'block';
+      }
+    }
+  } catch (e) {
+    if (err) {
+      err.textContent = '❌ Error de conexión al guardar.';
+      err.style.display = 'block';
+    }
+  } finally {
+    setLoading('btn-save-modulos', 'spinner-modulos-admin', 'btn-modulos-admin-text', false);
+  }
+}
+
 function addDatalistOption(id, val) {
   const el = document.getElementById(id);
   if (el && val && val.trim()) {
@@ -688,7 +866,7 @@ function addDatalistOption(id, val) {
 }
 
 // QR
-const QR_TABS=['areas','salas','centrifugas','refrigeradores','refri-limpieza','conductividad','etiquetadoras','cobas'];
+const QR_TABS=['areas','salas','centrifugas','refrigeradores','refri-limpieza','conductividad','etiquetadoras','cobas','dxh900'];
 function switchQrTab(tab){
   state.qrTab=tab;
   const qrTabsElements = document.querySelectorAll('.qr-tab');
@@ -733,7 +911,10 @@ function switchQrTab(tab){
 }
 
 function generateQR(){
-  const base=window.location.origin+window.location.pathname;
+  let base = API_URL;
+  if (!base || base.includes('googleusercontent.com') || base.includes('userCodeAppPanel')) {
+    base = 'https://script.google.com/macros/s/AKfycbxuqcui0-hjJ721uMWZk3w-4l2fVCaBWQgdMJqVMb5Pno339Jqetq4r62p3-1gGBUvFOg/exec';
+  }
   let url,val;
   if(state.qrTab==='conductividad'){
     url=`${base}?modulo=conductividad`;
@@ -759,12 +940,14 @@ function generateQR(){
   const canvas=document.getElementById('qr-canvas');
   canvas.innerHTML='';
   if(state.qrInstance)try{state.qrInstance.clear()}catch(e){}
+  
   try {
     state.qrInstance=new QRCode(canvas,{text:url,width:220,height:220,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H});
   } catch(e) {
     console.warn('Error con la librería local QRCode, usando API qrserver.com como respaldo:', e);
     canvas.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(url)}" style="width:220px;height:220px;display:block;" />`;
   }
+  
   wrap.classList.add('visible');
   document.getElementById('qr-label-text').textContent=val;
   document.getElementById('qr-label-text').style.display='block';
@@ -1418,6 +1601,134 @@ async function saveEtiquetadoraBitacora(e) {
   }
 }
 
+// Init
+async function init(){
+  document.getElementById('termo-fecha').value=today();
+  document.getElementById('cent-fecha').value=today();
+  document.getElementById('meson-fecha').value=today();
+  document.getElementById('refri-fecha').value=today();
+  document.getElementById('limp-refri-fecha').value=today();
+  document.getElementById('conduct-fecha').value=today();
+  if(document.getElementById('et-bitacora-fecha')) {
+    document.getElementById('et-bitacora-fecha').value=today();
+  }
+  if(document.getElementById('cobas-fecha')) {
+    document.getElementById('cobas-fecha').value=today();
+  }
+  if(document.getElementById('dxh-fecha')) {
+    document.getElementById('dxh-fecha').value=today();
+  }
+  autoSetAmPm();
+  updateInfoCentrifuga();
+  updateInfoLimpRefri();
+  initCobasChecklist();
+  initDashSelectors();
+  // Load maestros and dashboard in parallel to improve load times
+  const maestrosPromise = loadMaestros();
+  const dashboardPromise = loadDashboard();
+  
+  await Promise.all([maestrosPromise, dashboardPromise]);
+  checkUrlParams();
+}
+init();
+
+// ── DxH 900 Urgencias ─────────────────────────────────────────
+
+async function loadDxH900HistorialForm() {
+  document.getElementById('dxh-fecha').value = today();
+  const loading = document.getElementById('dxh-loading');
+  const empty = document.getElementById('dxh-history-empty');
+  const list = document.getElementById('dxh-history-list');
+  
+  loading.style.display = 'block';
+  empty.style.display = 'none';
+  list.style.display = 'none';
+  
+  try {
+    const data = await apiGet({ action: 'getDxH900Historial' });
+    loading.style.display = 'none';
+    if (!data || data.length === 0) {
+      empty.style.display = 'block';
+    } else {
+      list.innerHTML = data.map(r => {
+        let fechaFormateada = r.fecha;
+        if (fechaFormateada) {
+          const strVal = String(fechaFormateada).trim();
+          if (!/^\d{2}\/\d{2}\/\d{4}$/.test(strVal)) {
+            const cleaned = strVal.replace(/\s*\(.*\)\s*/g, '').trim();
+            const d = new Date(cleaned);
+            if (!isNaN(d.getTime())) {
+              const dia = String(d.getDate()).padStart(2, '0');
+              const mes = String(d.getMonth() + 1).padStart(2, '0');
+              const anio = d.getFullYear();
+              fechaFormateada = `${dia}/${mes}/${anio}`;
+            }
+          }
+        }
+        return `
+        <div style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.04); font-size:13px; line-height:1.4;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-weight:700;">
+            <span style="color:var(--primary-color);">🔧 Especialista: ${r.especialista}</span>
+            <span style="color:var(--text-dim); font-size:11px;">📅 ${fechaFormateada} — 👤 ${r.usuario_responsable}</span>
+          </div>
+          <div style="color:var(--text-color); font-weight:400; font-size:12.5px;">${r.descripcion}</div>
+        </div>
+      `;
+      }).join('');
+      list.style.display = 'block';
+    }
+  } catch (e) {
+    loading.style.display = 'none';
+    empty.textContent = 'Error cargando historial.';
+    empty.style.display = 'block';
+  }
+}
+
+async function saveDxH900RegistroForm(e) {
+  e.preventDefault();
+  const respInput = document.getElementById('dxh-usuario');
+  const espInput = document.getElementById('dxh-especialista');
+  const descInput = document.getElementById('dxh-descripcion');
+  
+  const spinner = document.getElementById('spinner-dxh');
+  const btnText = document.getElementById('btn-dxh-text');
+  
+  spinner.classList.add('visible');
+  btnText.style.display = 'none';
+  
+  const payload = {
+    action: 'saveDxH900Registro',
+    fecha: document.getElementById('dxh-fecha').value,
+    usuario_responsable: respInput.value.trim(),
+    especialista: espInput.value.trim(),
+    descripcion: descInput.value.trim()
+  };
+  
+  try {
+    const res = await apiPost(payload);
+    spinner.classList.remove('visible');
+    btnText.style.display = '';
+    
+    if (res.success) {
+      showToast('Registro guardado y correo enviado ✓', 'success');
+      
+      // Limpiar campos (excepto fecha)
+      respInput.value = '';
+      espInput.value = '';
+      descInput.value = '';
+      
+      // Recargar historial
+      loadDxH900HistorialForm();
+    } else {
+      showToast(res.error || 'Error al guardar registro.', 'error');
+    }
+  } catch (err) {
+    spinner.classList.remove('visible');
+    btnText.style.display = '';
+    showToast('Error de conexión con el servidor.', 'error');
+  }
+}
+
 // ── Eliminación de Muestras ──────────────────────────────────
 
 function updateMuestrasEliminadasText() {
@@ -1537,144 +1848,3 @@ async function saveElimMuestrasForm(e) {
     showToast('Error de conexión con el servidor.', 'error');
   }
 }
-
-// Admin — Configuración de Módulos Activos
-const MODULOS_LIST = [
-  { key: 'termo', label: 'Ambiental (Temperatura / Humedad)', icon: '🌡️' },
-  { key: 'centrifugas', label: 'Centrífugas', icon: '⚙️' },
-  { key: 'mesones', label: 'Limpieza de Mesones', icon: '🧽' },
-  { key: 'refri-temp', label: 'Temp. Refrigeradores', icon: '🧊' },
-  { key: 'limp-refri', label: 'Limpieza Refrigeradores', icon: '🧹' },
-  { key: 'conductividad', label: 'Conductividad del Agua', icon: '💧' },
-  { key: 'etiquetadoras', label: 'Etiquetadoras (Bitácora)', icon: '🏷️' },
-  { key: 'cobas', label: 'Mantención Cobas', icon: '🔬' },
-  { key: 'dxh900', label: 'Reparaciones DxH 900', icon: '🛠️' },
-  { key: 'elim-muestras', label: 'Eliminación de Muestras', icon: '🗑️' }
-];
-
-async function loadModulosAdmin() {
-  const container = document.getElementById('modulos-config-container');
-  if (!container) return;
-
-  container.innerHTML = `
-    <div style="text-align: center; padding: 20px; color: var(--text-dim);">
-      <div class="spinner visible" style="display:inline-block; margin-bottom: 8px;"></div>
-      <div>Cargando configuración de módulos...</div>
-    </div>
-  `;
-
-  try {
-    const modulos = await apiGet({ action: 'getModulosActivos' });
-    state.modulosActivos = modulos || {};
-    applyModulosVisibilidad();
-
-    let html = '<div style="border:1px solid var(--border); border-radius:var(--radius-sm); overflow:hidden;">';
-    MODULOS_LIST.forEach(m => {
-      const active = isModuloActivo(m.key);
-      html += `
-        <div class="toggle-item">
-          <div class="toggle-label-group">
-            <span style="font-size:18px;">${m.icon}</span>
-            <span style="color:var(--text); font-size:14px; font-weight:500;">${m.label}</span>
-          </div>
-          <label class="toggle-switch">
-            <input type="checkbox" id="modulo-toggle-${m.key}" ${active ? 'checked' : ''} />
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-      `;
-    });
-    html += '</div>';
-    container.innerHTML = html;
-  } catch (e) {
-    console.error(e);
-    container.innerHTML = `<div class="alert-banner alert-danger visible">Error de conexión al cargar módulos.</div>`;
-  }
-}
-
-async function submitModulosAdmin() {
-  const pwd = document.getElementById('modulos-admin-pwd').value;
-  const err = document.getElementById('modulos-admin-error');
-  const succ = document.getElementById('modulos-admin-success');
-
-  if (err) err.style.display = 'none';
-  if (succ) succ.style.display = 'none';
-
-  if (!pwd) {
-    if (err) {
-      err.textContent = 'Ingrese la contraseña de administrador.';
-      err.style.display = 'block';
-    }
-    return;
-  }
-
-  const modulosObj = {};
-  MODULOS_LIST.forEach(m => {
-    const toggle = document.getElementById(`modulo-toggle-${m.key}`);
-    modulosObj[m.key] = toggle ? toggle.checked : true;
-  });
-
-  setLoading('btn-save-modulos', 'spinner-modulos-admin', 'btn-modulos-admin-text', true);
-
-  try {
-    const response = await apiPost({
-      action: 'saveModulosActivos',
-      password: pwd,
-      modulos: modulosObj
-    });
-
-    if (response.success) {
-      state.modulosActivos = response.modulos || modulosObj;
-      applyModulosVisibilidad();
-      if (succ) {
-        succ.textContent = '✅ ' + response.message;
-        succ.style.display = 'block';
-      }
-      document.getElementById('modulos-admin-pwd').value = '';
-    } else {
-      if (err) {
-        err.textContent = '❌ ' + (response.error || 'Error al guardar.');
-        err.style.display = 'block';
-      }
-    }
-  } catch (e) {
-    if (err) {
-      err.textContent = 'Error de conexión al guardar.';
-      err.style.display = 'block';
-    }
-  } finally {
-    setLoading('btn-save-modulos', 'spinner-modulos-admin', 'btn-modulos-admin-text', false);
-  }
-}
-
-// Init
-async function init(){
-  document.getElementById('termo-fecha').value=today();
-  document.getElementById('cent-fecha').value=today();
-  document.getElementById('meson-fecha').value=today();
-  document.getElementById('refri-fecha').value=today();
-  document.getElementById('limp-refri-fecha').value=today();
-  document.getElementById('conduct-fecha').value=today();
-  if(document.getElementById('et-bitacora-fecha')) {
-    document.getElementById('et-bitacora-fecha').value=today();
-  }
-  if(document.getElementById('cobas-fecha')) {
-    document.getElementById('cobas-fecha').value=today();
-  }
-  if(document.getElementById('elim-fecha')) {
-    document.getElementById('elim-fecha').value=today();
-  }
-  if(document.getElementById('elim-fecha-corte')) {
-    document.getElementById('elim-fecha-corte').value=today();
-    updateMuestrasEliminadasText();
-  }
-  autoSetAmPm();
-  updateInfoCentrifuga();
-  updateInfoLimpRefri();
-  initCobasChecklist();
-  initDashSelectors();
-  await loadMaestros();
-  checkUrlParams();
-  loadDashboard();
-}
-init();

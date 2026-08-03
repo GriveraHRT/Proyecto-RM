@@ -1,6 +1,9 @@
-const API_URL='https://script.google.com/macros/s/AKfycbxuqcui0-hjJ721uMWZk3w-4l2fVCaBWQgdMJqVMb5Pno339Jqetq4r62p3-1gGBUvFOg/exec';
+
+if (typeof API_URL === 'undefined') {
+  var API_URL = 'https://script.google.com/macros/s/AKfycbxuqcui0-hjJ721uMWZk3w-4l2fVCaBWQgdMJqVMb5Pno339Jqetq4r62p3-1gGBUvFOg/exec';
+}
 const PREANALISIS=[1,2,3,4,5,18,19];
-const state={areas:[],centrifugas:[],salas:[],acciones:[],refrigeradores:[],refriLimpieza:[],cobasObs:[],ampm:'AM',ampmRefri:'AM',ampmConduct:'AM',qrInstance:null,qrTab:'areas',dashMes:new Date().getMonth()+1,dashAnio:new Date().getFullYear(),dashTab:'diario',dashData:null,dashMaestros:null,dashCache:null};
+const state={areas:[],centrifugas:[],salas:[],acciones:[],refrigeradores:[],refriLimpieza:[],cobasObs:[],ampm:'AM',ampmRefri:'AM',ampmConduct:'AM',qrInstance:null,qrTab:'areas',dashMes:new Date().getMonth()+1,dashAnio:new Date().getFullYear(),dashTab:'diario',dashData:null,dashMaestros:null,dashCache:null,maestrosPromise:null,modulosActivos:null};
 
 function today(){return new Date().toISOString().split('T')[0]}
 function showToast(m,t='success'){const el=document.getElementById('toast');el.textContent=m;el.className=`show toast-${t}`;setTimeout(()=>{el.className=''},3200)}
@@ -26,7 +29,11 @@ setInterval(updateClock,1000);updateClock();
 
 // Theme
 function toggleTheme(){const d=document.documentElement,dark=d.getAttribute('data-theme')==='dark';d.setAttribute('data-theme',dark?'':'dark');document.getElementById('theme-toggle').textContent=dark?'☀️':'🌙';localStorage.setItem('theme',dark?'light':'dark');document.querySelector('meta[name="theme-color"]').content=dark?'#F0F4F8':'#0B1426'}
-(function(){const t=localStorage.getItem('theme');if(t==='dark'){document.documentElement.setAttribute('data-theme','dark');document.getElementById('theme-toggle').textContent='🌙';document.querySelector('meta[name="theme-color"]').content='#0B1426'}})();
+(function(){const t=localStorage.getItem('theme');if(t==='dark'){document.documentElement.setAttribute('data-theme','dark');document.getElementById('theme-toggle').textContent='🌙';document.querySelector('meta[name="theme-color"]').content='#0B1426'};try{const savedM=localStorage.getItem('modulosActivos');if(savedM){state.modulosActivos=JSON.parse(savedM);setTimeout(applyModulosVisibilidad,0)}}catch(e){}})();
+
+// Modulos Activos Control
+function isModuloActivo(k){if(!state.modulosActivos)return true;return state.modulosActivos[k]!==false}
+function applyModulosVisibilidad(){if(!state.modulosActivos)return;try{localStorage.setItem('modulosActivos',JSON.stringify(state.modulosActivos))}catch(e){};document.querySelectorAll('#bottom-nav .nav-item[data-section]').forEach(el=>{const s=el.getAttribute('data-section');if(s==='dashboard'||s==='admin'){el.style.display=''}else{el.style.display=isModuloActivo(s)?'':'none'}});const statMap={'termo':'stat-termo','centrifugas':'stat-cent','mesones':'stat-limp','refri-temp':'stat-refri','limp-refri':'stat-limp-refri','conductividad':'stat-conduct','cobas':'stat-cobas'};Object.entries(statMap).forEach(([k,id])=>{const el=document.getElementById(id);if(el){const c=el.closest('.stat-card');if(c)c.style.display=isModuloActivo(k)?'':'none'}});document.querySelectorAll('.stats-row').forEach(row=>{const vis=Array.from(row.querySelectorAll('.stat-card')).filter(c=>c.style.display!=='none');row.style.display=vis.length>0?'':'none'});if(state.dashData&&typeof renderDashContent==='function'){renderDashContent(state.dashData)}if(state.dashData&&typeof renderTables==='function'){renderTables(state.dashData)}}
 
 // Navigation
 function navigateTo(s){document.querySelectorAll('.section').forEach(el=>el.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));const sec=document.getElementById('section-'+s);if(sec)sec.classList.add('active');const navBtn=document.querySelector(`[data-section="${s}"]`);if(navBtn)navBtn.classList.add('active');if(s==='dashboard')loadDashboard();if(s==='admin'){initRevAdminSelectors();loadNotificacionesAdmin();if(typeof loadModulosAdmin==='function')loadModulosAdmin()}if(s==='dxh900'){loadDxH900HistorialForm()}if(s==='elim-muestras'){loadElimMuestrasHistorialForm()}}
@@ -155,15 +162,21 @@ function updateInfoCentrifuga(){const t=document.getElementById('cent-tipo').val
 
 // Load masters
 async function loadMaestros(){
-  try{
-    const data=await apiGet({action:'getMaestros'});
-    state.areas=data.areas||[];
+  if (state.maestrosPromise && !state.dashMaestros) {
+    return state.maestrosPromise;
+  }
+  state.maestrosPromise = (async () => {
+    try{
+      const data=await apiGet({action:'getMaestros'});
+      state.areas=data.areas||[];
     state.centrifugas=data.centrifugas||[];
     state.salas=data.salas||[];
     state.acciones=data.acciones||[];
     state.refrigeradores=data.refrigeradores||[];
     state.refriLimpieza=data.refriLimpieza||[];
     state.etiquetadoras=data.etiquetadoras||[];
+    if(data.modulosActivos){state.modulosActivos=data.modulosActivos}
+    applyModulosVisibilidad();
     state.dashMaestros={areas:state.areas,centrifugas:state.centrifugas,salas:state.salas,refrigeradores:state.refrigeradores,refriLimpieza:state.refriLimpieza};
     populateSelect('termo-area',state.areas,'Seleccionar área…');
     populateSelect('admin-select',state.areas,'— Seleccionar —');
@@ -255,7 +268,9 @@ async function loadMaestros(){
     populateDatalist('list-et-comentario', fallbackSugerencias.etComentario);
     populateDatalist('list-et-bitacora-desc', fallbackSugerencias.etBitacoraDesc);
     populateDatalist('list-cobas-obs', fallbackSugerencias.cobasObs);
-  }
+    }
+  })();
+  return state.maestrosPromise;
 }
 
 function populateSelect(id,items,ph){const s=document.getElementById(id);s.innerHTML=`<option value="">${ph}</option>`+items.map(i=>`<option value="${i}">${i}</option>`).join('')}
@@ -366,6 +381,9 @@ function checkUrlParams(){
   if(modulo==='conductividad'){
     navigateTo('conductividad');
   }
+  if(modulo==='dxh900'){
+    navigateTo('dxh900');
+  }
   if(etName){
     document.getElementById('etiquetadora-prefill-name').textContent=etName;
     document.getElementById('etiquetadora-prefill-indicator').style.display='block';
@@ -428,4 +446,3 @@ function updateCacheIndicator(){
   else{el.textContent='hace '+mins+' min';el.className='cache-indicator cache-stale'}
   el.style.display='inline-block';
 }
-
