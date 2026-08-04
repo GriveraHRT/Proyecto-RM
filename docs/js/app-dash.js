@@ -2183,13 +2183,14 @@ async function checkDuplicateTermo() {
   if (existing) {
     const respUser = existing.responsable || 'Desconocido';
     const fechaFmt = `${String(dia).padStart(2,'0')}/${String(mes).padStart(2,'0')}/${anio}`;
-    const htmlMsg = `⚠️ <strong>Aviso de Duplicidad:</strong> Este registro para el área <strong>${areaVal}</strong> en el turno <strong>${ampmVal}</strong> del día <strong>${fechaFmt}</strong> ya fue realizado por el usuario <strong>"${respUser}"</strong>.<br>¿Está seguro que desea continuar?`;
+    const htmlMsg = `⚠️ <strong>Aviso de Duplicidad:</strong> Registro para el área <strong>${areaVal}</strong> (${ampmVal}) del <strong>${fechaFmt}</strong> ya realizado por <strong>"${respUser}"</strong>.<br>¿Está seguro que desea continuar?`;
     alertEl.innerHTML = htmlMsg;
     alertEl.classList.add('visible');
     alertEl.style.display = 'block';
     return {
       existing,
-      message: `El registro de Temperatura Ambiental para el área "${areaVal}" en el turno ${ampmVal} del día ${fechaFmt} ya fue ingresado por el usuario "${respUser}".\n\n¿Está seguro que desea continuar?`
+      cleanMessage: `Se detectó un registro previo de temperatura y humedad para la fecha <strong>${fechaFmt}</strong>:`,
+      message: `El registro de Temperatura Ambiental para el área "${areaVal}" en el turno ${ampmVal} del día ${fechaFmt} ya fue ingresado por "${respUser}".`
     };
   } else {
     alertEl.classList.remove('visible');
@@ -2244,16 +2245,19 @@ async function checkDuplicateCentrifugas() {
   if (duplicates.length > 0) {
     const fechaFmt = `${String(dia).padStart(2,'0')}/${String(mes).padStart(2,'0')}/${anio}`;
     const dupListStr = duplicates.map(d => `<strong>${d.name}</strong> (por <strong>"${d.resp}"</strong>)`).join(', ');
-    const dupListPlain = duplicates.map(d => `"${d.name}" (por "${d.resp}")`).join(', ');
+    const cant = duplicates.length;
 
-    const htmlMsg = `⚠️ <strong>Aviso de Duplicidad:</strong> Registro(s) de mantención diaria para el día <strong>${fechaFmt}</strong> ya realizado(s): ${dupListStr}.<br>¿Está seguro que desea continuar?`;
+    const htmlMsg = `⚠️ <strong>Aviso de Duplicidad:</strong> Se detectó mantención diaria del <strong>${fechaFmt}</strong> previa: ${dupListStr}.<br>¿Está seguro que desea continuar?`;
     alertEl.innerHTML = htmlMsg;
     alertEl.classList.add('visible');
     alertEl.style.display = 'block';
 
     return {
       duplicates,
-      message: `El/los registro(s) de mantención diaria de centrífuga para el día ${fechaFmt} ya fue(ron) ingresado(s):\n${dupListPlain}\n\n¿Está seguro que desea continuar?`
+      cleanMessage: cant > 1 
+        ? `Se detectaron registros de mantención previa para la fecha <strong>${fechaFmt}</strong>:` 
+        : `Se detectó un registro de mantención previa para la fecha <strong>${fechaFmt}</strong>:`,
+      message: `Ya existe registro de mantención diaria para el día ${fechaFmt}.`
     };
   } else {
     alertEl.classList.remove('visible');
@@ -2306,16 +2310,19 @@ async function checkDuplicateMesones() {
   if (duplicates.length > 0) {
     const fechaFmt = `${String(dia).padStart(2,'0')}/${String(mes).padStart(2,'0')}/${anio}`;
     const dupListStr = duplicates.map(d => `<strong>${d.name}</strong> (por <strong>"${d.resp}"</strong>)`).join(', ');
-    const dupListPlain = duplicates.map(d => `"${d.name}" (por "${d.resp}")`).join(', ');
+    const cant = duplicates.length;
 
-    const htmlMsg = `⚠️ <strong>Aviso de Duplicidad:</strong> Registro(s) de limpieza de mesones para el día <strong>${fechaFmt}</strong> ya realizado(s): ${dupListStr}.<br>¿Está seguro que desea continuar?`;
+    const htmlMsg = `⚠️ <strong>Aviso de Duplicidad:</strong> Se detectó limpieza de mesones del <strong>${fechaFmt}</strong> previa: ${dupListStr}.<br>¿Está seguro que desea continuar?`;
     alertEl.innerHTML = htmlMsg;
     alertEl.classList.add('visible');
     alertEl.style.display = 'block';
 
     return {
       duplicates,
-      message: `El/los registro(s) de limpieza de mesones para el día ${fechaFmt} ya fue(ron) ingresado(s):\n${dupListPlain}\n\n¿Está seguro que desea continuar?`
+      cleanMessage: cant > 1 
+        ? `Se detectaron registros de limpieza previa para la fecha <strong>${fechaFmt}</strong>:` 
+        : `Se detectó un registro de limpieza previa para la fecha <strong>${fechaFmt}</strong>:`,
+      message: `Ya existe registro de limpieza para el día ${fechaFmt}.`
     };
   } else {
     alertEl.classList.remove('visible');
@@ -2359,14 +2366,15 @@ async function checkDuplicateElimMuestras() {
   if (existing) {
     const respUser = existing.responsable || 'Desconocido';
     const fechaFmt = `${String(dia).padStart(2,'0')}/${String(mes).padStart(2,'0')}/${anio}`;
-    const htmlMsg = `⚠️ <strong>Aviso de Duplicidad:</strong> El registro de eliminación de muestras para el día <strong>${fechaFmt}</strong> ya fue realizado por el usuario <strong>"${respUser}"</strong>.<br>¿Está seguro que desea continuar?`;
+    const htmlMsg = `⚠️ <strong>Aviso de Duplicidad:</strong> El registro de eliminación de muestras para el día <strong>${fechaFmt}</strong> ya fue realizado por <strong>"${respUser}"</strong>.<br>¿Está seguro que desea continuar?`;
     alertEl.innerHTML = htmlMsg;
     alertEl.classList.add('visible');
     alertEl.style.display = 'block';
 
     return {
       existing,
-      message: `El registro de eliminación de muestras para el día ${fechaFmt} ya fue realizado por el usuario "${respUser}".\n\n¿Está seguro que desea continuar?`
+      cleanMessage: `Se detectó un registro previo de eliminación de muestras para la fecha <strong>${fechaFmt}</strong>:`,
+      message: `El registro de eliminación de muestras para el día ${fechaFmt} ya fue realizado por "${respUser}".`
     };
   } else {
     alertEl.classList.remove('visible');
