@@ -2063,14 +2063,16 @@ function showDuplicateConfirmModal(dupInfo) {
       detailsHtml = `<div class="dup-items-list">${listItems}</div>`;
     }
 
-    const mainText = dupInfo.cleanMessage || dupInfo.message || 'Ya existe un registro realizado para esta fecha.';
+    let mainText = dupInfo.cleanMessage || dupInfo.message || 'Ya existe un registro realizado para esta fecha.';
+    mainText = mainText.replace(/\n\n¿Está seguro que desea continuar\?/gi, '').trim();
+    const formattedMainText = mainText.replace(/\n/g, '<br>');
 
     bodyEl.innerHTML = `
       <div class="dup-modal-msg">
-        ${mainText}
+        ${formattedMainText}
       </div>
       ${detailsHtml}
-      <div style="font-size: 0.9rem; font-weight: 600; color: var(--primary-color, #00D4FF); margin-top: 10px; text-align: center;">
+      <div class="dup-modal-question">
         ¿Desea ingresar el registro de todas formas?
       </div>
     `;

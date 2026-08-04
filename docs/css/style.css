@@ -1426,8 +1426,10 @@ body {
 #modal-duplicate-confirm {
   max-width: 480px;
   width: 92%;
-  border: 1px solid rgba(245, 158, 11, 0.4);
-  box-shadow: 0 12px 32px rgba(245, 158, 11, 0.2), 0 8px 24px rgba(0,0,0,0.4);
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.15), 0 0 24px rgba(245, 158, 11, 0.15);
+  background: var(--bg-card2, #ffffff);
+  color: var(--text, #0f172a);
 }
 
 .dup-modal-header {
@@ -1436,44 +1438,58 @@ body {
   gap: 12px;
   margin-bottom: 16px;
   padding-bottom: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--border, rgba(15, 23, 42, 0.1));
 }
 
 .dup-modal-icon {
-  font-size: 28px;
+  font-size: 26px;
   line-height: 1;
   background: rgba(245, 158, 11, 0.15);
-  border: 1px solid rgba(245, 158, 11, 0.35);
+  border: 1px solid rgba(245, 158, 11, 0.4);
   padding: 10px;
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #f59e0b;
+  color: #d97706;
+  flex-shrink: 0;
 }
 
 .dup-modal-title-text {
   font-size: 1.15rem;
   font-weight: 700;
-  color: var(--text-color, #fff);
+  color: #92400e;
+  letter-spacing: -0.01em;
+}
+
+[data-theme="dark"] .dup-modal-title-text {
+  color: #fbbf24;
 }
 
 .dup-modal-subtitle {
-  font-size: 0.82rem;
-  color: var(--text-dim, #94a3b8);
+  font-size: 0.84rem;
+  color: #475569;
   margin-top: 2px;
+}
+
+[data-theme="dark"] .dup-modal-subtitle {
+  color: rgba(240, 246, 255, 0.65);
 }
 
 .dup-modal-msg {
   font-size: 0.95rem;
   line-height: 1.5;
-  color: var(--text-color, #e2e8f0);
+  color: #334155;
   margin-bottom: 14px;
+}
+
+[data-theme="dark"] .dup-modal-msg {
+  color: #e2e8f0;
 }
 
 .dup-detail-card {
   background: rgba(245, 158, 11, 0.08);
-  border: 1px dashed rgba(245, 158, 11, 0.35);
+  border: 1px dashed rgba(245, 158, 11, 0.4);
   border-radius: 10px;
   padding: 12px 14px;
   margin-bottom: 14px;
@@ -1490,12 +1506,22 @@ body {
 }
 
 .dup-detail-label {
-  color: var(--text-dim, #94a3b8);
+  color: #64748b;
+  font-size: 0.88rem;
+}
+
+[data-theme="dark"] .dup-detail-label {
+  color: rgba(240, 246, 255, 0.6);
 }
 
 .dup-detail-val {
   font-weight: 700;
-  color: var(--text-color, #fff);
+  color: #0f172a;
+  font-size: 0.9rem;
+}
+
+[data-theme="dark"] .dup-detail-val {
+  color: #f8fafc;
 }
 
 .dup-items-list {
@@ -1520,12 +1546,32 @@ body {
 
 .dup-item-name {
   font-weight: 700;
-  color: var(--text-color, #fff);
+  color: #1e293b;
+}
+
+[data-theme="dark"] .dup-item-name {
+  color: #f8fafc;
 }
 
 .dup-item-resp {
   font-size: 0.82rem;
-  color: var(--text-dim, #94a3b8);
+  color: #475569;
+}
+
+[data-theme="dark"] .dup-item-resp {
+  color: rgba(240, 246, 255, 0.7);
+}
+
+.dup-modal-question {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #d97706;
+  margin-top: 14px;
+  text-align: center;
+}
+
+[data-theme="dark"] .dup-modal-question {
+  color: #fbbf24;
 }
 
 .dup-modal-actions {
@@ -1548,14 +1594,15 @@ body {
 }
 
 .btn-dup-yes:hover {
+  background: linear-gradient(135deg, #d97706, #b45309);
   transform: translateY(-1px);
   box-shadow: 0 6px 16px rgba(245, 158, 11, 0.4);
 }
 
 .btn-dup-no {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text-color, #cbd5e1);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: #f1f5f9;
+  color: #334155;
+  border: 1px solid #cbd5e1;
   font-weight: 600;
   padding: 10px 16px;
   border-radius: 8px;
@@ -1564,6 +1611,18 @@ body {
 }
 
 .btn-dup-no:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+[data-theme="dark"] .btn-dup-no {
+  background: rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+[data-theme="dark"] .btn-dup-no:hover {
   background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
 }
 
