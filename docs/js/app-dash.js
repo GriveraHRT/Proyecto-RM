@@ -4,7 +4,8 @@ document.getElementById('form-termo').addEventListener('submit',async e=>{
   e.preventDefault();
   const dup = await checkDuplicateTermo();
   if (dup) {
-    if (!confirm(dup.message)) return;
+    const confirmed = await showDuplicateConfirmModal(dup);
+    if (!confirmed) return;
   }
   const obsVal = document.getElementById('termo-obs').value;
   const issues=isOutOfRange();
@@ -32,7 +33,8 @@ document.getElementById('form-centrifugas').addEventListener('submit',async e=>{
   if(!sel.length){showToast('Seleccione al menos una centrífuga','error');return}
   const dup = await checkDuplicateCentrifugas();
   if (dup) {
-    if (!confirm(dup.message)) return;
+    const confirmed = await showDuplicateConfirmModal(dup);
+    if (!confirmed) return;
   }
   setLoading('btn-cent-submit','spinner-cent','btn-cent-text',true);
   try{
@@ -56,7 +58,8 @@ document.getElementById('form-mesones').addEventListener('submit',async e=>{
   if(!sel.length){showToast('Seleccione al menos una sala','error');return}
   const dup = await checkDuplicateMesones();
   if (dup) {
-    if (!confirm(dup.message)) return;
+    const confirmed = await showDuplicateConfirmModal(dup);
+    if (!confirmed) return;
   }
   setLoading('btn-meson-submit','spinner-meson','btn-meson-text',true);
   try{
@@ -301,9 +304,11 @@ async function loadDashboard(forceReload){
     if(!state.dashMaestros)state.dashMaestros={areas:state.areas,centrifugas:state.centrifugas,salas:state.salas,refrigeradores:state.refrigeradores,refriLimpieza:state.refriLimpieza};
     applyDashData(reg);updateCacheIndicator();return;
   }
-  document.getElementById('dash-loading').style.display='block';
-  document.getElementById('dash-tables').innerHTML='';document.getElementById('dash-alerts-container').innerHTML='';
-  document.getElementById('dash-daily-view').innerHTML='';document.getElementById('dash-monthly-view').innerHTML='';
+  const dl=document.getElementById('dash-loading');if(dl)dl.style.display='block';
+  const dt=document.getElementById('dash-tables');if(dt)dt.innerHTML='';
+  const dac=document.getElementById('dash-alerts-container');if(dac)dac.innerHTML='';
+  const ddv=document.getElementById('dash-daily-view');if(ddv)ddv.innerHTML='';
+  const dmv=document.getElementById('dash-monthly-view');if(dmv)dmv.innerHTML='';
   try{
     const[reg,rev]=await Promise.all([apiGet({action:'getRegistros',mes:state.dashMes,anio:state.dashAnio}),apiGet({action:'getRevisiones',mes:state.dashMes,anio:state.dashAnio})]);
     if(!state.dashMaestros || !state.dashMaestros.centrifugasDetailed){
@@ -323,7 +328,7 @@ async function loadDashboard(forceReload){
     state.dashData=mockReg;
     applyDashData(mockReg);
   }
-  document.getElementById('dash-loading').style.display='none';updateCacheIndicator();
+  if(dl)dl.style.display='none';updateCacheIndicator();
 }
 function applyDashData(reg){
   if(!reg) return;
@@ -1969,6 +1974,12 @@ async function saveElimMuestrasForm(e) {
     return;
   }
 
+  const dup = await checkDuplicateElimMuestras();
+  if (dup) {
+    const confirmed = await showDuplicateConfirmModal(dup);
+    if (!confirmed) return;
+  }
+
   const spinner = document.getElementById('spinner-elim');
   const btnText = document.getElementById('btn-elim-text');
   
@@ -2008,6 +2019,87 @@ async function saveElimMuestrasForm(e) {
 }
 
 // ══ COMPROBACIÓN DE REGISTROS DUPLICADOS ═════════════════════════════════════
+
+function showDuplicateConfirmModal(dupInfo) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('modal-duplicate-confirm');
+    const overlay = document.getElementById('modal-overlay');
+    const bodyEl = document.getElementById('dup-confirm-body');
+    const btnConfirm = document.getElementById('btn-dup-confirm-yes');
+    const btnCancel = document.getElementById('btn-dup-confirm-no');
+
+    if (!modal || !overlay || !bodyEl) {
+      resolve(confirm(dupInfo.message || '¿Está seguro que desea continuar?'));
+      return;
+    }
+
+    let detailsHtml = '';
+    if (dupInfo.existing) {
+      detailsHtml = `
+        <div class="dup-detail-card">
+          <div class="dup-detail-row">
+            <span class="dup-detail-label">👤 Responsable previo:</span>
+            <span class="dup-detail-val">"${dupInfo.existing.responsable || 'Desconocido'}"</span>
+          </div>
+          ${dupInfo.existing.area ? `
+          <div class="dup-detail-row">
+            <span class="dup-detail-label">📍 Área:</span>
+            <span class="dup-detail-val">${dupInfo.existing.area}</span>
+          </div>` : ''}
+          ${dupInfo.existing.turno ? `
+          <div class="dup-detail-row">
+            <span class="dup-detail-label">🕒 Turno:</span>
+            <span class="dup-detail-val">${dupInfo.existing.turno}</span>
+          </div>` : ''}
+        </div>
+      `;
+    } else if (dupInfo.duplicates && dupInfo.duplicates.length > 0) {
+      const listItems = dupInfo.duplicates.map(d => `
+        <div class="dup-item-badge">
+          <span class="dup-item-name">📌 ${d.name}</span>
+          <span class="dup-item-resp">Ingresado por <strong>"${d.resp}"</strong></span>
+        </div>
+      `).join('');
+      detailsHtml = `<div class="dup-items-list">${listItems}</div>`;
+    }
+
+    const mainText = dupInfo.cleanMessage || dupInfo.message || 'Ya existe un registro realizado para esta fecha.';
+
+    bodyEl.innerHTML = `
+      <div class="dup-modal-msg">
+        ${mainText}
+      </div>
+      ${detailsHtml}
+      <div style="font-size: 0.9rem; font-weight: 600; color: var(--primary-color, #00D4FF); margin-top: 10px; text-align: center;">
+        ¿Desea ingresar el registro de todas formas?
+      </div>
+    `;
+
+    document.querySelectorAll('.modal-card').forEach(m => m.style.display = 'none');
+    modal.style.display = 'block';
+    overlay.classList.add('active');
+
+    const cleanup = () => {
+      overlay.classList.remove('active');
+      modal.style.display = 'none';
+      btnConfirm.removeEventListener('click', onYes);
+      btnCancel.removeEventListener('click', onNo);
+    };
+
+    const onYes = () => {
+      cleanup();
+      resolve(true);
+    };
+
+    const onNo = () => {
+      cleanup();
+      resolve(false);
+    };
+
+    btnConfirm.addEventListener('click', onYes);
+    btnCancel.addEventListener('click', onNo);
+  });
+}
 
 async function getRegistrosForMonth(mes, anio) {
   mes = parseInt(mes);

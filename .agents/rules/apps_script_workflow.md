@@ -11,3 +11,9 @@
 ## 3. Sincronización Dual de Frontend (`apps-script/js/` ↔ `docs/js/`)
 - Cualquier cambio realizado en la lógica o formularios frontend dentro de `apps-script/js/` (archivos `.html` empaquetados en Apps Script) debe sincronizarse inmediatamente a los archivos correspondientes en `docs/js/` (`.js` consumidos por GitHub Pages).
 - Toda referencia a elementos DOM de módulos opcionales o con visibilidad dinámica MUST incluir verificaciones nulas (ej. `if (document.getElementById(...))`) para evitar excepciones incontroladas (`TypeError`) que bloqueen la carga del Dashboard y simulen errores de red/offline.
+
+## 4. Despliegue de Apps Script mediante Clasp (`clasp deploy -i`)
+- Al publicar actualizaciones en Google Apps Script, ejecutar un `clasp deploy` simple sin argumentos crea una ID de despliegue nueva e independiente, dejando la URL pública del Web App apuntando a la versión anterior.
+- **Obligatorio**: Consultar los despliegues activos con `clasp deployments` y actualizar la ID de producción existente de forma explícita mediante:
+  `npx clasp deploy -i <deploymentId> -d "<descripción>"`
+

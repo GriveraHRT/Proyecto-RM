@@ -90,8 +90,6 @@
       <div style="color:var(--text-dim);margin-top:12px;font-size:13px;">Cargando datos…</div>
     </div>
 
-    <!-- Tablas por módulo -->
-    <div id="dash-tables"></div>
   </section>
 
   <!-- ── SECCIÓN: TEMPERATURA & HUMEDAD ─────────────────── -->
@@ -273,6 +271,38 @@
         </button>
       </form>
     </div>
+
+    <!-- Tarjeta: ÚLTIMOS REGISTROS CENTRÍFUGAS -->
+    <div class="card" style="margin-top: 24px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+        <div>
+          <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-color, #1e293b);">📋 Últimos Registros</h3>
+          <p style="margin: 2px 0 0 0; font-size: 0.85rem; color: #64748b;">Visualiza los datos recientes de mantención de centrífugas</p>
+        </div>
+        <button type="button" class="btn btn-secondary" onclick="loadRecentCentrifugas()" style="padding: 6px 12px; font-size: 0.85rem;">
+          🔄 Actualizar Lista
+        </button>
+      </div>
+
+      <div class="table-responsive" style="overflow-x: auto;">
+        <table class="table" id="table-recent-centrifugas" style="width: 100%; border-collapse: collapse; font-size: 0.84rem;">
+          <thead>
+            <tr style="border-bottom: 2px solid #e2e8f0; text-align: left;">
+              <th style="padding: 8px 4px; white-space: nowrap;">Fecha</th>
+              <th style="padding: 8px 4px;">Centrífuga</th>
+              <th style="padding: 8px 4px; text-align: center; white-space: nowrap;">Resp</th>
+              <th style="padding: 8px 4px; text-align: center; white-space: nowrap;">Tipo Mantención</th>
+              <th style="padding: 8px 4px; text-align: center; white-space: nowrap;">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-recent-centrifugas">
+            <tr>
+              <td colspan="5" style="text-align: center; padding: 16px; color: #94a3b8;">Cargando registros recientes...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </section>
 
   <!-- ── SECCIÓN: MESONES ──────────────────────────────── -->
@@ -321,6 +351,37 @@
           <span id="btn-meson-text">💾 Guardar Registro</span>
         </button>
       </form>
+    </div>
+
+    <!-- Tarjeta: ÚLTIMOS REGISTROS MESONES -->
+    <div class="card" style="margin-top: 24px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+        <div>
+          <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-color, #1e293b);">📋 Últimos Registros</h3>
+          <p style="margin: 2px 0 0 0; font-size: 0.85rem; color: #64748b;">Visualiza los datos recientes de limpieza de mesones</p>
+        </div>
+        <button type="button" class="btn btn-secondary" onclick="loadRecentMesones()" style="padding: 6px 12px; font-size: 0.85rem;">
+          🔄 Actualizar Lista
+        </button>
+      </div>
+
+      <div class="table-responsive" style="overflow-x: auto;">
+        <table class="table" id="table-recent-mesones" style="width: 100%; border-collapse: collapse; font-size: 0.84rem;">
+          <thead>
+            <tr style="border-bottom: 2px solid #e2e8f0; text-align: left;">
+              <th style="padding: 8px 4px; white-space: nowrap;">Fecha</th>
+              <th style="padding: 8px 4px;">Sala</th>
+              <th style="padding: 8px 4px; text-align: center; white-space: nowrap;">Resp</th>
+              <th style="padding: 8px 4px; text-align: center; white-space: nowrap;">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-recent-mesones">
+            <tr>
+              <td colspan="4" style="text-align: center; padding: 16px; color: #94a3b8;">Cargando registros recientes...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </section>
 
@@ -395,6 +456,39 @@
         </button>
       </form>
     </div>
+
+    <!-- Tarjeta: ÚLTIMOS REGISTROS TEMP. REFRIGERADORES -->
+    <div class="card" style="margin-top: 24px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+        <div>
+          <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-color, #1e293b);">📋 Últimos Registros</h3>
+          <p style="margin: 2px 0 0 0; font-size: 0.85rem; color: #64748b;">Visualiza los datos recientes de temperatura de refrigeradores</p>
+        </div>
+        <button type="button" class="btn btn-secondary" onclick="loadRecentRefriTemp()" style="padding: 6px 12px; font-size: 0.85rem;">
+          🔄 Actualizar Lista
+        </button>
+      </div>
+
+      <div class="table-responsive" style="overflow-x: auto;">
+        <table class="table" id="table-recent-refri-temp" style="width: 100%; border-collapse: collapse; font-size: 0.84rem;">
+          <thead>
+            <tr style="border-bottom: 2px solid #e2e8f0; text-align: left;">
+              <th style="padding: 8px 4px; white-space: nowrap;">Fecha / Turno</th>
+              <th style="padding: 8px 4px;">Equipo</th>
+              <th style="padding: 8px 4px; text-align: center; white-space: nowrap;">Temp (°C)</th>
+              <th style="padding: 8px 4px; text-align: center; white-space: nowrap;">Resp</th>
+              <th style="padding: 8px 4px;">Acción / Obs</th>
+              <th style="padding: 8px 4px; text-align: center; white-space: nowrap;">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-recent-refri-temp">
+            <tr>
+              <td colspan="6" style="text-align: center; padding: 16px; color: #94a3b8;">Cargando registros recientes...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </section>
 
   <!-- ── SECCIÓN: LIMPIEZA REFRIGERADORES ────────────────── -->
@@ -451,6 +545,39 @@
           <span id="btn-limp-refri-text">💾 Guardar Registro</span>
         </button>
       </form>
+    </div>
+
+    <!-- Tarjeta: ÚLTIMOS REGISTROS LIMPIEZA REFRIGERADORES -->
+    <div class="card" style="margin-top: 24px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+        <div>
+          <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-color, #1e293b);">📋 Últimos Registros</h3>
+          <p style="margin: 2px 0 0 0; font-size: 0.85rem; color: #64748b;">Visualiza los datos recientes de limpieza de refrigeradores</p>
+        </div>
+        <button type="button" class="btn btn-secondary" onclick="loadRecentLimpRefri()" style="padding: 6px 12px; font-size: 0.85rem;">
+          🔄 Actualizar Lista
+        </button>
+      </div>
+
+      <div class="table-responsive" style="overflow-x: auto;">
+        <table class="table" id="table-recent-limp-refri" style="width: 100%; border-collapse: collapse; font-size: 0.84rem;">
+          <thead>
+            <tr style="border-bottom: 2px solid #e2e8f0; text-align: left;">
+              <th style="padding: 8px 4px; white-space: nowrap;">Fecha</th>
+              <th style="padding: 8px 4px;">Tipo Mantención</th>
+              <th style="padding: 8px 4px;">Equipo</th>
+              <th style="padding: 8px 4px; text-align: center; white-space: nowrap;">Resp</th>
+              <th style="padding: 8px 4px;">Observaciones</th>
+              <th style="padding: 8px 4px; text-align: center; white-space: nowrap;">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-recent-limp-refri">
+            <tr>
+              <td colspan="6" style="text-align: center; padding: 16px; color: #94a3b8;">Cargando registros recientes...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </section>
 
@@ -522,6 +649,38 @@
           <span id="btn-conduct-text">💾 Guardar Registro</span>
         </button>
       </form>
+    </div>
+
+    <!-- Tarjeta: ÚLTIMOS REGISTROS CONDUCTIVIDAD -->
+    <div class="card" style="margin-top: 24px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+        <div>
+          <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-color, #1e293b);">📋 Últimos Registros</h3>
+          <p style="margin: 2px 0 0 0; font-size: 0.85rem; color: #64748b;">Visualiza los datos recientes de conductividad del agua</p>
+        </div>
+        <button type="button" class="btn btn-secondary" onclick="loadRecentConductividad()" style="padding: 6px 12px; font-size: 0.85rem;">
+          🔄 Actualizar Lista
+        </button>
+      </div>
+
+      <div class="table-responsive" style="overflow-x: auto;">
+        <table class="table" id="table-recent-conductividad" style="width: 100%; border-collapse: collapse; font-size: 0.84rem;">
+          <thead>
+            <tr style="border-bottom: 2px solid #e2e8f0; text-align: left;">
+              <th style="padding: 8px 4px; white-space: nowrap;">Fecha / Turno</th>
+              <th style="padding: 8px 4px; text-align: center; white-space: nowrap;">µS/cm</th>
+              <th style="padding: 8px 4px; text-align: center; white-space: nowrap;">Resp</th>
+              <th style="padding: 8px 4px;">Observaciones</th>
+              <th style="padding: 8px 4px; text-align: center; white-space: nowrap;">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-recent-conductividad">
+            <tr>
+              <td colspan="5" style="text-align: center; padding: 16px; color: #94a3b8;">Cargando registros recientes...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </section>
 
@@ -852,6 +1011,40 @@
           <span id="btn-cobas-text">💾 Guardar Registro</span>
         </button>
       </form>
+    </div>
+
+    <!-- Tarjeta: ÚLTIMOS REGISTROS COBAS -->
+    <div class="card" style="margin-top: 24px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+        <div>
+          <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-color, #1e293b);">📋 Últimos Registros</h3>
+          <p style="margin: 2px 0 0 0; font-size: 0.85rem; color: #64748b;">Visualiza los datos recientes de mantención Cobas</p>
+        </div>
+        <button type="button" class="btn btn-secondary" onclick="loadRecentCobas()" style="padding: 6px 12px; font-size: 0.85rem;">
+          🔄 Actualizar Lista
+        </button>
+      </div>
+
+      <div class="table-responsive" style="overflow-x: auto;">
+        <table class="table" id="table-recent-cobas" style="width: 100%; border-collapse: collapse; font-size: 0.84rem;">
+          <thead>
+            <tr style="border-bottom: 2px solid #e2e8f0; text-align: left;">
+              <th style="padding: 8px 4px; white-space: nowrap;">Fecha</th>
+              <th style="padding: 8px 4px;">Equipo</th>
+              <th style="padding: 8px 4px; text-align: center; white-space: nowrap;">Resp</th>
+              <th style="padding: 8px 4px;">Frecuencia</th>
+              <th style="padding: 8px 4px;">Actividad</th>
+              <th style="padding: 8px 4px;">Obs</th>
+              <th style="padding: 8px 4px; text-align: center; white-space: nowrap;">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-recent-cobas">
+            <tr>
+              <td colspan="7" style="text-align: center; padding: 16px; color: #94a3b8;">Cargando registros recientes...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </section>
 
@@ -1245,6 +1438,27 @@
     <button class="btn btn-warning" onclick="closeModal({target:document.getElementById('modal-overlay')})">Entendido</button>
   </div>
 
+  <!-- Modal: Confirmación de Registro Duplicado -->
+  <div class="modal-card" id="modal-duplicate-confirm" style="display:none;" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div class="dup-modal-header">
+      <div class="dup-modal-icon">⚠️</div>
+      <div>
+        <div class="dup-modal-title-text">Aviso de Registro Duplicado</div>
+        <div class="dup-modal-subtitle">Se detectó un registro grabado previamente para este día</div>
+      </div>
+    </div>
+    
+    <div id="dup-confirm-body">
+      <!-- Rellenado dinámicamente -->
+    </div>
+
+    <div class="dup-modal-actions">
+      <button type="button" class="btn-dup-no" id="btn-dup-confirm-no">✕ Cancelar</button>
+      <button type="button" class="btn-dup-yes" id="btn-dup-confirm-yes">✓ Sí, Continuar y Guardar</button>
+    </div>
+  </div>
+
   <!-- Modal: Editar Registro de Temperatura / Humedad -->
   <div class="modal-card" id="modal-edit-termo" style="display:none; max-width: 500px;" onclick="event.stopPropagation()">
     <button class="modal-close" onclick="closeModal()">✕</button>
@@ -1315,6 +1529,311 @@
         <button type="submit" class="btn btn-primary" id="btn-edit-termo-submit">
           <div class="spinner" id="spinner-edit-termo"></div>
           <span id="btn-edit-termo-text">💾 Guardar Cambios</span>
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Modal: Editar Registro de Centrífugas -->
+  <div class="modal-card" id="modal-edit-centrifugas" style="display:none; max-width: 500px;" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div class="modal-title" style="font-size: 1.15rem; font-weight: 700; margin-bottom: 16px;">✏️ Editar Registro de Centrífuga</div>
+    <form id="form-edit-centrifugas" onsubmit="submitEditCentrifuga(event)" autocomplete="off">
+      <input type="hidden" id="edit-cent-rowindex" />
+      <input type="hidden" id="edit-cent-fecha-reg" />
+      <input type="hidden" id="edit-cent-old-mes" />
+      <input type="hidden" id="edit-cent-old-anio" />
+
+      <div class="form-row" style="margin-bottom: 12px;">
+        <div class="form-group">
+          <label class="form-label" for="edit-cent-fecha">Fecha</label>
+          <input type="date" id="edit-cent-fecha" class="form-control" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="edit-cent-tipo">Tipo Mantención</label>
+          <select id="edit-cent-tipo" class="form-control" required>
+            <option value="Diaria">🔁 Diaria</option>
+            <option value="Semanal">📅 Semanal</option>
+            <option value="Anual">🔧 Anual / Según necesidad</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label class="form-label" for="edit-cent-nombre">Centrífuga</label>
+        <select id="edit-cent-nombre" class="form-control" required></select>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label class="form-label" for="edit-cent-resp">Responsable (iniciales)</label>
+        <input type="text" id="edit-cent-resp" class="form-control" maxlength="3" style="text-transform:uppercase; letter-spacing:2px; font-weight:700;" required />
+      </div>
+
+      <div class="form-group" style="margin-bottom: 16px;">
+        <label class="form-label" for="edit-cent-obs">Observaciones</label>
+        <input type="text" id="edit-cent-obs" class="form-control" placeholder="Opcional…" />
+      </div>
+
+      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal({target:document.getElementById('modal-overlay')})">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btn-edit-cent-submit">
+          <div class="spinner" id="spinner-edit-cent"></div>
+          <span id="btn-edit-cent-text">💾 Guardar Cambios</span>
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Modal: Editar Registro de Mesones -->
+  <div class="modal-card" id="modal-edit-mesones" style="display:none; max-width: 500px;" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div class="modal-title" style="font-size: 1.15rem; font-weight: 700; margin-bottom: 16px;">✏️ Editar Registro de Mesón</div>
+    <form id="form-edit-mesones" onsubmit="submitEditMeson(event)" autocomplete="off">
+      <input type="hidden" id="edit-meson-rowindex" />
+      <input type="hidden" id="edit-meson-fecha-reg" />
+      <input type="hidden" id="edit-meson-old-mes" />
+      <input type="hidden" id="edit-meson-old-anio" />
+
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label class="form-label" for="edit-meson-fecha">Fecha</label>
+        <input type="date" id="edit-meson-fecha" class="form-control" required />
+      </div>
+
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label class="form-label" for="edit-meson-sala">Sala</label>
+        <select id="edit-meson-sala" class="form-control" required></select>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label class="form-label" for="edit-meson-resp">Responsable (iniciales)</label>
+        <input type="text" id="edit-meson-resp" class="form-control" maxlength="3" style="text-transform:uppercase; letter-spacing:2px; font-weight:700;" required />
+      </div>
+
+      <div class="form-group" style="margin-bottom: 16px;">
+        <label class="form-label" for="edit-meson-obs">Observaciones</label>
+        <input type="text" id="edit-meson-obs" class="form-control" placeholder="Opcional…" />
+      </div>
+
+      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal({target:document.getElementById('modal-overlay')})">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btn-edit-meson-submit">
+          <div class="spinner" id="spinner-edit-meson"></div>
+          <span id="btn-edit-meson-text">💾 Guardar Cambios</span>
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Modal: Editar Registro Temp Refrigeradores -->
+  <div class="modal-card" id="modal-edit-refri-temp" style="display:none; max-width: 500px;" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div class="modal-title" style="font-size: 1.15rem; font-weight: 700; margin-bottom: 16px;">✏️ Editar Temp. Refrigerador</div>
+    <form id="form-edit-refri-temp" onsubmit="submitEditRefriTemp(event)" autocomplete="off">
+      <input type="hidden" id="edit-refri-rowindex" />
+      <input type="hidden" id="edit-refri-fecha-reg" />
+      <input type="hidden" id="edit-refri-old-mes" />
+      <input type="hidden" id="edit-refri-old-anio" />
+
+      <div class="form-row" style="margin-bottom: 12px;">
+        <div class="form-group">
+          <label class="form-label" for="edit-refri-fecha">Fecha</label>
+          <input type="date" id="edit-refri-fecha" class="form-control" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="edit-refri-turno">Turno</label>
+          <select id="edit-refri-turno" class="form-control" required>
+            <option value="Mañana">☀️ Mañana (AM)</option>
+            <option value="Tarde">🌙 Tarde (PM)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label class="form-label" for="edit-refri-equipo">Equipo</label>
+        <select id="edit-refri-equipo" class="form-control" required></select>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label class="form-label" for="edit-refri-temp-val">Temperatura (°C)</label>
+        <input type="number" id="edit-refri-temp-val" class="form-control" step="0.1" min="-100" max="50" required />
+      </div>
+
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label class="form-label" for="edit-refri-accion">Acción Correctiva</label>
+        <select id="edit-refri-accion" class="form-control">
+          <option value="">Ninguna / Opcional</option>
+        </select>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label class="form-label" for="edit-refri-resp">Responsable (iniciales)</label>
+        <input type="text" id="edit-refri-resp" class="form-control" maxlength="3" style="text-transform:uppercase; letter-spacing:2px; font-weight:700;" required />
+      </div>
+
+      <div class="form-group" style="margin-bottom: 16px;">
+        <label class="form-label" for="edit-refri-obs">Observaciones</label>
+        <input type="text" id="edit-refri-obs" class="form-control" placeholder="Opcional…" />
+      </div>
+
+      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal({target:document.getElementById('modal-overlay')})">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btn-edit-refri-submit">
+          <div class="spinner" id="spinner-edit-refri"></div>
+          <span id="btn-edit-refri-text">💾 Guardar Cambios</span>
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Modal: Editar Registro Limpieza Refrigeradores -->
+  <div class="modal-card" id="modal-edit-limp-refri" style="display:none; max-width: 500px;" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div class="modal-title" style="font-size: 1.15rem; font-weight: 700; margin-bottom: 16px;">✏️ Editar Limpieza Refrigerador</div>
+    <form id="form-edit-limp-refri" onsubmit="submitEditLimpRefri(event)" autocomplete="off">
+      <input type="hidden" id="edit-limp-refri-rowindex" />
+      <input type="hidden" id="edit-limp-refri-fecha-reg" />
+      <input type="hidden" id="edit-limp-refri-old-mes" />
+      <input type="hidden" id="edit-limp-refri-old-anio" />
+
+      <div class="form-row" style="margin-bottom: 12px;">
+        <div class="form-group">
+          <label class="form-label" for="edit-limp-refri-fecha">Fecha</label>
+          <input type="date" id="edit-limp-refri-fecha" class="form-control" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="edit-limp-refri-tipo">Tipo Mantención</label>
+          <select id="edit-limp-refri-tipo" class="form-control" required>
+            <option value="Semanal (externa)">📅 Semanal (externa)</option>
+            <option value="Semestral (interna)">🔧 Semestral (interna)</option>
+            <option value="Descongelación manual">❄️ Descongelación manual</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label class="form-label" for="edit-limp-refri-equipo">Equipo</label>
+        <select id="edit-limp-refri-equipo" class="form-control" required></select>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label class="form-label" for="edit-limp-refri-resp">Responsable (iniciales)</label>
+        <input type="text" id="edit-limp-refri-resp" class="form-control" maxlength="3" style="text-transform:uppercase; letter-spacing:2px; font-weight:700;" required />
+      </div>
+
+      <div class="form-group" style="margin-bottom: 16px;">
+        <label class="form-label" for="edit-limp-refri-obs">Observaciones</label>
+        <input type="text" id="edit-limp-refri-obs" class="form-control" placeholder="Opcional…" />
+      </div>
+
+      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal({target:document.getElementById('modal-overlay')})">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btn-edit-limp-refri-submit">
+          <div class="spinner" id="spinner-edit-limp-refri"></div>
+          <span id="btn-edit-limp-refri-text">💾 Guardar Cambios</span>
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Modal: Editar Registro Conductividad -->
+  <div class="modal-card" id="modal-edit-conductividad" style="display:none; max-width: 500px;" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div class="modal-title" style="font-size: 1.15rem; font-weight: 700; margin-bottom: 16px;">✏️ Editar Conductividad</div>
+    <form id="form-edit-conductividad" onsubmit="submitEditConductividad(event)" autocomplete="off">
+      <input type="hidden" id="edit-conduct-rowindex" />
+      <input type="hidden" id="edit-conduct-fecha-reg" />
+      <input type="hidden" id="edit-conduct-old-mes" />
+      <input type="hidden" id="edit-conduct-old-anio" />
+
+      <div class="form-row" style="margin-bottom: 12px;">
+        <div class="form-group">
+          <label class="form-label" for="edit-conduct-fecha">Fecha</label>
+          <input type="date" id="edit-conduct-fecha" class="form-control" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="edit-conduct-turno">Turno</label>
+          <select id="edit-conduct-turno" class="form-control" required>
+            <option value="Mañana">☀️ Mañana (AM)</option>
+            <option value="Tarde">🌙 Tarde (PM)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label class="form-label" for="edit-conduct-valor">Conductividad (µS/cm)</label>
+        <input type="number" id="edit-conduct-valor" class="form-control" step="0.01" min="0" max="10" required />
+      </div>
+
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label class="form-label" for="edit-conduct-resp">Responsable (iniciales)</label>
+        <input type="text" id="edit-conduct-resp" class="form-control" maxlength="3" style="text-transform:uppercase; letter-spacing:2px; font-weight:700;" required />
+      </div>
+
+      <div class="form-group" style="margin-bottom: 16px;">
+        <label class="form-label" for="edit-conduct-obs">Observaciones</label>
+        <input type="text" id="edit-conduct-obs" class="form-control" placeholder="Opcional…" />
+      </div>
+
+      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal({target:document.getElementById('modal-overlay')})">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btn-edit-conduct-submit">
+          <div class="spinner" id="spinner-edit-conduct"></div>
+          <span id="btn-edit-conduct-text">💾 Guardar Cambios</span>
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Modal: Editar Registro Cobas -->
+  <div class="modal-card" id="modal-edit-cobas" style="display:none; max-width: 500px;" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div class="modal-title" style="font-size: 1.15rem; font-weight: 700; margin-bottom: 16px;">✏️ Editar Mantención Cobas</div>
+    <form id="form-edit-cobas" onsubmit="submitEditCobas(event)" autocomplete="off">
+      <input type="hidden" id="edit-cobas-rowindex" />
+      <input type="hidden" id="edit-cobas-fecha-reg" />
+      <input type="hidden" id="edit-cobas-old-mes" />
+      <input type="hidden" id="edit-cobas-old-anio" />
+
+      <div class="form-row" style="margin-bottom: 12px;">
+        <div class="form-group">
+          <label class="form-label" for="edit-cobas-fecha">Fecha</label>
+          <input type="date" id="edit-cobas-fecha" class="form-control" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="edit-cobas-equipo">Equipo</label>
+          <select id="edit-cobas-equipo" class="form-control" required>
+            <option value="Cobas 1">Cobas 1</option>
+            <option value="Cobas 2">Cobas 2</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row" style="margin-bottom: 12px;">
+        <div class="form-group">
+          <label class="form-label" for="edit-cobas-frecuencia">Frecuencia</label>
+          <input type="text" id="edit-cobas-frecuencia" class="form-control" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="edit-cobas-resp">Responsable</label>
+          <input type="text" id="edit-cobas-resp" class="form-control" maxlength="3" style="text-transform:uppercase; letter-spacing:2px; font-weight:700;" required />
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label class="form-label" for="edit-cobas-actividad">Actividad</label>
+        <input type="text" id="edit-cobas-actividad" class="form-control" required />
+      </div>
+
+      <div class="form-group" style="margin-bottom: 16px;">
+        <label class="form-label" for="edit-cobas-obs">Observaciones</label>
+        <input type="text" id="edit-cobas-obs" class="form-control" placeholder="Opcional…" />
+      </div>
+
+      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal({target:document.getElementById('modal-overlay')})">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btn-edit-cobas-submit">
+          <div class="spinner" id="spinner-edit-cobas"></div>
+          <span id="btn-edit-cobas-text">💾 Guardar Cambios</span>
         </button>
       </div>
     </form>

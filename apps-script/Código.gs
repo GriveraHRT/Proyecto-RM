@@ -257,7 +257,13 @@ function doGet(e) {
       case 'getNotificaciones': return jsonResponse(getNotificaciones());
       case 'getDxH900Historial': return jsonResponse(getDxH900Historial());
       case 'getModulosActivos': return jsonResponse(getModulosActivos());
-      case 'getRecentTermo':    return jsonResponse(getRecentTermo(e.parameter.limit));
+      case 'getRecentTermo':        return jsonResponse(getRecentTermo(e.parameter.limit));
+      case 'getRecentCentrifugas':  return jsonResponse(getRecentCentrifugas(e.parameter.limit));
+      case 'getRecentMesones':      return jsonResponse(getRecentMesones(e.parameter.limit));
+      case 'getRecentRefriTemp':    return jsonResponse(getRecentRefriTemp(e.parameter.limit));
+      case 'getRecentLimpRefri':    return jsonResponse(getRecentLimpRefri(e.parameter.limit));
+      case 'getRecentConductividad': return jsonResponse(getRecentConductividad(e.parameter.limit));
+      case 'getRecentCobas':        return jsonResponse(getRecentCobas(e.parameter.limit));
       case 'getDiasNoHabilesHRT': return jsonResponse(getDiasNoHabilesHRT());
       case 'runSetupTriggers':  return jsonResponse({ success: true, message: setupTriggers() });
       case 'testTriggerConsolidado': return jsonResponse({ success: true, result: triggerAlertaConsolidadaTermo() });
@@ -283,11 +289,23 @@ function doPost(e) {
       case 'updateTermo':         return jsonResponse(updateTermo(data));
       case 'deleteTermo':         return jsonResponse(deleteTermo(data));
       case 'saveCentrifuga':      return jsonResponse(saveCentrifuga(data));
+      case 'updateCentrifuga':    return jsonResponse(updateCentrifuga(data));
+      case 'deleteCentrifuga':    return jsonResponse(deleteCentrifuga(data));
       case 'saveMesones':         return jsonResponse(saveMesones(data));
+      case 'updateMeson':         return jsonResponse(updateMeson(data));
+      case 'deleteMeson':         return jsonResponse(deleteMeson(data));
       case 'saveRefriTemp':       return jsonResponse(saveRefriTemp(data));
+      case 'updateRefriTemp':     return jsonResponse(updateRefriTemp(data));
+      case 'deleteRefriTemp':     return jsonResponse(deleteRefriTemp(data));
       case 'saveLimpiezaRefri':   return jsonResponse(saveLimpiezaRefri(data));
+      case 'updateLimpRefri':     return jsonResponse(updateLimpRefri(data));
+      case 'deleteLimpRefri':     return jsonResponse(deleteLimpRefri(data));
       case 'saveConductividad':   return jsonResponse(saveConductividad(data));
+      case 'updateConductividad': return jsonResponse(updateConductividad(data));
+      case 'deleteConductividad': return jsonResponse(deleteConductividad(data));
       case 'saveCobas':           return jsonResponse(saveCobas(data));
+      case 'updateCobas':         return jsonResponse(updateCobas(data));
+      case 'deleteCobas':         return jsonResponse(deleteCobas(data));
       case 'saveEtiquetadoraRegistro': return jsonResponse(saveEtiquetadoraRegistro(data));
       case 'updateEtiquetadoraMaestro': return jsonResponse(updateEtiquetadoraMaestro(data));
       case 'marcarRevisado':      return jsonResponse(marcarRevisado(data));
@@ -663,6 +681,441 @@ function getRecentTermo(limit) {
   });
 
   return { success: true, records: records };
+}
+
+function getRecentCentrifugas(limit) {
+  limit = parseInt(limit) || 20;
+  const sheet = getSheet(SHEETS.CENT_REG);
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { success: true, records: [] };
+  const endRow = Math.min(lastRow, 1 + limit);
+  const numRows = endRow - 1;
+  const data = sheet.getRange(2, 1, numRows, 11).getValues();
+  const records = data.map((r, idx) => {
+    let fechaStr = '';
+    if (r[0] instanceof Date) {
+      const d = String(r[0].getDate()).padStart(2, '0');
+      const m = String(r[0].getMonth() + 1).padStart(2, '0');
+      const y = r[0].getFullYear();
+      fechaStr = `${d}/${m}/${y}`;
+    } else {
+      fechaStr = String(r[0] || '');
+    }
+    let tsStr = r[8] instanceof Date ? getFechaRegistroFormatted(r[8]) : String(r[8] || '');
+    return {
+      rowIndex: 2 + idx,
+      fecha: fechaStr,
+      dia: r[1], mes: r[2], anio: r[3],
+      centrifuga: r[4] ? String(r[4]) : '',
+      responsable: r[5] ? String(r[5]) : '',
+      tipo_mantencion: r[6] ? String(r[6]) : '',
+      observaciones: r[7] ? String(r[7]) : '',
+      fecha_registro: tsStr
+    };
+  });
+  return { success: true, records: records };
+}
+
+function getRecentMesones(limit) {
+  limit = parseInt(limit) || 20;
+  const sheet = getSheet(SHEETS.MESONES);
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { success: true, records: [] };
+  const endRow = Math.min(lastRow, 1 + limit);
+  const numRows = endRow - 1;
+  const data = sheet.getRange(2, 1, numRows, 10).getValues();
+  const records = data.map((r, idx) => {
+    let fechaStr = '';
+    if (r[0] instanceof Date) {
+      const d = String(r[0].getDate()).padStart(2, '0');
+      const m = String(r[0].getMonth() + 1).padStart(2, '0');
+      const y = r[0].getFullYear();
+      fechaStr = `${d}/${m}/${y}`;
+    } else {
+      fechaStr = String(r[0] || '');
+    }
+    let tsStr = r[7] instanceof Date ? getFechaRegistroFormatted(r[7]) : String(r[7] || '');
+    return {
+      rowIndex: 2 + idx,
+      fecha: fechaStr,
+      dia: r[1], mes: r[2], anio: r[3],
+      sala: r[4] ? String(r[4]) : '',
+      responsable: r[5] ? String(r[5]) : '',
+      observaciones: r[6] ? String(r[6]) : '',
+      fecha_registro: tsStr
+    };
+  });
+  return { success: true, records: records };
+}
+
+function getRecentRefriTemp(limit) {
+  limit = parseInt(limit) || 20;
+  const sheet = getSheet(SHEETS.REFRI_REG);
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { success: true, records: [] };
+  const endRow = Math.min(lastRow, 1 + limit);
+  const numRows = endRow - 1;
+  const data = sheet.getRange(2, 1, numRows, 14).getValues();
+  const records = data.map((r, idx) => {
+    let fechaStr = '';
+    if (r[0] instanceof Date) {
+      const d = String(r[0].getDate()).padStart(2, '0');
+      const m = String(r[0].getMonth() + 1).padStart(2, '0');
+      const y = r[0].getFullYear();
+      fechaStr = `${d}/${m}/${y}`;
+    } else {
+      fechaStr = String(r[0] || '');
+    }
+    let tsStr = r[11] instanceof Date ? getFechaRegistroFormatted(r[11]) : String(r[11] || '');
+    return {
+      rowIndex: 2 + idx,
+      fecha: fechaStr,
+      dia: r[1], mes: r[2], anio: r[3],
+      responsable: r[4] ? String(r[4]) : '',
+      temperatura: r[5],
+      turno: r[6] ? String(r[6]) : '',
+      equipo: r[7] ? String(r[7]) : '',
+      tipo: r[8] ? String(r[8]) : '',
+      accion_correctiva: r[9] ? String(r[9]) : '',
+      observaciones: r[10] ? String(r[10]) : '',
+      fecha_registro: tsStr
+    };
+  });
+  return { success: true, records: records };
+}
+
+function getRecentLimpRefri(limit) {
+  limit = parseInt(limit) || 20;
+  const sheet = getSheet(SHEETS.LIMP_REFRI);
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { success: true, records: [] };
+  const endRow = Math.min(lastRow, 1 + limit);
+  const numRows = endRow - 1;
+  const data = sheet.getRange(2, 1, numRows, 11).getValues();
+  const records = data.map((r, idx) => {
+    let fechaStr = '';
+    if (r[0] instanceof Date) {
+      const d = String(r[0].getDate()).padStart(2, '0');
+      const m = String(r[0].getMonth() + 1).padStart(2, '0');
+      const y = r[0].getFullYear();
+      fechaStr = `${d}/${m}/${y}`;
+    } else {
+      fechaStr = String(r[0] || '');
+    }
+    let tsStr = r[8] instanceof Date ? getFechaRegistroFormatted(r[8]) : String(r[8] || '');
+    return {
+      rowIndex: 2 + idx,
+      fecha: fechaStr,
+      dia: r[1], mes: r[2], anio: r[3],
+      tipo_mantencion: r[4] ? String(r[4]) : '',
+      equipo: r[5] ? String(r[5]) : '',
+      responsable: r[6] ? String(r[6]) : '',
+      observaciones: r[7] ? String(r[7]) : '',
+      fecha_registro: tsStr
+    };
+  });
+  return { success: true, records: records };
+}
+
+function getRecentConductividad(limit) {
+  limit = parseInt(limit) || 20;
+  const sheet = getSheet(SHEETS.CONDUCT_REG);
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { success: true, records: [] };
+  const endRow = Math.min(lastRow, 1 + limit);
+  const numRows = endRow - 1;
+  const data = sheet.getRange(2, 1, numRows, 11).getValues();
+  const records = data.map((r, idx) => {
+    let fechaStr = '';
+    if (r[0] instanceof Date) {
+      const d = String(r[0].getDate()).padStart(2, '0');
+      const m = String(r[0].getMonth() + 1).padStart(2, '0');
+      const y = r[0].getFullYear();
+      fechaStr = `${d}/${m}/${y}`;
+    } else {
+      fechaStr = String(r[0] || '');
+    }
+    let tsStr = r[8] instanceof Date ? getFechaRegistroFormatted(r[8]) : String(r[8] || '');
+    return {
+      rowIndex: 2 + idx,
+      fecha: fechaStr,
+      dia: r[1], mes: r[2], anio: r[3],
+      responsable: r[4] ? String(r[4]) : '',
+      conductividad: r[5],
+      turno: r[6] ? String(r[6]) : '',
+      observaciones: r[7] ? String(r[7]) : '',
+      fecha_registro: tsStr
+    };
+  });
+  return { success: true, records: records };
+}
+
+function getRecentCobas(limit) {
+  limit = parseInt(limit) || 20;
+  const sheet = getSheet(SHEETS.COBAS_REG);
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { success: true, records: [] };
+  const endRow = Math.min(lastRow, 1 + limit);
+  const numRows = endRow - 1;
+  const data = sheet.getRange(2, 1, numRows, 12).getValues();
+  const records = data.map((r, idx) => {
+    let fechaStr = '';
+    if (r[0] instanceof Date) {
+      const d = String(r[0].getDate()).padStart(2, '0');
+      const m = String(r[0].getMonth() + 1).padStart(2, '0');
+      const y = r[0].getFullYear();
+      fechaStr = `${d}/${m}/${y}`;
+    } else {
+      fechaStr = String(r[0] || '');
+    }
+    let tsStr = r[9] instanceof Date ? getFechaRegistroFormatted(r[9]) : String(r[9] || '');
+    return {
+      rowIndex: 2 + idx,
+      fecha: fechaStr,
+      dia: r[1], mes: r[2], anio: r[3],
+      equipo: r[4] ? String(r[4]) : '',
+      responsable: r[5] ? String(r[5]) : '',
+      frecuencia: r[6] ? String(r[6]) : '',
+      actividad: r[7] ? String(r[7]) : '',
+      observaciones: r[8] ? String(r[8]) : '',
+      fecha_registro: tsStr
+    };
+  });
+  return { success: true, records: records };
+}
+
+function findRowIndexByTimestamp(sheetName, rowIndex, fechaRegistro, tsColIndex) {
+  const sheet = getSheet(sheetName);
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return -1;
+
+  rowIndex = parseInt(rowIndex);
+  if (rowIndex >= 2 && rowIndex <= lastRow) {
+    if (!fechaRegistro) return rowIndex;
+    const val = sheet.getRange(rowIndex, tsColIndex).getValue();
+    const tsStr = val instanceof Date ? getFechaRegistroFormatted(val) : String(val);
+    if (tsStr === String(fechaRegistro)) return rowIndex;
+  }
+
+  if (fechaRegistro) {
+    const colValues = sheet.getRange(2, tsColIndex, lastRow - 1, 1).getValues();
+    for (let i = 0; i < colValues.length; i++) {
+      const val = colValues[i][0];
+      const tsStr = val instanceof Date ? getFechaRegistroFormatted(val) : String(val);
+      if (tsStr === String(fechaRegistro)) {
+        return 2 + i;
+      }
+    }
+  }
+
+  return (rowIndex >= 2 && rowIndex <= lastRow) ? rowIndex : -1;
+}
+
+// ── Update / Delete — Centrífugas ──────────────────────────────
+function updateCentrifuga(data) {
+  if (!data.rowIndex || !data.responsable || !data.fecha || !data.centrifuga) {
+    return { success: false, error: 'Faltan campos obligatorios para actualizar.' };
+  }
+  const targetRow = findRowIndexByTimestamp(SHEETS.CENT_REG, data.rowIndex, data.fecha_registro, 9);
+  if (targetRow < 2) return { success: false, error: 'No se encontró el registro para actualizar.' };
+
+  const sheet = getSheet(SHEETS.CENT_REG);
+  const f = parseFecha(data.fecha);
+  sheet.getRange(targetRow, 1, 1, 8).setValues([[
+    formatFechaDDMMYYYY(f), f.dia, f.mes, f.anio,
+    data.centrifuga,
+    data.responsable.toUpperCase().substring(0, 3),
+    data.tipo_mantencion || 'Diaria',
+    data.observaciones || ''
+  ]]);
+  clearSheetCache('centrifugas', f.mes, f.anio);
+  return { success: true, message: 'Registro de Centrífuga actualizado.' };
+}
+
+function deleteCentrifuga(data) {
+  if (!data.rowIndex) return { success: false, error: 'ID de registro no especificado.' };
+  const targetRow = findRowIndexByTimestamp(SHEETS.CENT_REG, data.rowIndex, data.fecha_registro, 9);
+  if (targetRow < 2) return { success: false, error: 'No se encontró el registro a eliminar.' };
+
+  const sheet = getSheet(SHEETS.CENT_REG);
+  const mes = data.mes || sheet.getRange(targetRow, 3).getValue();
+  const anio = data.anio || sheet.getRange(targetRow, 4).getValue();
+  sheet.deleteRow(targetRow);
+  if (mes && anio) clearSheetCache('centrifugas', mes, anio);
+  return { success: true, message: 'Registro de Centrífuga eliminado.' };
+}
+
+// ── Update / Delete — Mesones ──────────────────────────────────
+function updateMeson(data) {
+  if (!data.rowIndex || !data.responsable || !data.fecha || !data.sala) {
+    return { success: false, error: 'Faltan campos obligatorios para actualizar.' };
+  }
+  const targetRow = findRowIndexByTimestamp(SHEETS.MESONES, data.rowIndex, data.fecha_registro, 8);
+  if (targetRow < 2) return { success: false, error: 'No se encontró el registro para actualizar.' };
+
+  const sheet = getSheet(SHEETS.MESONES);
+  const f = parseFecha(data.fecha);
+  sheet.getRange(targetRow, 1, 1, 7).setValues([[
+    formatFechaDDMMYYYY(f), f.dia, f.mes, f.anio,
+    data.sala,
+    data.responsable.toUpperCase().substring(0, 3),
+    data.observaciones || ''
+  ]]);
+  clearSheetCache('mesones', f.mes, f.anio);
+  return { success: true, message: 'Registro de Mesón actualizado.' };
+}
+
+function deleteMeson(data) {
+  if (!data.rowIndex) return { success: false, error: 'ID de registro no especificado.' };
+  const targetRow = findRowIndexByTimestamp(SHEETS.MESONES, data.rowIndex, data.fecha_registro, 8);
+  if (targetRow < 2) return { success: false, error: 'No se encontró el registro a eliminar.' };
+
+  const sheet = getSheet(SHEETS.MESONES);
+  const mes = data.mes || sheet.getRange(targetRow, 3).getValue();
+  const anio = data.anio || sheet.getRange(targetRow, 4).getValue();
+  sheet.deleteRow(targetRow);
+  if (mes && anio) clearSheetCache('mesones', mes, anio);
+  return { success: true, message: 'Registro de Mesón eliminado.' };
+}
+
+// ── Update / Delete — Temp. Refrigeradores ─────────────────────
+function updateRefriTemp(data) {
+  if (!data.rowIndex || !data.responsable || !data.fecha || !data.equipo || data.temperatura === undefined) {
+    return { success: false, error: 'Faltan campos obligatorios para actualizar.' };
+  }
+  const targetRow = findRowIndexByTimestamp(SHEETS.REFRI_REG, data.rowIndex, data.fecha_registro, 12);
+  if (targetRow < 2) return { success: false, error: 'No se encontró el registro para actualizar.' };
+
+  const sheet = getSheet(SHEETS.REFRI_REG);
+  const f = parseFecha(data.fecha);
+  sheet.getRange(targetRow, 1, 1, 11).setValues([[
+    formatFechaDDMMYYYY(f), f.dia, f.mes, f.anio,
+    data.responsable.toUpperCase().substring(0, 3),
+    parseFloat(data.temperatura),
+    data.turno || 'Mañana',
+    data.equipo,
+    data.tipo || '',
+    data.accion_correctiva || '',
+    data.observaciones || ''
+  ]]);
+  clearSheetCache('refriTemp', f.mes, f.anio);
+  return { success: true, message: 'Registro de Temp. Refrigerador actualizado.' };
+}
+
+function deleteRefriTemp(data) {
+  if (!data.rowIndex) return { success: false, error: 'ID de registro no especificado.' };
+  const targetRow = findRowIndexByTimestamp(SHEETS.REFRI_REG, data.rowIndex, data.fecha_registro, 12);
+  if (targetRow < 2) return { success: false, error: 'No se encontró el registro a eliminar.' };
+
+  const sheet = getSheet(SHEETS.REFRI_REG);
+  const mes = data.mes || sheet.getRange(targetRow, 3).getValue();
+  const anio = data.anio || sheet.getRange(targetRow, 4).getValue();
+  sheet.deleteRow(targetRow);
+  if (mes && anio) clearSheetCache('refriTemp', mes, anio);
+  return { success: true, message: 'Registro de Temp. Refrigerador eliminado.' };
+}
+
+// ── Update / Delete — Limpieza Refrigeradores ──────────────────
+function updateLimpRefri(data) {
+  if (!data.rowIndex || !data.responsable || !data.fecha || !data.equipo) {
+    return { success: false, error: 'Faltan campos obligatorios para actualizar.' };
+  }
+  const targetRow = findRowIndexByTimestamp(SHEETS.LIMP_REFRI, data.rowIndex, data.fecha_registro, 9);
+  if (targetRow < 2) return { success: false, error: 'No se encontró el registro para actualizar.' };
+
+  const sheet = getSheet(SHEETS.LIMP_REFRI);
+  const f = parseFecha(data.fecha);
+  sheet.getRange(targetRow, 1, 1, 8).setValues([[
+    formatFechaDDMMYYYY(f), f.dia, f.mes, f.anio,
+    data.tipo_mantencion || 'Semanal (externa)',
+    data.equipo,
+    data.responsable.toUpperCase().substring(0, 3),
+    data.observaciones || ''
+  ]]);
+  clearSheetCache('limpiezaRefri', f.mes, f.anio);
+  return { success: true, message: 'Registro de Limpieza Refrigerador actualizado.' };
+}
+
+function deleteLimpRefri(data) {
+  if (!data.rowIndex) return { success: false, error: 'ID de registro no especificado.' };
+  const targetRow = findRowIndexByTimestamp(SHEETS.LIMP_REFRI, data.rowIndex, data.fecha_registro, 9);
+  if (targetRow < 2) return { success: false, error: 'No se encontró el registro a eliminar.' };
+
+  const sheet = getSheet(SHEETS.LIMP_REFRI);
+  const mes = data.mes || sheet.getRange(targetRow, 3).getValue();
+  const anio = data.anio || sheet.getRange(targetRow, 4).getValue();
+  sheet.deleteRow(targetRow);
+  if (mes && anio) clearSheetCache('limpiezaRefri', mes, anio);
+  return { success: true, message: 'Registro de Limpieza Refrigerador eliminado.' };
+}
+
+// ── Update / Delete — Conductividad ────────────────────────────
+function updateConductividad(data) {
+  if (!data.rowIndex || !data.responsable || !data.fecha || data.conductividad === undefined) {
+    return { success: false, error: 'Faltan campos obligatorios para actualizar.' };
+  }
+  const targetRow = findRowIndexByTimestamp(SHEETS.CONDUCT_REG, data.rowIndex, data.fecha_registro, 9);
+  if (targetRow < 2) return { success: false, error: 'No se encontró el registro para actualizar.' };
+
+  const sheet = getSheet(SHEETS.CONDUCT_REG);
+  const f = parseFecha(data.fecha);
+  sheet.getRange(targetRow, 1, 1, 8).setValues([[
+    formatFechaDDMMYYYY(f), f.dia, f.mes, f.anio,
+    data.responsable.toUpperCase().substring(0, 3),
+    parseFloat(data.conductividad),
+    data.turno || 'Mañana',
+    data.observaciones || ''
+  ]]);
+  clearSheetCache('conductividad', f.mes, f.anio);
+  return { success: true, message: 'Registro de Conductividad actualizado.' };
+}
+
+function deleteConductividad(data) {
+  if (!data.rowIndex) return { success: false, error: 'ID de registro no especificado.' };
+  const targetRow = findRowIndexByTimestamp(SHEETS.CONDUCT_REG, data.rowIndex, data.fecha_registro, 9);
+  if (targetRow < 2) return { success: false, error: 'No se encontró el registro a eliminar.' };
+
+  const sheet = getSheet(SHEETS.CONDUCT_REG);
+  const mes = data.mes || sheet.getRange(targetRow, 3).getValue();
+  const anio = data.anio || sheet.getRange(targetRow, 4).getValue();
+  sheet.deleteRow(targetRow);
+  if (mes && anio) clearSheetCache('conductividad', mes, anio);
+  return { success: true, message: 'Registro de Conductividad eliminado.' };
+}
+
+// ── Update / Delete — Cobas ──────────────────────────────────
+function updateCobas(data) {
+  if (!data.rowIndex || !data.responsable || !data.fecha || !data.equipo) {
+    return { success: false, error: 'Faltan campos obligatorios para actualizar.' };
+  }
+  const targetRow = findRowIndexByTimestamp(SHEETS.COBAS_REG, data.rowIndex, data.fecha_registro, 10);
+  if (targetRow < 2) return { success: false, error: 'No se encontró el registro para actualizar.' };
+
+  const sheet = getSheet(SHEETS.COBAS_REG);
+  const f = parseFecha(data.fecha);
+  sheet.getRange(targetRow, 1, 1, 9).setValues([[
+    formatFechaDDMMYYYY(f), f.dia, f.mes, f.anio,
+    data.equipo,
+    data.responsable.toUpperCase().substring(0, 3),
+    data.frecuencia || '',
+    data.actividad || '',
+    data.observaciones || ''
+  ]]);
+  clearSheetCache('cobas', f.mes, f.anio);
+  return { success: true, message: 'Registro de Cobas actualizado.' };
+}
+
+function deleteCobas(data) {
+  if (!data.rowIndex) return { success: false, error: 'ID de registro no especificado.' };
+  const targetRow = findRowIndexByTimestamp(SHEETS.COBAS_REG, data.rowIndex, data.fecha_registro, 10);
+  if (targetRow < 2) return { success: false, error: 'No se encontró el registro a eliminar.' };
+
+  const sheet = getSheet(SHEETS.COBAS_REG);
+  const mes = data.mes || sheet.getRange(targetRow, 3).getValue();
+  const anio = data.anio || sheet.getRange(targetRow, 4).getValue();
+  sheet.deleteRow(targetRow);
+  if (mes && anio) clearSheetCache('cobas', mes, anio);
+  return { success: true, message: 'Registro de Cobas eliminado.' };
 }
 
 function findTermoRowIndex(rowIndex, fechaRegistro) {

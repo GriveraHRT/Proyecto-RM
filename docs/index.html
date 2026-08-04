@@ -1143,6 +1143,27 @@
     <button class="btn btn-warning" onclick="closeModal({target:document.getElementById('modal-overlay')})">Entendido</button>
   </div>
 
+  <!-- Modal: Confirmación de Registro Duplicado -->
+  <div class="modal-card" id="modal-duplicate-confirm" style="display:none;" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div class="dup-modal-header">
+      <div class="dup-modal-icon">⚠️</div>
+      <div>
+        <div class="dup-modal-title-text">Aviso de Registro Duplicado</div>
+        <div class="dup-modal-subtitle">Se detectó un registro grabado previamente para este día</div>
+      </div>
+    </div>
+    
+    <div id="dup-confirm-body">
+      <!-- Rellenado dinámicamente -->
+    </div>
+
+    <div class="dup-modal-actions">
+      <button type="button" class="btn-dup-no" id="btn-dup-confirm-no">✕ Cancelar</button>
+      <button type="button" class="btn-dup-yes" id="btn-dup-confirm-yes">✓ Sí, Continuar y Guardar</button>
+    </div>
+  </div>
+
   <!-- Modal: Editar Registro de Temperatura / Humedad -->
   <div class="modal-card" id="modal-edit-termo" style="display:none; max-width: 500px;" onclick="event.stopPropagation()">
     <button class="modal-close" onclick="closeModal()">✕</button>

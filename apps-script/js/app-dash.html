@@ -4,7 +4,8 @@ document.getElementById('form-termo').addEventListener('submit',async e=>{
   e.preventDefault();
   const dup = await checkDuplicateTermo();
   if (dup) {
-    if (!confirm(dup.message)) return;
+    const confirmed = await showDuplicateConfirmModal(dup);
+    if (!confirmed) return;
   }
   const obsVal = document.getElementById('termo-obs').value;
   const issues=isOutOfRange();
@@ -32,7 +33,8 @@ document.getElementById('form-centrifugas').addEventListener('submit',async e=>{
   if(!sel.length){showToast('Seleccione al menos una centrífuga','error');return}
   const dup = await checkDuplicateCentrifugas();
   if (dup) {
-    if (!confirm(dup.message)) return;
+    const confirmed = await showDuplicateConfirmModal(dup);
+    if (!confirmed) return;
   }
   setLoading('btn-cent-submit','spinner-cent','btn-cent-text',true);
   try{
@@ -42,6 +44,7 @@ document.getElementById('form-centrifugas').addEventListener('submit',async e=>{
       clearRecordsMonthCache();
       prefetchDashboard();
       checkDuplicateCentrifugas();
+      if(typeof loadRecentCentrifugas==='function')loadRecentCentrifugas();
     }
     else showToast('❌ '+r.error,'error')
   }catch(err){showToast('❌ Error de conexión','error')}
@@ -56,7 +59,8 @@ document.getElementById('form-mesones').addEventListener('submit',async e=>{
   if(!sel.length){showToast('Seleccione al menos una sala','error');return}
   const dup = await checkDuplicateMesones();
   if (dup) {
-    if (!confirm(dup.message)) return;
+    const confirmed = await showDuplicateConfirmModal(dup);
+    if (!confirmed) return;
   }
   setLoading('btn-meson-submit','spinner-meson','btn-meson-text',true);
   try{
@@ -66,6 +70,7 @@ document.getElementById('form-mesones').addEventListener('submit',async e=>{
       clearRecordsMonthCache();
       prefetchDashboard();
       checkDuplicateMesones();
+      if(typeof loadRecentMesones==='function')loadRecentMesones();
     }
     else showToast('❌ '+r.error,'error')
   }catch(err){showToast('❌ Error de conexión','error')}
@@ -81,14 +86,14 @@ document.getElementById('form-refri-temp').addEventListener('submit',async e=>{
   setLoading('btn-refri-submit','spinner-refri','btn-refri-text',true);
   try{
     const r=await apiPost({action:'saveRefriTemp',fecha:document.getElementById('refri-fecha').value,ampm:state.ampmRefri,equipo:document.getElementById('refri-equipo').value,temperatura:document.getElementById('refri-temp-input').value,responsable:document.getElementById('refri-resp').value,observaciones:obsVal,accion_correctiva:document.getElementById('refri-accion').value||''});
-    if(r.success){addDatalistOption('list-refri-obs', obsVal);showToast('✅ '+r.message);e.target.reset();document.getElementById('refri-fecha').value=today();resetRangoRefri();autoSetAmPm();prefetchDashboard()}
+    if(r.success){addDatalistOption('list-refri-obs', obsVal);showToast('✅ '+r.message);e.target.reset();document.getElementById('refri-fecha').value=today();resetRangoRefri();autoSetAmPm();prefetchDashboard();if(typeof loadRecentRefriTemp==='function')loadRecentRefriTemp();}
     else showToast('❌ '+r.error,'error');
   }catch(err){showToast('❌ Error de conexión','error')}
   setLoading('btn-refri-submit','spinner-refri','btn-refri-text',false);
 });
 
 // Forms — Limpieza Refrigeradores
-document.getElementById('form-limp-refri').addEventListener('submit',async e=>{e.preventDefault();const obsVal=document.getElementById('limp-refri-obs').value;const sel=getSelectedChips('limp-refri-chips');if(!sel.length){showToast('Seleccione al menos un equipo','error');return}setLoading('btn-limp-refri-submit','spinner-limp-refri','btn-limp-refri-text',true);try{const r=await apiPost({action:'saveLimpiezaRefri',fecha:document.getElementById('limp-refri-fecha').value,equipos:sel,responsable:document.getElementById('limp-refri-resp').value,tipo_mantencion:document.getElementById('limp-refri-tipo').value,observaciones:obsVal});if(r.success){addDatalistOption('list-limp-refri-obs',obsVal);showToast('✅ '+r.message);e.target.reset();document.getElementById('limp-refri-fecha').value=today();document.getElementById('limp-refri-tipo').value='Semanal (externa)';updateInfoLimpRefri();document.querySelectorAll('#limp-refri-chips .chip-item').forEach(c=>c.classList.remove('selected'));prefetchDashboard()}else showToast('❌ '+r.error,'error')}catch(err){showToast('❌ Error de conexión','error')}setLoading('btn-limp-refri-submit','spinner-limp-refri','btn-limp-refri-text',false)});
+document.getElementById('form-limp-refri').addEventListener('submit',async e=>{e.preventDefault();const obsVal=document.getElementById('limp-refri-obs').value;const sel=getSelectedChips('limp-refri-chips');if(!sel.length){showToast('Seleccione al menos un equipo','error');return}setLoading('btn-limp-refri-submit','spinner-limp-refri','btn-limp-refri-text',true);try{const r=await apiPost({action:'saveLimpiezaRefri',fecha:document.getElementById('limp-refri-fecha').value,equipos:sel,responsable:document.getElementById('limp-refri-resp').value,tipo_mantencion:document.getElementById('limp-refri-tipo').value,observaciones:obsVal});if(r.success){addDatalistOption('list-limp-refri-obs',obsVal);showToast('✅ '+r.message);e.target.reset();document.getElementById('limp-refri-fecha').value=today();document.getElementById('limp-refri-tipo').value='Semanal (externa)';updateInfoLimpRefri();document.querySelectorAll('#limp-refri-chips .chip-item').forEach(c=>c.classList.remove('selected'));prefetchDashboard();if(typeof loadRecentLimpRefri==='function')loadRecentLimpRefri();}else showToast('❌ '+r.error,'error')}catch(err){showToast('❌ Error de conexión','error')}setLoading('btn-limp-refri-submit','spinner-limp-refri','btn-limp-refri-text',false)});
 
 // Forms — Conductividad
 document.getElementById('form-conductividad').addEventListener('submit',async e=>{
@@ -97,7 +102,7 @@ document.getElementById('form-conductividad').addEventListener('submit',async e=
   setLoading('btn-conduct-submit','spinner-conduct','btn-conduct-text',true);
   try{
     const r=await apiPost({action:'saveConductividad',fecha:document.getElementById('conduct-fecha').value,ampm:state.ampmConduct,conductividad:document.getElementById('conduct-valor').value,responsable:document.getElementById('conduct-resp').value,observaciones:obsVal});
-    if(r.success){addDatalistOption('list-conduct-obs', obsVal);showToast('✅ '+r.message);e.target.reset();document.getElementById('conduct-fecha').value=today();resetRangoConductividad();autoSetAmPm();prefetchDashboard()}
+    if(r.success){addDatalistOption('list-conduct-obs', obsVal);showToast('✅ '+r.message);e.target.reset();document.getElementById('conduct-fecha').value=today();resetRangoConductividad();autoSetAmPm();prefetchDashboard();if(typeof loadRecentConductividad==='function')loadRecentConductividad();}
     else showToast('❌ '+r.error,'error');
   }catch(err){showToast('❌ Error de conexión','error')}
   setLoading('btn-conduct-submit','spinner-conduct','btn-conduct-text',false);
@@ -250,6 +255,7 @@ if (formCobas) {
         showToast('✅ ' + r.message);
         e.target.reset();
         document.getElementById('cobas-fecha').value = today();
+        if (typeof loadRecentCobas === 'function') loadRecentCobas();
         
         // Reset checklist selections
         document.querySelectorAll('#form-cobas .checklist-item.selected').forEach(c => c.classList.remove('selected'));
@@ -301,9 +307,11 @@ async function loadDashboard(forceReload){
     if(!state.dashMaestros)state.dashMaestros={areas:state.areas,centrifugas:state.centrifugas,salas:state.salas,refrigeradores:state.refrigeradores,refriLimpieza:state.refriLimpieza};
     applyDashData(reg);updateCacheIndicator();return;
   }
-  document.getElementById('dash-loading').style.display='block';
-  document.getElementById('dash-tables').innerHTML='';document.getElementById('dash-alerts-container').innerHTML='';
-  document.getElementById('dash-daily-view').innerHTML='';document.getElementById('dash-monthly-view').innerHTML='';
+  const dl=document.getElementById('dash-loading');if(dl)dl.style.display='block';
+  const dt=document.getElementById('dash-tables');if(dt)dt.innerHTML='';
+  const dac=document.getElementById('dash-alerts-container');if(dac)dac.innerHTML='';
+  const ddv=document.getElementById('dash-daily-view');if(ddv)ddv.innerHTML='';
+  const dmv=document.getElementById('dash-monthly-view');if(dmv)dmv.innerHTML='';
   try{
     const[reg,rev]=await Promise.all([apiGet({action:'getRegistros',mes:state.dashMes,anio:state.dashAnio}),apiGet({action:'getRevisiones',mes:state.dashMes,anio:state.dashAnio})]);
     if(!state.dashMaestros || !state.dashMaestros.centrifugasDetailed){
@@ -323,7 +331,7 @@ async function loadDashboard(forceReload){
     state.dashData=mockReg;
     applyDashData(mockReg);
   }
-  document.getElementById('dash-loading').style.display='none';updateCacheIndicator();
+  if(dl)dl.style.display='none';updateCacheIndicator();
 }
 function applyDashData(reg){
   if(!reg) return;
@@ -560,8 +568,9 @@ function renderMonthlyView(reg){
 }
 
 function renderTables(reg){
-  if(!reg) return;
-  const c=document.getElementById('dash-tables');let html='';
+  const c=document.getElementById('dash-tables');
+  if(!c||!reg) return;
+  let html='';
   if(isModuloActivo('termo'))html+=renderTableCard('🌡️ Temp. Ambiental',reg.termo||[],['Día','Turno','Área','Temp°','Hum%','Resp','Acción','Obs'],r=>[r.dia,r.turno,r.area,r.temperatura,r.humedad,r.responsable,r.accion_correctiva||'',r.observaciones]);
   if(isModuloActivo('centrifugas'))html+=renderTableCard('⚙️ Centrífugas',reg.centrifugas||[],['Día','Centrífuga','Resp','Tipo','Obs'],r=>[r.dia,r.centrifuga,r.responsable,r.tipo_mantencion,r.observaciones]);
   if(isModuloActivo('mesones'))html+=renderTableCard('🧽 Mesones',reg.mesones||[],['Día','Sala','Resp','Obs'],r=>[r.dia,r.sala,r.responsable,r.observaciones]);
@@ -1969,6 +1978,12 @@ async function saveElimMuestrasForm(e) {
     return;
   }
 
+  const dup = await checkDuplicateElimMuestras();
+  if (dup) {
+    const confirmed = await showDuplicateConfirmModal(dup);
+    if (!confirmed) return;
+  }
+
   const spinner = document.getElementById('spinner-elim');
   const btnText = document.getElementById('btn-elim-text');
   
@@ -2008,6 +2023,87 @@ async function saveElimMuestrasForm(e) {
 }
 
 // ══ COMPROBACIÓN DE REGISTROS DUPLICADOS ═════════════════════════════════════
+
+function showDuplicateConfirmModal(dupInfo) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('modal-duplicate-confirm');
+    const overlay = document.getElementById('modal-overlay');
+    const bodyEl = document.getElementById('dup-confirm-body');
+    const btnConfirm = document.getElementById('btn-dup-confirm-yes');
+    const btnCancel = document.getElementById('btn-dup-confirm-no');
+
+    if (!modal || !overlay || !bodyEl) {
+      resolve(confirm(dupInfo.message || '¿Está seguro que desea continuar?'));
+      return;
+    }
+
+    let detailsHtml = '';
+    if (dupInfo.existing) {
+      detailsHtml = `
+        <div class="dup-detail-card">
+          <div class="dup-detail-row">
+            <span class="dup-detail-label">👤 Responsable previo:</span>
+            <span class="dup-detail-val">"${dupInfo.existing.responsable || 'Desconocido'}"</span>
+          </div>
+          ${dupInfo.existing.area ? `
+          <div class="dup-detail-row">
+            <span class="dup-detail-label">📍 Área:</span>
+            <span class="dup-detail-val">${dupInfo.existing.area}</span>
+          </div>` : ''}
+          ${dupInfo.existing.turno ? `
+          <div class="dup-detail-row">
+            <span class="dup-detail-label">🕒 Turno:</span>
+            <span class="dup-detail-val">${dupInfo.existing.turno}</span>
+          </div>` : ''}
+        </div>
+      `;
+    } else if (dupInfo.duplicates && dupInfo.duplicates.length > 0) {
+      const listItems = dupInfo.duplicates.map(d => `
+        <div class="dup-item-badge">
+          <span class="dup-item-name">📌 ${d.name}</span>
+          <span class="dup-item-resp">Ingresado por <strong>"${d.resp}"</strong></span>
+        </div>
+      `).join('');
+      detailsHtml = `<div class="dup-items-list">${listItems}</div>`;
+    }
+
+    const mainText = dupInfo.cleanMessage || dupInfo.message || 'Ya existe un registro realizado para esta fecha.';
+
+    bodyEl.innerHTML = `
+      <div class="dup-modal-msg">
+        ${mainText}
+      </div>
+      ${detailsHtml}
+      <div style="font-size: 0.9rem; font-weight: 600; color: var(--primary-color, #00D4FF); margin-top: 10px; text-align: center;">
+        ¿Desea ingresar el registro de todas formas?
+      </div>
+    `;
+
+    document.querySelectorAll('.modal-card').forEach(m => m.style.display = 'none');
+    modal.style.display = 'block';
+    overlay.classList.add('active');
+
+    const cleanup = () => {
+      overlay.classList.remove('active');
+      modal.style.display = 'none';
+      btnConfirm.removeEventListener('click', onYes);
+      btnCancel.removeEventListener('click', onNo);
+    };
+
+    const onYes = () => {
+      cleanup();
+      resolve(true);
+    };
+
+    const onNo = () => {
+      cleanup();
+      resolve(false);
+    };
+
+    btnConfirm.addEventListener('click', onYes);
+    btnCancel.addEventListener('click', onNo);
+  });
+}
 
 async function getRegistrosForMonth(mes, anio) {
   mes = parseInt(mes);
@@ -2646,6 +2742,809 @@ async function deleteDiaNoHabilHRTAdmin(fechaStr) {
   } catch (err) {
     console.error('Error deleteDiaNoHabilHRTAdmin:', err);
     showToast('❌ Error de conexión al quitar fecha', 'error');
+  }
+}
+
+// ── Recent Centrifugas Records ──────────────────────────
+let recentCentrifugasCache = [];
+
+async function loadRecentCentrifugas() {
+  const tbody = document.getElementById('tbody-recent-centrifugas');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 16px; color: #94a3b8;">🔄 Cargando registros recientes...</td></tr>';
+  try {
+    const res = await apiGet({ action: 'getRecentCentrifugas', limit: 20 });
+    if (res && res.success && Array.isArray(res.records)) {
+      recentCentrifugasCache = res.records;
+      renderRecentCentrifugasTable(recentCentrifugasCache);
+    } else {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${res.error || 'Error al cargar registros.'}</td></tr>`;
+    }
+  } catch (err) {
+    console.error('Error cargando últimos centrifugas:', err);
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 16px; color: #ef4444;">❌ Error de conexión al cargar registros.</td></tr>';
+  }
+}
+
+function renderRecentCentrifugasTable(records) {
+  const tbody = document.getElementById('tbody-recent-centrifugas');
+  if (!tbody) return;
+  if (!records || records.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 16px; color: #94a3b8;">No hay registros recientes.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = records.map((r, idx) => `
+    <tr style="border-bottom: 1px solid #f1f5f9;">
+      <td style="padding: 8px 4px; white-space: nowrap;"><strong>${r.fecha}</strong></td>
+      <td style="padding: 8px 4px; font-weight:600;">${r.centrifuga || '-'}</td>
+      <td style="padding: 8px 4px; text-align: center; font-weight:700; letter-spacing:1px; white-space: nowrap;">${r.responsable}</td>
+      <td style="padding: 8px 4px; text-align: center; white-space: nowrap;"><span class="chip" style="font-size:0.75rem;">${r.tipo_mantencion}</span></td>
+      <td style="padding: 8px 4px; text-align: center; white-space: nowrap;">
+        <button type="button" class="btn btn-secondary" style="padding: 4px 6px; font-size: 0.75rem;" onclick="openEditCentrifugaModal(${idx})" title="Editar">✏️ Edit</button>
+        <button type="button" class="btn btn-danger" style="padding: 4px 6px; font-size: 0.75rem; margin-left: 2px;" onclick="confirmDeleteCentrifuga(${idx})" title="Eliminar">🗑️ Elim</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function openEditCentrifugaModal(idx) {
+  const rec = recentCentrifugasCache[idx];
+  if (!rec) return;
+  document.getElementById('edit-cent-rowindex').value = rec.rowIndex;
+  document.getElementById('edit-cent-fecha-reg').value = rec.fecha_registro || '';
+  document.getElementById('edit-cent-old-mes').value = rec.mes || '';
+  document.getElementById('edit-cent-old-anio').value = rec.anio || '';
+  document.getElementById('edit-cent-fecha').value = parseFechaToInput(rec.fecha);
+  document.getElementById('edit-cent-tipo').value = rec.tipo_mantencion || 'Diaria';
+  document.getElementById('edit-cent-resp').value = rec.responsable || '';
+  document.getElementById('edit-cent-obs').value = rec.observaciones || '';
+
+  const selectCent = document.getElementById('edit-cent-nombre');
+  if (selectCent && Array.isArray(state.centrifugas)) {
+    selectCent.innerHTML = state.centrifugas.map(c => `<option value="${c}" ${c === rec.centrifuga ? 'selected' : ''}>${c}</option>`).join('');
+  }
+
+  document.querySelectorAll('.modal-card').forEach(m => m.style.display = 'none');
+  const modal = document.getElementById('modal-edit-centrifugas');
+  if (modal) modal.style.display = 'block';
+  const overlay = document.getElementById('modal-overlay');
+  if (overlay) overlay.classList.add('active');
+}
+
+async function submitEditCentrifuga(e) {
+  e.preventDefault();
+  const rowIndex = parseInt(document.getElementById('edit-cent-rowindex').value);
+  const fechaReg = document.getElementById('edit-cent-fecha-reg').value;
+  const fechaVal = document.getElementById('edit-cent-fecha').value;
+  const tipoVal = document.getElementById('edit-cent-tipo').value;
+  const centVal = document.getElementById('edit-cent-nombre').value;
+  const respVal = document.getElementById('edit-cent-resp').value;
+  const obsVal = document.getElementById('edit-cent-obs').value;
+
+  setLoading('btn-edit-cent-submit', 'spinner-edit-cent', 'btn-edit-cent-text', true);
+  try {
+    const res = await apiPost({
+      action: 'updateCentrifuga',
+      rowIndex: rowIndex,
+      fecha_registro: fechaReg,
+      fecha: fechaVal,
+      tipo_mantencion: tipoVal,
+      centrifuga: centVal,
+      responsable: respVal,
+      observaciones: obsVal
+    });
+
+    if (res && res.success) {
+      showToast('✅ ' + res.message);
+      closeModal({ target: document.getElementById('modal-overlay') });
+      if (typeof clearRecordsMonthCache === 'function') clearRecordsMonthCache();
+      if (typeof prefetchDashboard === 'function') prefetchDashboard();
+      loadRecentCentrifugas();
+    } else {
+      showToast('❌ ' + (res.error || 'Error al actualizar registro'), 'error');
+    }
+  } catch (err) {
+    showToast('❌ Error de conexión al actualizar', 'error');
+  }
+  setLoading('btn-edit-cent-submit', 'spinner-edit-cent', 'btn-edit-cent-text', false);
+}
+
+async function confirmDeleteCentrifuga(idx) {
+  const rec = recentCentrifugasCache[idx];
+  if (!rec) return;
+  if (!confirm(`¿Está seguro de eliminar el registro de centrífuga "${rec.centrifuga}" del día ${rec.fecha}?`)) return;
+
+  try {
+    const res = await apiPost({
+      action: 'deleteCentrifuga',
+      rowIndex: rec.rowIndex,
+      fecha_registro: rec.fecha_registro,
+      mes: rec.mes,
+      anio: rec.anio
+    });
+
+    if (res && res.success) {
+      showToast('✅ ' + res.message);
+      if (typeof clearRecordsMonthCache === 'function') clearRecordsMonthCache();
+      if (typeof prefetchDashboard === 'function') prefetchDashboard();
+      loadRecentCentrifugas();
+    } else {
+      showToast('❌ ' + (res.error || 'Error al eliminar registro'), 'error');
+    }
+  } catch (err) {
+    showToast('❌ Error de conexión al eliminar', 'error');
+  }
+}
+
+// ── Recent Mesones Records ──────────────────────────
+let recentMesonesCache = [];
+
+async function loadRecentMesones() {
+  const tbody = document.getElementById('tbody-recent-mesones');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 16px; color: #94a3b8;">🔄 Cargando registros recientes...</td></tr>';
+  try {
+    const res = await apiGet({ action: 'getRecentMesones', limit: 20 });
+    if (res && res.success && Array.isArray(res.records)) {
+      recentMesonesCache = res.records;
+      renderRecentMesonesTable(recentMesonesCache);
+    } else {
+      tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${res.error || 'Error al cargar registros.'}</td></tr>`;
+    }
+  } catch (err) {
+    console.error('Error cargando últimos mesones:', err);
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 16px; color: #ef4444;">❌ Error de conexión al cargar registros.</td></tr>';
+  }
+}
+
+function renderRecentMesonesTable(records) {
+  const tbody = document.getElementById('tbody-recent-mesones');
+  if (!tbody) return;
+  if (!records || records.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 16px; color: #94a3b8;">No hay registros recientes.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = records.map((r, idx) => `
+    <tr style="border-bottom: 1px solid #f1f5f9;">
+      <td style="padding: 8px 4px; white-space: nowrap;"><strong>${r.fecha}</strong></td>
+      <td style="padding: 8px 4px; font-weight:600;">${r.sala || '-'}</td>
+      <td style="padding: 8px 4px; text-align: center; font-weight:700; letter-spacing:1px; white-space: nowrap;">${r.responsable}</td>
+      <td style="padding: 8px 4px; text-align: center; white-space: nowrap;">
+        <button type="button" class="btn btn-secondary" style="padding: 4px 6px; font-size: 0.75rem;" onclick="openEditMesonModal(${idx})" title="Editar">✏️ Edit</button>
+        <button type="button" class="btn btn-danger" style="padding: 4px 6px; font-size: 0.75rem; margin-left: 2px;" onclick="confirmDeleteMeson(${idx})" title="Eliminar">🗑️ Elim</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function openEditMesonModal(idx) {
+  const rec = recentMesonesCache[idx];
+  if (!rec) return;
+  document.getElementById('edit-meson-rowindex').value = rec.rowIndex;
+  document.getElementById('edit-meson-fecha-reg').value = rec.fecha_registro || '';
+  document.getElementById('edit-meson-old-mes').value = rec.mes || '';
+  document.getElementById('edit-meson-old-anio').value = rec.anio || '';
+  document.getElementById('edit-meson-fecha').value = parseFechaToInput(rec.fecha);
+  document.getElementById('edit-meson-resp').value = rec.responsable || '';
+  document.getElementById('edit-meson-obs').value = rec.observaciones || '';
+
+  const selectSala = document.getElementById('edit-meson-sala');
+  if (selectSala && Array.isArray(state.salas)) {
+    selectSala.innerHTML = state.salas.map(s => `<option value="${s}" ${s === rec.sala ? 'selected' : ''}>${s}</option>`).join('');
+  }
+
+  document.querySelectorAll('.modal-card').forEach(m => m.style.display = 'none');
+  const modal = document.getElementById('modal-edit-mesones');
+  if (modal) modal.style.display = 'block';
+  const overlay = document.getElementById('modal-overlay');
+  if (overlay) overlay.classList.add('active');
+}
+
+async function submitEditMeson(e) {
+  e.preventDefault();
+  const rowIndex = parseInt(document.getElementById('edit-meson-rowindex').value);
+  const fechaReg = document.getElementById('edit-meson-fecha-reg').value;
+  const fechaVal = document.getElementById('edit-meson-fecha').value;
+  const salaVal = document.getElementById('edit-meson-sala').value;
+  const respVal = document.getElementById('edit-meson-resp').value;
+  const obsVal = document.getElementById('edit-meson-obs').value;
+
+  setLoading('btn-edit-meson-submit', 'spinner-edit-meson', 'btn-edit-meson-text', true);
+  try {
+    const res = await apiPost({
+      action: 'updateMeson',
+      rowIndex: rowIndex,
+      fecha_registro: fechaReg,
+      fecha: fechaVal,
+      sala: salaVal,
+      responsable: respVal,
+      observaciones: obsVal
+    });
+
+    if (res && res.success) {
+      showToast('✅ ' + res.message);
+      closeModal({ target: document.getElementById('modal-overlay') });
+      if (typeof clearRecordsMonthCache === 'function') clearRecordsMonthCache();
+      if (typeof prefetchDashboard === 'function') prefetchDashboard();
+      loadRecentMesones();
+    } else {
+      showToast('❌ ' + (res.error || 'Error al actualizar registro'), 'error');
+    }
+  } catch (err) {
+    showToast('❌ Error de conexión al actualizar', 'error');
+  }
+  setLoading('btn-edit-meson-submit', 'spinner-edit-meson', 'btn-edit-meson-text', false);
+}
+
+async function confirmDeleteMeson(idx) {
+  const rec = recentMesonesCache[idx];
+  if (!rec) return;
+  if (!confirm(`¿Está seguro de eliminar el registro de mesón de "${rec.sala}" del día ${rec.fecha}?`)) return;
+
+  try {
+    const res = await apiPost({
+      action: 'deleteMeson',
+      rowIndex: rec.rowIndex,
+      fecha_registro: rec.fecha_registro,
+      mes: rec.mes,
+      anio: rec.anio
+    });
+
+    if (res && res.success) {
+      showToast('✅ ' + res.message);
+      if (typeof clearRecordsMonthCache === 'function') clearRecordsMonthCache();
+      if (typeof prefetchDashboard === 'function') prefetchDashboard();
+      loadRecentMesones();
+    } else {
+      showToast('❌ ' + (res.error || 'Error al eliminar registro'), 'error');
+    }
+  } catch (err) {
+    showToast('❌ Error de conexión al eliminar', 'error');
+  }
+}
+
+// ── Recent Refri Temp Records ──────────────────────────
+let recentRefriTempCache = [];
+
+async function loadRecentRefriTemp() {
+  const tbody = document.getElementById('tbody-recent-refri-temp');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 16px; color: #94a3b8;">🔄 Cargando registros recientes...</td></tr>';
+  try {
+    const res = await apiGet({ action: 'getRecentRefriTemp', limit: 20 });
+    if (res && res.success && Array.isArray(res.records)) {
+      recentRefriTempCache = res.records;
+      renderRecentRefriTempTable(recentRefriTempCache);
+    } else {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${res.error || 'Error al cargar registros.'}</td></tr>`;
+    }
+  } catch (err) {
+    console.error('Error cargando últimos refri temp:', err);
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 16px; color: #ef4444;">❌ Error de conexión al cargar registros.</td></tr>';
+  }
+}
+
+function renderRecentRefriTempTable(records) {
+  const tbody = document.getElementById('tbody-recent-refri-temp');
+  if (!tbody) return;
+  if (!records || records.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 16px; color: #94a3b8;">No hay registros recientes.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = records.map((r, idx) => {
+    const turnoBadge = r.turno === 'Mañana' ? '☀️ AM' : '🌙 PM';
+    return `
+      <tr style="border-bottom: 1px solid #f1f5f9;">
+        <td style="padding: 8px 4px; white-space: nowrap;"><strong>${r.fecha}</strong> <span style="font-size:0.75rem; color:#64748b;">(${turnoBadge})</span></td>
+        <td style="padding: 8px 4px; font-weight:600;">${r.equipo || '-'}</td>
+        <td style="padding: 8px 4px; text-align: center; font-weight:700; color:#16a34a; white-space: nowrap;">${r.temperatura} °C</td>
+        <td style="padding: 8px 4px; text-align: center; font-weight:700; letter-spacing:1px; white-space: nowrap;">${r.responsable}</td>
+        <td style="padding: 8px 4px; font-size: 0.82rem;">${[r.accion_correctiva, r.observaciones].filter(Boolean).join(' - ') || '-'}</td>
+        <td style="padding: 8px 4px; text-align: center; white-space: nowrap;">
+          <button type="button" class="btn btn-secondary" style="padding: 4px 6px; font-size: 0.75rem;" onclick="openEditRefriTempModal(${idx})" title="Editar">✏️ Edit</button>
+          <button type="button" class="btn btn-danger" style="padding: 4px 6px; font-size: 0.75rem; margin-left: 2px;" onclick="confirmDeleteRefriTemp(${idx})" title="Eliminar">🗑️ Elim</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function openEditRefriTempModal(idx) {
+  const rec = recentRefriTempCache[idx];
+  if (!rec) return;
+  document.getElementById('edit-refri-rowindex').value = rec.rowIndex;
+  document.getElementById('edit-refri-fecha-reg').value = rec.fecha_registro || '';
+  document.getElementById('edit-refri-old-mes').value = rec.mes || '';
+  document.getElementById('edit-refri-old-anio').value = rec.anio || '';
+  document.getElementById('edit-refri-fecha').value = parseFechaToInput(rec.fecha);
+  document.getElementById('edit-refri-turno').value = rec.turno === 'Tarde' ? 'Tarde' : 'Mañana';
+  document.getElementById('edit-refri-temp-val').value = rec.temperatura;
+  document.getElementById('edit-refri-resp').value = rec.responsable || '';
+  document.getElementById('edit-refri-obs').value = rec.observaciones || '';
+
+  const selectEq = document.getElementById('edit-refri-equipo');
+  if (selectEq && Array.isArray(state.refrigeradores)) {
+    selectEq.innerHTML = state.refrigeradores.map(e => `<option value="${e.equipo || e}" ${(e.equipo || e) === rec.equipo ? 'selected' : ''}>${e.equipo || e}</option>`).join('');
+  }
+
+  const selectAcc = document.getElementById('edit-refri-accion');
+  if (selectAcc && Array.isArray(state.acciones)) {
+    selectAcc.innerHTML = '<option value="">Ninguna / Opcional</option>' +
+      state.acciones.map(a => `<option value="${a}" ${a === rec.accion_correctiva ? 'selected' : ''}>${a}</option>`).join('');
+  }
+
+  document.querySelectorAll('.modal-card').forEach(m => m.style.display = 'none');
+  const modal = document.getElementById('modal-edit-refri-temp');
+  if (modal) modal.style.display = 'block';
+  const overlay = document.getElementById('modal-overlay');
+  if (overlay) overlay.classList.add('active');
+}
+
+async function submitEditRefriTemp(e) {
+  e.preventDefault();
+  const rowIndex = parseInt(document.getElementById('edit-refri-rowindex').value);
+  const fechaReg = document.getElementById('edit-refri-fecha-reg').value;
+  const fechaVal = document.getElementById('edit-refri-fecha').value;
+  const turnoVal = document.getElementById('edit-refri-turno').value;
+  const equipoVal = document.getElementById('edit-refri-equipo').value;
+  const tempVal = document.getElementById('edit-refri-temp-val').value;
+  const accVal = document.getElementById('edit-refri-accion').value;
+  const respVal = document.getElementById('edit-refri-resp').value;
+  const obsVal = document.getElementById('edit-refri-obs').value;
+
+  setLoading('btn-edit-refri-submit', 'spinner-edit-refri', 'btn-edit-refri-text', true);
+  try {
+    const res = await apiPost({
+      action: 'updateRefriTemp',
+      rowIndex: rowIndex,
+      fecha_registro: fechaReg,
+      fecha: fechaVal,
+      turno: turnoVal,
+      equipo: equipoVal,
+      temperatura: tempVal,
+      accion_correctiva: accVal,
+      responsable: respVal,
+      observaciones: obsVal
+    });
+
+    if (res && res.success) {
+      showToast('✅ ' + res.message);
+      closeModal({ target: document.getElementById('modal-overlay') });
+      if (typeof clearRecordsMonthCache === 'function') clearRecordsMonthCache();
+      if (typeof prefetchDashboard === 'function') prefetchDashboard();
+      loadRecentRefriTemp();
+    } else {
+      showToast('❌ ' + (res.error || 'Error al actualizar registro'), 'error');
+    }
+  } catch (err) {
+    showToast('❌ Error de conexión al actualizar', 'error');
+  }
+  setLoading('btn-edit-refri-submit', 'spinner-edit-refri', 'btn-edit-refri-text', false);
+}
+
+async function confirmDeleteRefriTemp(idx) {
+  const rec = recentRefriTempCache[idx];
+  if (!rec) return;
+  if (!confirm(`¿Está seguro de eliminar el registro de temp. de "${rec.equipo}" del día ${rec.fecha}?`)) return;
+
+  try {
+    const res = await apiPost({
+      action: 'deleteRefriTemp',
+      rowIndex: rec.rowIndex,
+      fecha_registro: rec.fecha_registro,
+      mes: rec.mes,
+      anio: rec.anio
+    });
+
+    if (res && res.success) {
+      showToast('✅ ' + res.message);
+      if (typeof clearRecordsMonthCache === 'function') clearRecordsMonthCache();
+      if (typeof prefetchDashboard === 'function') prefetchDashboard();
+      loadRecentRefriTemp();
+    } else {
+      showToast('❌ ' + (res.error || 'Error al eliminar registro'), 'error');
+    }
+  } catch (err) {
+    showToast('❌ Error de conexión al eliminar', 'error');
+  }
+}
+
+// ── Recent Limpieza Refri Records ──────────────────────────
+let recentLimpRefriCache = [];
+
+async function loadRecentLimpRefri() {
+  const tbody = document.getElementById('tbody-recent-limp-refri');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 16px; color: #94a3b8;">🔄 Cargando registros recientes...</td></tr>';
+  try {
+    const res = await apiGet({ action: 'getRecentLimpRefri', limit: 20 });
+    if (res && res.success && Array.isArray(res.records)) {
+      recentLimpRefriCache = res.records;
+      renderRecentLimpRefriTable(recentLimpRefriCache);
+    } else {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${res.error || 'Error al cargar registros.'}</td></tr>`;
+    }
+  } catch (err) {
+    console.error('Error cargando últimos limpieza refri:', err);
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 16px; color: #ef4444;">❌ Error de conexión al cargar registros.</td></tr>';
+  }
+}
+
+function renderRecentLimpRefriTable(records) {
+  const tbody = document.getElementById('tbody-recent-limp-refri');
+  if (!tbody) return;
+  if (!records || records.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 16px; color: #94a3b8;">No hay registros recientes.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = records.map((r, idx) => `
+    <tr style="border-bottom: 1px solid #f1f5f9;">
+      <td style="padding: 8px 4px; white-space: nowrap;"><strong>${r.fecha}</strong></td>
+      <td style="padding: 8px 4px;"><span class="chip" style="font-size:0.75rem;">${r.tipo_mantencion}</span></td>
+      <td style="padding: 8px 4px; font-weight:600;">${r.equipo || '-'}</td>
+      <td style="padding: 8px 4px; text-align: center; font-weight:700; letter-spacing:1px; white-space: nowrap;">${r.responsable}</td>
+      <td style="padding: 8px 4px; font-size: 0.82rem;">${r.observaciones || '-'}</td>
+      <td style="padding: 8px 4px; text-align: center; white-space: nowrap;">
+        <button type="button" class="btn btn-secondary" style="padding: 4px 6px; font-size: 0.75rem;" onclick="openEditLimpRefriModal(${idx})" title="Editar">✏️ Edit</button>
+        <button type="button" class="btn btn-danger" style="padding: 4px 6px; font-size: 0.75rem; margin-left: 2px;" onclick="confirmDeleteLimpRefri(${idx})" title="Eliminar">🗑️ Elim</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function openEditLimpRefriModal(idx) {
+  const rec = recentLimpRefriCache[idx];
+  if (!rec) return;
+  document.getElementById('edit-limp-refri-rowindex').value = rec.rowIndex;
+  document.getElementById('edit-limp-refri-fecha-reg').value = rec.fecha_registro || '';
+  document.getElementById('edit-limp-refri-old-mes').value = rec.mes || '';
+  document.getElementById('edit-limp-refri-old-anio').value = rec.anio || '';
+  document.getElementById('edit-limp-refri-fecha').value = parseFechaToInput(rec.fecha);
+  document.getElementById('edit-limp-refri-tipo').value = rec.tipo_mantencion || 'Semanal (externa)';
+  document.getElementById('edit-limp-refri-resp').value = rec.responsable || '';
+  document.getElementById('edit-limp-refri-obs').value = rec.observaciones || '';
+
+  const selectEq = document.getElementById('edit-limp-refri-equipo');
+  if (selectEq && Array.isArray(state.refriLimpieza)) {
+    selectEq.innerHTML = state.refriLimpieza.map(e => `<option value="${e}" ${e === rec.equipo ? 'selected' : ''}>${e}</option>`).join('');
+  }
+
+  document.querySelectorAll('.modal-card').forEach(m => m.style.display = 'none');
+  const modal = document.getElementById('modal-edit-limp-refri');
+  if (modal) modal.style.display = 'block';
+  const overlay = document.getElementById('modal-overlay');
+  if (overlay) overlay.classList.add('active');
+}
+
+async function submitEditLimpRefri(e) {
+  e.preventDefault();
+  const rowIndex = parseInt(document.getElementById('edit-limp-refri-rowindex').value);
+  const fechaReg = document.getElementById('edit-limp-refri-fecha-reg').value;
+  const fechaVal = document.getElementById('edit-limp-refri-fecha').value;
+  const tipoVal = document.getElementById('edit-limp-refri-tipo').value;
+  const equipoVal = document.getElementById('edit-limp-refri-equipo').value;
+  const respVal = document.getElementById('edit-limp-refri-resp').value;
+  const obsVal = document.getElementById('edit-limp-refri-obs').value;
+
+  setLoading('btn-edit-limp-refri-submit', 'spinner-edit-limp-refri', 'btn-edit-limp-refri-text', true);
+  try {
+    const res = await apiPost({
+      action: 'updateLimpRefri',
+      rowIndex: rowIndex,
+      fecha_registro: fechaReg,
+      fecha: fechaVal,
+      tipo_mantencion: tipoVal,
+      equipo: equipoVal,
+      responsable: respVal,
+      observaciones: obsVal
+    });
+
+    if (res && res.success) {
+      showToast('✅ ' + res.message);
+      closeModal({ target: document.getElementById('modal-overlay') });
+      if (typeof clearRecordsMonthCache === 'function') clearRecordsMonthCache();
+      if (typeof prefetchDashboard === 'function') prefetchDashboard();
+      loadRecentLimpRefri();
+    } else {
+      showToast('❌ ' + (res.error || 'Error al actualizar registro'), 'error');
+    }
+  } catch (err) {
+    showToast('❌ Error de conexión al actualizar', 'error');
+  }
+  setLoading('btn-edit-limp-refri-submit', 'spinner-edit-limp-refri', 'btn-edit-limp-refri-text', false);
+}
+
+async function confirmDeleteLimpRefri(idx) {
+  const rec = recentLimpRefriCache[idx];
+  if (!rec) return;
+  if (!confirm(`¿Está seguro de eliminar la limpieza de "${rec.equipo}" del día ${rec.fecha}?`)) return;
+
+  try {
+    const res = await apiPost({
+      action: 'deleteLimpRefri',
+      rowIndex: rec.rowIndex,
+      fecha_registro: rec.fecha_registro,
+      mes: rec.mes,
+      anio: rec.anio
+    });
+
+    if (res && res.success) {
+      showToast('✅ ' + res.message);
+      if (typeof clearRecordsMonthCache === 'function') clearRecordsMonthCache();
+      if (typeof prefetchDashboard === 'function') prefetchDashboard();
+      loadRecentLimpRefri();
+    } else {
+      showToast('❌ ' + (res.error || 'Error al eliminar registro'), 'error');
+    }
+  } catch (err) {
+    showToast('❌ Error de conexión al eliminar', 'error');
+  }
+}
+
+// ── Recent Conductividad Records ──────────────────────────
+let recentConductividadCache = [];
+
+async function loadRecentConductividad() {
+  const tbody = document.getElementById('tbody-recent-conductividad');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 16px; color: #94a3b8;">🔄 Cargando registros recientes...</td></tr>';
+  try {
+    const res = await apiGet({ action: 'getRecentConductividad', limit: 20 });
+    if (res && res.success && Array.isArray(res.records)) {
+      recentConductividadCache = res.records;
+      renderRecentConductividadTable(recentConductividadCache);
+    } else {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${res.error || 'Error al cargar registros.'}</td></tr>`;
+    }
+  } catch (err) {
+    console.error('Error cargando últimos conductividad:', err);
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 16px; color: #ef4444;">❌ Error de conexión al cargar registros.</td></tr>';
+  }
+}
+
+function renderRecentConductividadTable(records) {
+  const tbody = document.getElementById('tbody-recent-conductividad');
+  if (!tbody) return;
+  if (!records || records.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 16px; color: #94a3b8;">No hay registros recientes.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = records.map((r, idx) => {
+    const val = parseFloat(r.conductividad);
+    const oor = !isNaN(val) && val > 0.8;
+    const badge = oor
+      ? `<span style="color:#dc2626; font-weight:700; background:#fee2e2; padding:2px 5px; border-radius:4px; white-space:nowrap; display:inline-block;">⚠️ ${r.conductividad} µS/cm</span>`
+      : `<span style="font-weight:600; color:#0284c7; white-space:nowrap; display:inline-block;">${r.conductividad} µS/cm</span>`;
+    const turnoBadge = r.turno === 'Mañana' ? '☀️ AM' : '🌙 PM';
+    return `
+      <tr style="border-bottom: 1px solid #f1f5f9;">
+        <td style="padding: 8px 4px; white-space: nowrap;"><strong>${r.fecha}</strong> <span style="font-size:0.75rem; color:#64748b;">(${turnoBadge})</span></td>
+        <td style="padding: 8px 4px; text-align: center; white-space: nowrap;">${badge}</td>
+        <td style="padding: 8px 4px; text-align: center; font-weight:700; letter-spacing:1px; white-space: nowrap;">${r.responsable}</td>
+        <td style="padding: 8px 4px; font-size: 0.82rem;">${r.observaciones || '-'}</td>
+        <td style="padding: 8px 4px; text-align: center; white-space: nowrap;">
+          <button type="button" class="btn btn-secondary" style="padding: 4px 6px; font-size: 0.75rem;" onclick="openEditConductividadModal(${idx})" title="Editar">✏️ Edit</button>
+          <button type="button" class="btn btn-danger" style="padding: 4px 6px; font-size: 0.75rem; margin-left: 2px;" onclick="confirmDeleteConductividad(${idx})" title="Eliminar">🗑️ Elim</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function openEditConductividadModal(idx) {
+  const rec = recentConductividadCache[idx];
+  if (!rec) return;
+  document.getElementById('edit-conduct-rowindex').value = rec.rowIndex;
+  document.getElementById('edit-conduct-fecha-reg').value = rec.fecha_registro || '';
+  document.getElementById('edit-conduct-old-mes').value = rec.mes || '';
+  document.getElementById('edit-conduct-old-anio').value = rec.anio || '';
+  document.getElementById('edit-conduct-fecha').value = parseFechaToInput(rec.fecha);
+  document.getElementById('edit-conduct-turno').value = rec.turno === 'Tarde' ? 'Tarde' : 'Mañana';
+  document.getElementById('edit-conduct-valor').value = rec.conductividad;
+  document.getElementById('edit-conduct-resp').value = rec.responsable || '';
+  document.getElementById('edit-conduct-obs').value = rec.observaciones || '';
+
+  document.querySelectorAll('.modal-card').forEach(m => m.style.display = 'none');
+  const modal = document.getElementById('modal-edit-conductividad');
+  if (modal) modal.style.display = 'block';
+  const overlay = document.getElementById('modal-overlay');
+  if (overlay) overlay.classList.add('active');
+}
+
+async function submitEditConductividad(e) {
+  e.preventDefault();
+  const rowIndex = parseInt(document.getElementById('edit-conduct-rowindex').value);
+  const fechaReg = document.getElementById('edit-conduct-fecha-reg').value;
+  const fechaVal = document.getElementById('edit-conduct-fecha').value;
+  const turnoVal = document.getElementById('edit-conduct-turno').value;
+  const valVal = document.getElementById('edit-conduct-valor').value;
+  const respVal = document.getElementById('edit-conduct-resp').value;
+  const obsVal = document.getElementById('edit-conduct-obs').value;
+
+  setLoading('btn-edit-conduct-submit', 'spinner-edit-conduct', 'btn-edit-conduct-text', true);
+  try {
+    const res = await apiPost({
+      action: 'updateConductividad',
+      rowIndex: rowIndex,
+      fecha_registro: fechaReg,
+      fecha: fechaVal,
+      turno: turnoVal,
+      conductividad: valVal,
+      responsable: respVal,
+      observaciones: obsVal
+    });
+
+    if (res && res.success) {
+      showToast('✅ ' + res.message);
+      closeModal({ target: document.getElementById('modal-overlay') });
+      if (typeof clearRecordsMonthCache === 'function') clearRecordsMonthCache();
+      if (typeof prefetchDashboard === 'function') prefetchDashboard();
+      loadRecentConductividad();
+    } else {
+      showToast('❌ ' + (res.error || 'Error al actualizar registro'), 'error');
+    }
+  } catch (err) {
+    showToast('❌ Error de conexión al actualizar', 'error');
+  }
+  setLoading('btn-edit-conduct-submit', 'spinner-edit-conduct', 'btn-edit-conduct-text', false);
+}
+
+async function confirmDeleteConductividad(idx) {
+  const rec = recentConductividadCache[idx];
+  if (!rec) return;
+  if (!confirm(`¿Está seguro de eliminar el registro de conductividad del día ${rec.fecha}?`)) return;
+
+  try {
+    const res = await apiPost({
+      action: 'deleteConductividad',
+      rowIndex: rec.rowIndex,
+      fecha_registro: rec.fecha_registro,
+      mes: rec.mes,
+      anio: rec.anio
+    });
+
+    if (res && res.success) {
+      showToast('✅ ' + res.message);
+      if (typeof clearRecordsMonthCache === 'function') clearRecordsMonthCache();
+      if (typeof prefetchDashboard === 'function') prefetchDashboard();
+      loadRecentConductividad();
+    } else {
+      showToast('❌ ' + (res.error || 'Error al eliminar registro'), 'error');
+    }
+  } catch (err) {
+    showToast('❌ Error de conexión al eliminar', 'error');
+  }
+}
+
+// ── Recent Cobas Records ──────────────────────────
+let recentCobasCache = [];
+
+async function loadRecentCobas() {
+  const tbody = document.getElementById('tbody-recent-cobas');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 16px; color: #94a3b8;">🔄 Cargando registros recientes...</td></tr>';
+  try {
+    const res = await apiGet({ action: 'getRecentCobas', limit: 20 });
+    if (res && res.success && Array.isArray(res.records)) {
+      recentCobasCache = res.records;
+      renderRecentCobasTable(recentCobasCache);
+    } else {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${res.error || 'Error al cargar registros.'}</td></tr>`;
+    }
+  } catch (err) {
+    console.error('Error cargando últimos cobas:', err);
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 16px; color: #ef4444;">❌ Error de conexión al cargar registros.</td></tr>';
+  }
+}
+
+function renderRecentCobasTable(records) {
+  const tbody = document.getElementById('tbody-recent-cobas');
+  if (!tbody) return;
+  if (!records || records.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 16px; color: #94a3b8;">No hay registros recientes.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = records.map((r, idx) => `
+    <tr style="border-bottom: 1px solid #f1f5f9;">
+      <td style="padding: 8px 4px; white-space: nowrap;"><strong>${r.fecha}</strong></td>
+      <td style="padding: 8px 4px; font-weight:600;">${r.equipo || '-'}</td>
+      <td style="padding: 8px 4px; text-align: center; font-weight:700; letter-spacing:1px; white-space: nowrap;">${r.responsable}</td>
+      <td style="padding: 8px 4px;"><span class="chip" style="font-size:0.75rem;">${r.frecuencia || '-'}</span></td>
+      <td style="padding: 8px 4px; font-size: 0.82rem;">${r.actividad || '-'}</td>
+      <td style="padding: 8px 4px; font-size: 0.82rem;">${r.observaciones || '-'}</td>
+      <td style="padding: 8px 4px; text-align: center; white-space: nowrap;">
+        <button type="button" class="btn btn-secondary" style="padding: 4px 6px; font-size: 0.75rem;" onclick="openEditCobasModal(${idx})" title="Editar">✏️ Edit</button>
+        <button type="button" class="btn btn-danger" style="padding: 4px 6px; font-size: 0.75rem; margin-left: 2px;" onclick="confirmDeleteCobas(${idx})" title="Eliminar">🗑️ Elim</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function openEditCobasModal(idx) {
+  const rec = recentCobasCache[idx];
+  if (!rec) return;
+  document.getElementById('edit-cobas-rowindex').value = rec.rowIndex;
+  document.getElementById('edit-cobas-fecha-reg').value = rec.fecha_registro || '';
+  document.getElementById('edit-cobas-old-mes').value = rec.mes || '';
+  document.getElementById('edit-cobas-old-anio').value = rec.anio || '';
+  document.getElementById('edit-cobas-fecha').value = parseFechaToInput(rec.fecha);
+  document.getElementById('edit-cobas-equipo').value = rec.equipo || 'Cobas 1';
+  document.getElementById('edit-cobas-frecuencia').value = rec.frecuencia || '';
+  document.getElementById('edit-cobas-actividad').value = rec.actividad || '';
+  document.getElementById('edit-cobas-resp').value = rec.responsable || '';
+  document.getElementById('edit-cobas-obs').value = rec.observaciones || '';
+
+  document.querySelectorAll('.modal-card').forEach(m => m.style.display = 'none');
+  const modal = document.getElementById('modal-edit-cobas');
+  if (modal) modal.style.display = 'block';
+  const overlay = document.getElementById('modal-overlay');
+  if (overlay) overlay.classList.add('active');
+}
+
+async function submitEditCobas(e) {
+  e.preventDefault();
+  const rowIndex = parseInt(document.getElementById('edit-cobas-rowindex').value);
+  const fechaReg = document.getElementById('edit-cobas-fecha-reg').value;
+  const fechaVal = document.getElementById('edit-cobas-fecha').value;
+  const equipoVal = document.getElementById('edit-cobas-equipo').value;
+  const freqVal = document.getElementById('edit-cobas-frecuencia').value;
+  const actVal = document.getElementById('edit-cobas-actividad').value;
+  const respVal = document.getElementById('edit-cobas-resp').value;
+  const obsVal = document.getElementById('edit-cobas-obs').value;
+
+  setLoading('btn-edit-cobas-submit', 'spinner-edit-cobas', 'btn-edit-cobas-text', true);
+  try {
+    const res = await apiPost({
+      action: 'updateCobas',
+      rowIndex: rowIndex,
+      fecha_registro: fechaReg,
+      fecha: fechaVal,
+      equipo: equipoVal,
+      frecuencia: freqVal,
+      actividad: actVal,
+      responsable: respVal,
+      observaciones: obsVal
+    });
+
+    if (res && res.success) {
+      showToast('✅ ' + res.message);
+      closeModal({ target: document.getElementById('modal-overlay') });
+      if (typeof clearRecordsMonthCache === 'function') clearRecordsMonthCache();
+      if (typeof prefetchDashboard === 'function') prefetchDashboard();
+      loadRecentCobas();
+    } else {
+      showToast('❌ ' + (res.error || 'Error al actualizar registro'), 'error');
+    }
+  } catch (err) {
+    showToast('❌ Error de conexión al actualizar', 'error');
+  }
+  setLoading('btn-edit-cobas-submit', 'spinner-edit-cobas', 'btn-edit-cobas-text', false);
+}
+
+async function confirmDeleteCobas(idx) {
+  const rec = recentCobasCache[idx];
+  if (!rec) return;
+  if (!confirm(`¿Está seguro de eliminar el registro de mantención Cobas de "${rec.equipo}" del día ${rec.fecha}?`)) return;
+
+  try {
+    const res = await apiPost({
+      action: 'deleteCobas',
+      rowIndex: rec.rowIndex,
+      fecha_registro: rec.fecha_registro,
+      mes: rec.mes,
+      anio: rec.anio
+    });
+
+    if (res && res.success) {
+      showToast('✅ ' + res.message);
+      if (typeof clearRecordsMonthCache === 'function') clearRecordsMonthCache();
+      if (typeof prefetchDashboard === 'function') prefetchDashboard();
+      loadRecentCobas();
+    } else {
+      showToast('❌ ' + (res.error || 'Error al eliminar registro'), 'error');
+    }
+  } catch (err) {
+    showToast('❌ Error de conexión al eliminar', 'error');
   }
 }
 </script>
