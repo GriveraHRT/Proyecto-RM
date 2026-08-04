@@ -1544,20 +1544,7 @@ async function loadEtiquetadoraBitacora(name) {
       empty.style.display = 'block';
     } else {
       list.innerHTML = data.map(r => {
-        let fechaFormateada = r.fecha;
-        if (fechaFormateada) {
-          const strVal = String(fechaFormateada).trim();
-          if (!/^\d{2}\/\d{2}\/\d{4}$/.test(strVal)) {
-            const cleaned = strVal.replace(/\s*\(.*\)\s*/g, '').trim();
-            const d = new Date(cleaned);
-            if (!isNaN(d.getTime())) {
-              const dia = String(d.getDate()).padStart(2, '0');
-              const mes = String(d.getMonth() + 1).padStart(2, '0');
-              const anio = d.getFullYear();
-              fechaFormateada = `${dia}/${mes}/${anio}`;
-            }
-          }
-        }
+        let fechaFormateada = formatDDMMYYYY(r.fecha);
         return `
         <div style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.04); font-size:13px; line-height:1.4;">
           <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-weight:700;">
@@ -1812,20 +1799,7 @@ async function loadDxH900HistorialForm() {
       empty.style.display = 'block';
     } else {
       list.innerHTML = data.map(r => {
-        let fechaFormateada = r.fecha;
-        if (fechaFormateada) {
-          const strVal = String(fechaFormateada).trim();
-          if (!/^\d{2}\/\d{2}\/\d{4}$/.test(strVal)) {
-            const cleaned = strVal.replace(/\s*\(.*\)\s*/g, '').trim();
-            const d = new Date(cleaned);
-            if (!isNaN(d.getTime())) {
-              const dia = String(d.getDate()).padStart(2, '0');
-              const mes = String(d.getMonth() + 1).padStart(2, '0');
-              const anio = d.getFullYear();
-              fechaFormateada = `${dia}/${mes}/${anio}`;
-            }
-          }
-        }
+        let fechaFormateada = formatDDMMYYYY(r.fecha);
         return `
         <div style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.04); font-size:13px; line-height:1.4;">
           <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-weight:700;">
@@ -2455,7 +2429,7 @@ function renderRecentTermoTable(records) {
 
     return `
       <tr style="border-bottom: 1px solid #f1f5f9;">
-        <td style="padding: 8px 4px; white-space: nowrap;"><strong>${r.fecha}</strong> <span style="font-size:0.75rem; color:#64748b; margin-left:2px;">(${turnoBadge})</span></td>
+        <td style="padding: 8px 4px; white-space: nowrap;"><strong>${formatDDMMYYYY(r.fecha)}</strong> <span style="font-size:0.75rem; color:#64748b; margin-left:2px;">(${turnoBadge})</span></td>
         <td style="padding: 8px 4px; font-size: 0.82rem;">${r.area || '-'}</td>
         <td style="padding: 8px 4px; text-align: center; white-space: nowrap;">${tempBadge}</td>
         <td style="padding: 8px 4px; text-align: center; white-space: nowrap;">${humBadge}</td>

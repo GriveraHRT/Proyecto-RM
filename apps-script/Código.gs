@@ -196,6 +196,33 @@ function formatFechaDDMMYYYY(f) {
   return String(f.dia).padStart(2,'0') + '/' + String(f.mes).padStart(2,'0') + '/' + f.anio;
 }
 
+function formatFechaValue(val) {
+  if (!val) return '';
+  if (val instanceof Date) {
+    const d = String(val.getDate()).padStart(2, '0');
+    const m = String(val.getMonth() + 1).padStart(2, '0');
+    const y = val.getFullYear();
+    return `${d}/${m}/${y}`;
+  }
+  const str = String(val).trim();
+  const isoMatch = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (isoMatch) {
+    return `${isoMatch[3].padStart(2, '0')}/${isoMatch[2].padStart(2, '0')}/${isoMatch[1]}`;
+  }
+  return str;
+}
+
+function getFechaFromRow(r) {
+  if (!r) return '';
+  const dia = parseInt(r[1]);
+  const mes = parseInt(r[2]);
+  const anio = parseInt(r[3]);
+  if (!isNaN(dia) && !isNaN(mes) && !isNaN(anio) && dia > 0 && mes > 0 && anio > 1900) {
+    return `${String(dia).padStart(2, '0')}/${String(mes).padStart(2, '0')}/${anio}`;
+  }
+  return formatFechaValue(r[0]);
+}
+
 function getFechaRegistroFormatted(d) {
   const date = d || new Date();
   try {
@@ -222,6 +249,9 @@ function insertRowAtTop(sheet, values) {
   sheet.insertRowAfter(1);
   const range = sheet.getRange(2, 1, 1, values.length);
   range.setValues([values]);
+  try {
+    sheet.getRange(2, 1).setNumberFormat('@');
+  } catch (e) {}
   range.setBackground(null).setFontColor(null).setFontWeight("normal");
 }
 
@@ -408,12 +438,7 @@ function esDiaHabil(fecha) {
       const rows = sheetHRT.getDataRange().getValues();
       for (let i = 1; i < rows.length; i++) {
         const rFecha = rows[i][0];
-        let fStr = '';
-        if (rFecha instanceof Date) {
-          fStr = `${String(rFecha.getDate()).padStart(2, '0')}/${String(rFecha.getMonth() + 1).padStart(2, '0')}/${rFecha.getFullYear()}`;
-        } else {
-          fStr = String(rFecha).trim();
-        }
+        let fStr = formatFechaValue(rFecha);
         if (fStr === fechaStr) return false;
       }
     }
@@ -444,12 +469,7 @@ function getDiasNoHabilesHRT() {
   for (let i = 1; i < rows.length; i++) {
     const r = rows[i];
     if (!r[0]) continue;
-    let fechaStr = '';
-    if (r[0] instanceof Date) {
-      fechaStr = `${String(r[0].getDate()).padStart(2, '0')}/${String(r[0].getMonth() + 1).padStart(2, '0')}/${r[0].getFullYear()}`;
-    } else {
-      fechaStr = String(r[0]).trim();
-    }
+    let fechaStr = formatFechaValue(r[0]);
     items.push({
       fecha: fechaStr,
       motivo: String(r[1] || '').trim(),
@@ -480,6 +500,9 @@ function saveDiaNoHabilHRT(data) {
     data.motivo || 'Feriado / Día no hábil HRT',
     data.registradoPor || 'Admin'
   ]);
+  try {
+    sheet.getRange(sheet.getLastRow(), 1).setNumberFormat('@');
+  } catch (e) {}
 
   clearSheetCache('maestros_all', 0, 0);
   return { success: true, message: 'Día no hábil agregado correctamente.' };
@@ -494,12 +517,7 @@ function deleteDiaNoHabilHRT(data) {
 
   let targetIndex = -1;
   for (let i = 1; i < rows.length; i++) {
-    let fStr = rows[i][0];
-    if (fStr instanceof Date) {
-      fStr = `${String(fStr.getDate()).padStart(2, '0')}/${String(fStr.getMonth() + 1).padStart(2, '0')}/${fStr.getFullYear()}`;
-    } else {
-      fStr = String(fStr).trim();
-    }
+    let fStr = formatFechaValue(rows[i][0]);
     if (fStr === String(data.fecha).trim()) {
       targetIndex = i + 1;
       break;
@@ -644,15 +662,7 @@ function getRecentTermo(limit) {
   const data = sheet.getRange(2, 1, numRows, 14).getValues();
 
   const records = data.map((r, idx) => {
-    let fechaStr = '';
-    if (r[0] instanceof Date) {
-      const d = String(r[0].getDate()).padStart(2, '0');
-      const m = String(r[0].getMonth() + 1).padStart(2, '0');
-      const y = r[0].getFullYear();
-      fechaStr = `${d}/${m}/${y}`;
-    } else {
-      fechaStr = String(r[0] || '');
-    }
+    let fechaStr = getFechaFromRow(r);
 
     let tsStr = '';
     if (r[11] instanceof Date) {
@@ -692,15 +702,7 @@ function getRecentCentrifugas(limit) {
   const numRows = endRow - 1;
   const data = sheet.getRange(2, 1, numRows, 11).getValues();
   const records = data.map((r, idx) => {
-    let fechaStr = '';
-    if (r[0] instanceof Date) {
-      const d = String(r[0].getDate()).padStart(2, '0');
-      const m = String(r[0].getMonth() + 1).padStart(2, '0');
-      const y = r[0].getFullYear();
-      fechaStr = `${d}/${m}/${y}`;
-    } else {
-      fechaStr = String(r[0] || '');
-    }
+    let fechaStr = getFechaFromRow(r);
     let tsStr = r[8] instanceof Date ? getFechaRegistroFormatted(r[8]) : String(r[8] || '');
     return {
       rowIndex: 2 + idx,
@@ -725,15 +727,7 @@ function getRecentMesones(limit) {
   const numRows = endRow - 1;
   const data = sheet.getRange(2, 1, numRows, 10).getValues();
   const records = data.map((r, idx) => {
-    let fechaStr = '';
-    if (r[0] instanceof Date) {
-      const d = String(r[0].getDate()).padStart(2, '0');
-      const m = String(r[0].getMonth() + 1).padStart(2, '0');
-      const y = r[0].getFullYear();
-      fechaStr = `${d}/${m}/${y}`;
-    } else {
-      fechaStr = String(r[0] || '');
-    }
+    let fechaStr = getFechaFromRow(r);
     let tsStr = r[7] instanceof Date ? getFechaRegistroFormatted(r[7]) : String(r[7] || '');
     return {
       rowIndex: 2 + idx,
@@ -757,15 +751,7 @@ function getRecentRefriTemp(limit) {
   const numRows = endRow - 1;
   const data = sheet.getRange(2, 1, numRows, 14).getValues();
   const records = data.map((r, idx) => {
-    let fechaStr = '';
-    if (r[0] instanceof Date) {
-      const d = String(r[0].getDate()).padStart(2, '0');
-      const m = String(r[0].getMonth() + 1).padStart(2, '0');
-      const y = r[0].getFullYear();
-      fechaStr = `${d}/${m}/${y}`;
-    } else {
-      fechaStr = String(r[0] || '');
-    }
+    let fechaStr = getFechaFromRow(r);
     let tsStr = r[11] instanceof Date ? getFechaRegistroFormatted(r[11]) : String(r[11] || '');
     return {
       rowIndex: 2 + idx,
@@ -793,15 +779,7 @@ function getRecentLimpRefri(limit) {
   const numRows = endRow - 1;
   const data = sheet.getRange(2, 1, numRows, 11).getValues();
   const records = data.map((r, idx) => {
-    let fechaStr = '';
-    if (r[0] instanceof Date) {
-      const d = String(r[0].getDate()).padStart(2, '0');
-      const m = String(r[0].getMonth() + 1).padStart(2, '0');
-      const y = r[0].getFullYear();
-      fechaStr = `${d}/${m}/${y}`;
-    } else {
-      fechaStr = String(r[0] || '');
-    }
+    let fechaStr = getFechaFromRow(r);
     let tsStr = r[8] instanceof Date ? getFechaRegistroFormatted(r[8]) : String(r[8] || '');
     return {
       rowIndex: 2 + idx,
@@ -826,15 +804,7 @@ function getRecentConductividad(limit) {
   const numRows = endRow - 1;
   const data = sheet.getRange(2, 1, numRows, 11).getValues();
   const records = data.map((r, idx) => {
-    let fechaStr = '';
-    if (r[0] instanceof Date) {
-      const d = String(r[0].getDate()).padStart(2, '0');
-      const m = String(r[0].getMonth() + 1).padStart(2, '0');
-      const y = r[0].getFullYear();
-      fechaStr = `${d}/${m}/${y}`;
-    } else {
-      fechaStr = String(r[0] || '');
-    }
+    let fechaStr = getFechaFromRow(r);
     let tsStr = r[8] instanceof Date ? getFechaRegistroFormatted(r[8]) : String(r[8] || '');
     return {
       rowIndex: 2 + idx,
@@ -859,15 +829,7 @@ function getRecentCobas(limit) {
   const numRows = endRow - 1;
   const data = sheet.getRange(2, 1, numRows, 12).getValues();
   const records = data.map((r, idx) => {
-    let fechaStr = '';
-    if (r[0] instanceof Date) {
-      const d = String(r[0].getDate()).padStart(2, '0');
-      const m = String(r[0].getMonth() + 1).padStart(2, '0');
-      const y = r[0].getFullYear();
-      fechaStr = `${d}/${m}/${y}`;
-    } else {
-      fechaStr = String(r[0] || '');
-    }
+    let fechaStr = getFechaFromRow(r);
     let tsStr = r[9] instanceof Date ? getFechaRegistroFormatted(r[9]) : String(r[9] || '');
     return {
       rowIndex: 2 + idx,
@@ -1421,44 +1383,44 @@ function getRegistros(mes, anio) {
 
   const sheetsToFetch = [
     { key: 'termo',         sheetName: SHEETS.TERMO,       colMes: 2, colAnio: 3, mapper: r => ({
-      fecha: r[0], dia: r[1], mes: r[2], anio: r[3],
+      fecha: getFechaFromRow(r), dia: r[1], mes: r[2], anio: r[3],
       responsable: r[4], temperatura: r[5], humedad: r[6], turno: r[7],
       area: r[8], accion_correctiva: r[9] || '', observaciones: r[10],
       revisado_por: r[12] || '', fecha_revision: r[13] || ''
     }) },
     { key: 'centrifugas',   sheetName: SHEETS.CENT_REG,    colMes: 2, colAnio: 3, mapper: r => ({
-      fecha: r[0], dia: r[1], mes: r[2], anio: r[3], centrifuga: r[4],
+      fecha: getFechaFromRow(r), dia: r[1], mes: r[2], anio: r[3], centrifuga: r[4],
       responsable: r[5], tipo_mantencion: r[6], observaciones: r[7],
       revisado_por: r[9] || '', fecha_revision: r[10] || ''
     }) },
     { key: 'mesones',       sheetName: SHEETS.MESONES,     colMes: 2, colAnio: 3, mapper: r => ({
-      fecha: r[0], dia: r[1], mes: r[2], anio: r[3], sala: r[4],
+      fecha: getFechaFromRow(r), dia: r[1], mes: r[2], anio: r[3], sala: r[4],
       responsable: r[5], observaciones: r[6],
       revisado_por: r[8] || '', fecha_revision: r[9] || ''
     }) },
     { key: 'refriTemp',     sheetName: SHEETS.REFRI_REG,    colMes: 2, colAnio: 3, mapper: r => ({
-      fecha: r[0], dia: r[1], mes: r[2], anio: r[3],
+      fecha: getFechaFromRow(r), dia: r[1], mes: r[2], anio: r[3],
       responsable: r[4], temperatura: r[5], turno: r[6],
       equipo: r[7], tipo: r[8], accion_correctiva: r[9] || '', observaciones: r[10],
       revisado_por: r[12] || '', fecha_revision: r[13] || ''
     }) },
     { key: 'limpiezaRefri',  sheetName: SHEETS.LIMP_REFRI,   colMes: 2, colAnio: 3, mapper: r => ({
-      fecha: r[0], dia: r[1], mes: r[2], anio: r[3],
+      fecha: getFechaFromRow(r), dia: r[1], mes: r[2], anio: r[3],
       tipo_mantencion: r[4], equipo: r[5], responsable: r[6], observaciones: r[7],
       revisado_por: r[9] || '', fecha_revision: r[10] || ''
     }) },
     { key: 'conductividad', sheetName: SHEETS.CONDUCT_REG,  colMes: 2, colAnio: 3, mapper: r => ({
-      fecha: r[0], dia: r[1], mes: r[2], anio: r[3],
+      fecha: getFechaFromRow(r), dia: r[1], mes: r[2], anio: r[3],
       responsable: r[4], conductividad: r[5], turno: r[6], observaciones: r[7],
       revisado_por: r[9] || '', fecha_revision: r[10] || ''
     }) },
     { key: 'cobas',         sheetName: SHEETS.COBAS_REG,   colMes: 2, colAnio: 3, mapper: r => ({
-      fecha: r[0], dia: r[1], mes: r[2], anio: r[3],
+      fecha: getFechaFromRow(r), dia: r[1], mes: r[2], anio: r[3],
       equipo: r[4], responsable: r[5], frecuencia: r[6], actividad: r[7],
       observaciones: r[8], revisado_por: r[10] || '', fecha_revision: r[11] || ''
     }) },
     { key: 'elimMuestras',  sheetName: SHEETS.ELIM_MUESTRAS, colMes: 2, colAnio: 3, mapper: r => ({
-      fecha: r[0], dia: r[1], mes: r[2], anio: r[3],
+      fecha: getFechaFromRow(r), dia: r[1], mes: r[2], anio: r[3],
       responsable: r[4], muestras_eliminadas: r[5],
       revisado_por: r[7] || '', fecha_revision: r[8] || ''
     }) }
@@ -1539,7 +1501,7 @@ function marcarRevisado(data) {
   const anio = parseInt(data.anio);
   const sheet = getSheet(SHEETS.REVISIONES);
   const ts    = getFechaRegistroFormatted();
-  const fechaRev = new Date().toLocaleDateString('es-CL');
+  const fechaRev = formatFechaValue(new Date());
 
   // Agregar nueva fila de revisión (permite múltiples revisiones parciales)
   sheet.appendRow([mes, anio, registros.join(','), revisor, ts]);
@@ -2046,7 +2008,7 @@ function triggerMantencionSemanal() {
         if (diffDias > 7) {
           isOverdue = true;
           diasSinRegistro = diffDias + ' días';
-          ultimaFechaStr = ultimaFecha.toLocaleDateString('es-CL');
+          ultimaFechaStr = formatFechaValue(ultimaFecha);
         }
       }
 
@@ -2180,7 +2142,7 @@ function checkCobasPeriodicasVencidas() {
             equipo: eq,
             actividad: 'Mantención ' + freq,
             frecuencia: freq,
-            ultimaFechaStr: ultimaFecha ? ultimaFecha.toLocaleDateString('es-CL') : 'Nunca',
+            ultimaFechaStr: ultimaFecha ? formatFechaValue(ultimaFecha) : 'Nunca',
             diasSinRegistro: ultimaFecha ? diffDias + ' días' : '∞ (sin registros)'
           });
         }
@@ -2206,7 +2168,7 @@ function checkCobasPeriodicasVencidas() {
               equipo: eq,
               actividad: act,
               frecuencia: freq,
-              ultimaFechaStr: ultimaFecha ? ultimaFecha.toLocaleDateString('es-CL') : 'Nunca',
+              ultimaFechaStr: ultimaFecha ? formatFechaValue(ultimaFecha) : 'Nunca',
               diasSinRegistro: ultimaFecha ? diffDias + ' días' : '∞ (sin registros)'
             });
           }
@@ -2563,31 +2525,7 @@ function getEtiquetadoraHistorial(etName) {
   const result = data.slice(1)
     .filter(r => r[4] && String(r[4]) === etName)
     .map(r => {
-      let fechaStr = '';
-      const rawFecha = r[0];
-      if (rawFecha instanceof Date) {
-        const dia = String(rawFecha.getDate()).padStart(2, '0');
-        const mes = String(rawFecha.getMonth() + 1).padStart(2, '0');
-        const anio = rawFecha.getFullYear();
-        fechaStr = dia + '/' + mes + '/' + anio;
-      } else if (rawFecha) {
-        const strVal = String(rawFecha).trim();
-        if (/^\d{2}\/\d{2}\/\d{4}$/.test(strVal)) {
-          fechaStr = strVal;
-        } else {
-          // Si tiene formato de fecha de JS con huso horario
-          const cleaned = strVal.replace(/\s*\(.*\)\s*/g, '').trim();
-          const d = new Date(cleaned);
-          if (!isNaN(d.getTime())) {
-            const dia = String(d.getDate()).padStart(2, '0');
-            const mes = String(d.getMonth() + 1).padStart(2, '0');
-            const anio = d.getFullYear();
-            fechaStr = dia + '/' + mes + '/' + anio;
-          } else {
-            fechaStr = strVal;
-          }
-        }
-      }
+      let fechaStr = getFechaFromRow(r);
       return {
         fecha: fechaStr,
         nombrePractico: String(r[5]),
@@ -2912,30 +2850,7 @@ function getDxH900Historial() {
   const result = data.slice(1)
     .filter(r => r[0] !== '' && r[5] !== '') // Ignore empty/deleted rows
     .map(r => {
-    let fechaStr = '';
-    const rawFecha = r[0];
-    if (rawFecha instanceof Date) {
-      const dia = String(rawFecha.getDate()).padStart(2, '0');
-      const mes = String(rawFecha.getMonth() + 1).padStart(2, '0');
-      const anio = rawFecha.getFullYear();
-      fechaStr = dia + '/' + mes + '/' + anio;
-    } else if (rawFecha) {
-      const strVal = String(rawFecha).trim();
-      if (/^\d{2}\/\d{2}\/\d{4}$/.test(strVal)) {
-        fechaStr = strVal;
-      } else {
-        const cleaned = strVal.replace(/\s*\(.*\)\s*/g, '').trim();
-        const d = new Date(cleaned);
-        if (!isNaN(d.getTime())) {
-          const dia = String(d.getDate()).padStart(2, '0');
-          const mes = String(d.getMonth() + 1).padStart(2, '0');
-          const anio = d.getFullYear();
-          fechaStr = dia + '/' + mes + '/' + anio;
-        } else {
-          fechaStr = strVal;
-        }
-      }
-    }
+    let fechaStr = getFechaFromRow(r);
     return {
       fecha: fechaStr,
       usuario_responsable: String(r[4]),

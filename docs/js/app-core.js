@@ -5,7 +5,32 @@ if (typeof API_URL === 'undefined') {
 const PREANALISIS=[1,2,3,4,5,18,19];
 const state={areas:[],centrifugas:[],salas:[],acciones:[],refrigeradores:[],refriLimpieza:[],cobasObs:[],ampm:'AM',ampmRefri:'AM',ampmConduct:'AM',qrInstance:null,qrTab:'areas',dashMes:new Date().getMonth()+1,dashAnio:new Date().getFullYear(),dashTab:'diario',dashData:null,dashMaestros:null,dashCache:null,maestrosPromise:null,modulosActivos:null};
 
-function today(){return new Date().toISOString().split('T')[0]}
+function today() {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function formatDDMMYYYY(val) {
+  if (!val) return '';
+  const strVal = String(val).trim();
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(strVal)) return strVal;
+  const isoMatch = strVal.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (isoMatch) {
+    return `${isoMatch[3].padStart(2, '0')}/${isoMatch[2].padStart(2, '0')}/${isoMatch[1]}`;
+  }
+  const cleaned = strVal.replace(/\s*\(.*\)\s*/g, '').trim();
+  const d = new Date(cleaned);
+  if (!isNaN(d.getTime())) {
+    const dia = String(d.getDate()).padStart(2, '0');
+    const mes = String(d.getMonth() + 1).padStart(2, '0');
+    const anio = d.getFullYear();
+    return `${dia}/${mes}/${anio}`;
+  }
+  return strVal;
+}
 function showToast(m,t='success'){const el=document.getElementById('toast');el.textContent=m;el.className=`show toast-${t}`;setTimeout(()=>{el.className=''},3200)}
 function setLoading(b,s,t,l){document.getElementById(b).disabled=l;document.getElementById(s).classList.toggle('visible',l);document.getElementById(t).style.display=l?'none':''}
 async function fetchWithTimeout(url, options = {}, timeout = 25000) {
