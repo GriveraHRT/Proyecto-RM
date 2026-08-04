@@ -291,6 +291,7 @@ function switchDashTab(t){state.dashTab=t;document.getElementById('tab-diario').
 function getDiasHasta(m,a){const h=new Date();const d=new Date(a,m,0).getDate();return(a===h.getFullYear()&&m===(h.getMonth()+1))?h.getDate():d}
 
 async function loadDashboard(forceReload){
+  if(forceReload){ state.dashMaestros = null; state.maestrosPromise = null; }
   state.dashMes=parseInt(document.getElementById('dash-mes').value);
   state.dashAnio=parseInt(document.getElementById('dash-anio').value);
   const cacheKey=state.dashMes+'-'+state.dashAnio;
@@ -305,11 +306,12 @@ async function loadDashboard(forceReload){
   document.getElementById('dash-daily-view').innerHTML='';document.getElementById('dash-monthly-view').innerHTML='';
   try{
     const[reg,rev]=await Promise.all([apiGet({action:'getRegistros',mes:state.dashMes,anio:state.dashAnio}),apiGet({action:'getRevisiones',mes:state.dashMes,anio:state.dashAnio})]);
-    if(!state.dashMaestros){
+    if(!state.dashMaestros || !state.dashMaestros.centrifugasDetailed){
       if(state.maestrosPromise){
         await state.maestrosPromise;
-      } else {
-        try{state.dashMaestros=await apiGet({action:'getMaestros'})}catch(e){state.dashMaestros={areas:state.areas,centrifugas:state.centrifugas,salas:state.salas,refrigeradores:state.refrigeradores,refriLimpieza:state.refriLimpieza}}
+      }
+      if(!state.dashMaestros || !state.dashMaestros.centrifugasDetailed){
+        try{state.dashMaestros=await apiGet({action:'getMaestros'})}catch(e){}
       }
     }
     state.dashData=reg;
@@ -340,15 +342,26 @@ function renderDashContent(reg){if(state.dashTab==='diario')renderDailyView(reg)
 function renderDailyView(reg){
   if(!reg) return;
   const hoy=new Date().getDate();
-  const m=state.dashMaestros||{areas:[],centrifugas:[],salas:[],refrigeradores:[],refriLimpieza:[]};
-  let html='<div class="card card-sm" style="margin-bottom:12px;"><strong style="font-size:14px;">📅 Estado del Día '+hoy+'</strong></div>';
+  const m=state.dashMaestros||{areas:[],centrifugas:[],salas:[],refrigeradores:[],refriLimpieza:[],isTodayHabit:true};
+  const isHabit = m.isTodayHabit !== false;
+  let html=`<div class="card card-sm" style="margin-bottom:12px;"><strong style="font-size:14px;">📅 Estado del Día ${hoy} ${!isHabit ? '<span style="font-size:12px; font-weight:normal; color:#fbbf24; margin-left:8px;">(Día no hábil / Feriado)</span>' : ''}</strong></div>`;
 
   if(isModuloActivo('termo')){
     const termoHoy=(reg.termo||[]).filter(r=>parseInt(r.dia)===hoy);
     html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🌡️ Temp. Ambiental</div>';
+    const list = m.areasDetailed || (m.areas||[]).map(a=>({nombre:a, horarioTurno:'si'}));
     ['Mañana','Tarde'].forEach(turno=>{
       html+=`<div style="font-size:11px;font-weight:600;color:var(--text-dim);margin:6px 0 4px;text-transform:uppercase;">${turno}</div><div class="status-grid">`;
-      (m.areas||[]).forEach(a=>{const done=termoHoy.some(r=>r.area===a&&r.turno===turno);html+=`<div class="status-item ${done?'done':'miss'}"><span class="status-dot ${done?'green':'red'}"></span>${a}</div>`});
+      list.forEach(item=>{
+        const a = item.nombre;
+        const isNoHabit = !isHabit && item.horarioTurno === 'no';
+        const done = termoHoy.some(r=>r.area===a&&r.turno===turno);
+        if (isNoHabit && !done) {
+          html+=`<div class="status-item opt" style="opacity:0.55;" title="No exigido en días no hábiles"><span class="status-dot gray" style="background:#64748b;"></span>${a} (N/A)</div>`;
+        } else {
+          html+=`<div class="status-item ${done?'done':'miss'}"><span class="status-dot ${done?'green':'red'}"></span>${a}</div>`;
+        }
+      });
       html+='</div>';
     });
     html+='</div>';
@@ -357,14 +370,34 @@ function renderDailyView(reg){
   if(isModuloActivo('centrifugas')){
     const centHoy=(reg.centrifugas||[]).filter(r=>parseInt(r.dia)===hoy&&r.tipo_mantencion==='Diaria');
     html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">⚙️ Centrífugas (Diaria)</div><div class="status-grid">';
-    (m.centrifugas||[]).forEach(c=>{const done=centHoy.some(r=>r.centrifuga===c);html+=`<div class="status-item ${done?'done':'miss'}"><span class="status-dot ${done?'green':'red'}"></span>${c.replace('Centrífuga ','C')}</div>`});
+    const list = m.centrifugasDetailed || (m.centrifugas||[]).map(c=>({nombre:c, horarioTurno:'si'}));
+    list.forEach(item=>{
+      const c = item.nombre;
+      const isNoHabit = !isHabit && item.horarioTurno === 'no';
+      const done = centHoy.some(r=>r.centrifuga===c);
+      if (isNoHabit && !done) {
+        html+=`<div class="status-item opt" style="opacity:0.55;" title="No exigido en días no hábiles"><span class="status-dot gray" style="background:#64748b;"></span>${c.replace('Centrífuga ','C')} (N/A)</div>`;
+      } else {
+        html+=`<div class="status-item ${done?'done':'miss'}"><span class="status-dot ${done?'green':'red'}"></span>${c.replace('Centrífuga ','C')}</div>`;
+      }
+    });
     html+='</div></div>';
   }
 
   if(isModuloActivo('mesones')){
     const mesoHoy=(reg.mesones||[]).filter(r=>parseInt(r.dia)===hoy);
     html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🧽 Mesones</div><div class="status-grid">';
-    (m.salas||[]).forEach(s=>{const done=mesoHoy.some(r=>r.sala===s);html+=`<div class="status-item ${done?'done':'miss'}"><span class="status-dot ${done?'green':'red'}"></span>${s}</div>`});
+    const list = m.salasDetailed || (m.salas||[]).map(s=>({nombre:s, horarioTurno:'si'}));
+    list.forEach(item=>{
+      const s = item.nombre;
+      const isNoHabit = !isHabit && item.horarioTurno === 'no';
+      const done = mesoHoy.some(r=>r.sala===s);
+      if (isNoHabit && !done) {
+        html+=`<div class="status-item opt" style="opacity:0.55;" title="No exigido en días no hábiles"><span class="status-dot gray" style="background:#64748b;"></span>${s} (N/A)</div>`;
+      } else {
+        html+=`<div class="status-item ${done?'done':'miss'}"><span class="status-dot ${done?'green':'red'}"></span>${s}</div>`;
+      }
+    });
     html+='</div></div>';
   }
 
@@ -407,27 +440,98 @@ function renderDailyView(reg){
   document.getElementById('dash-daily-view').innerHTML=html;
 }
 
+function isNonWorkingDay(d, mes, anio, diasNoHabilesSet) {
+  if (diasNoHabilesSet && diasNoHabilesSet.has(d)) return true;
+  const dt = new Date(anio, mes - 1, d);
+  const day = dt.getDay();
+  return day === 0 || day === 6;
+}
+
 function renderMonthlyView(reg){
   if(!reg) return;
   const dh=getDiasHasta(state.dashMes,state.dashAnio);
   const m=state.dashMaestros||{areas:[],centrifugas:[],salas:[],refrigeradores:[]};
+  const diasNoHabilesSet = new Set(reg.diasNoHabiles || []);
   let html='';
 
   if(isModuloActivo('termo')){
     html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🌡️ Temp. Ambiental</div>';
-    (m.areas||[]).forEach(a=>{html+=`<div style="font-size:12px;font-weight:600;margin:8px 0 4px;">${a}</div>`;['Mañana','Tarde'].forEach(turno=>{const dias=new Set((reg.termo||[]).filter(r=>r.area===a&&r.turno===turno).map(r=>parseInt(r.dia)));let miss=0;let chips='';for(let d=1;d<=dh;d++){const ok=dias.has(d);if(!ok)miss++;chips+=`<span class="day-chip ${ok?'chip-ok':'chip-missing'}">${d}</span>`}html+=`<div style="font-size:11px;color:var(--text-dim);margin:4px 0 2px;">${turno} ${miss?'('+miss+' faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`})});
+    const list = m.areasDetailed || (m.areas||[]).map(a=>({nombre:a, horarioTurno:'si'}));
+    list.forEach(item => {
+      const a = item.nombre;
+      const esSoloHabil = (item.horarioTurno || '').toString().trim().toLowerCase() === 'no';
+      html+=`<div style="font-size:12px;font-weight:600;margin:8px 0 4px;">${a} ${esSoloHabil ? '<span style="font-weight:normal; font-size:11px; color:var(--text-dim);">(Solo días hábiles)</span>' : ''}</div>`;
+      ['Mañana','Tarde'].forEach(turno=>{
+        const diasDone = new Set((reg.termo||[]).filter(r=>r.area===a&&r.turno===turno).map(r=>parseInt(r.dia)));
+        let miss=0;
+        let chips='';
+        for(let d=1; d<=dh; d++){
+          const ok = diasDone.has(d);
+          const isNonWorking = esSoloHabil && isNonWorkingDay(d, state.dashMes, state.dashAnio, diasNoHabilesSet);
+          if (ok) {
+            chips += `<span class="day-chip chip-ok">${d}</span>`;
+          } else if (isNonWorking) {
+            chips += `<span class="day-chip chip-na" title="Día no hábil / No exigido">${d}</span>`;
+          } else {
+            miss++;
+            chips += `<span class="day-chip chip-missing">${d}</span>`;
+          }
+        }
+        html+=`<div style="font-size:11px;color:var(--text-dim);margin:4px 0 2px;">${turno} ${miss?'('+miss+' faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`;
+      });
+    });
     html+='</div>';
   }
 
   if(isModuloActivo('centrifugas')){
     html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">⚙️ Centrífugas</div>';
-    (m.centrifugas||[]).forEach(c=>{const diasD=new Set((reg.centrifugas||[]).filter(r=>r.centrifuga===c&&r.tipo_mantencion==='Diaria').map(r=>parseInt(r.dia)));let miss=0;let chips='';for(let d=1;d<=dh;d++){const ok=diasD.has(d);if(!ok)miss++;chips+=`<span class="day-chip ${ok?'chip-ok':'chip-missing'}">${d}</span>`}html+=`<div style="font-size:12px;font-weight:600;margin:8px 0 4px;">${c} ${miss?'('+miss+' faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`});
+    const list = m.centrifugasDetailed || (m.centrifugas||[]).map(c=>({nombre:c, horarioTurno:'si'}));
+    list.forEach(item => {
+      const c = item.nombre;
+      const esSoloHabil = (item.horarioTurno || '').toString().trim().toLowerCase() === 'no';
+      const diasDone = new Set((reg.centrifugas||[]).filter(r=>r.centrifuga===c&&r.tipo_mantencion==='Diaria').map(r=>parseInt(r.dia)));
+      let miss=0;
+      let chips='';
+      for(let d=1; d<=dh; d++){
+        const ok = diasDone.has(d);
+        const isNonWorking = esSoloHabil && isNonWorkingDay(d, state.dashMes, state.dashAnio, diasNoHabilesSet);
+        if (ok) {
+          chips += `<span class="day-chip chip-ok">${d}</span>`;
+        } else if (isNonWorking) {
+          chips += `<span class="day-chip chip-na" title="Día no hábil / No exigido">${d}</span>`;
+        } else {
+          miss++;
+          chips += `<span class="day-chip chip-missing">${d}</span>`;
+        }
+      }
+      html+=`<div style="font-size:12px;font-weight:600;margin:8px 0 4px;">${c} ${esSoloHabil ? '<span style="font-weight:normal; font-size:11px; color:var(--text-dim);">(Solo días hábiles)</span>' : ''} ${miss?'('+miss+' faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`;
+    });
     html+='</div>';
   }
 
   if(isModuloActivo('mesones')){
     html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🧽 Mesones</div>';
-    (m.salas||[]).forEach(s=>{const dias=new Set((reg.mesones||[]).filter(r=>r.sala===s).map(r=>parseInt(r.dia)));let miss=0;let chips='';for(let d=1;d<=dh;d++){const ok=dias.has(d);if(!ok)miss++;chips+=`<span class="day-chip ${ok?'chip-ok':'chip-missing'}">${d}</span>`}html+=`<div style="font-size:12px;font-weight:600;margin:8px 0 4px;">${s} ${miss?'('+miss+' faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`});
+    const list = m.salasDetailed || (m.salas||[]).map(s=>({nombre:s, horarioTurno:'si'}));
+    list.forEach(item => {
+      const s = item.nombre;
+      const esSoloHabil = (item.horarioTurno || '').toString().trim().toLowerCase() === 'no';
+      const diasDone = new Set((reg.mesones||[]).filter(r=>r.sala===s).map(r=>parseInt(r.dia)));
+      let miss=0;
+      let chips='';
+      for(let d=1; d<=dh; d++){
+        const ok = diasDone.has(d);
+        const isNonWorking = esSoloHabil && isNonWorkingDay(d, state.dashMes, state.dashAnio, diasNoHabilesSet);
+        if (ok) {
+          chips += `<span class="day-chip chip-ok">${d}</span>`;
+        } else if (isNonWorking) {
+          chips += `<span class="day-chip chip-na" title="Día no hábil / No exigido">${d}</span>`;
+        } else {
+          miss++;
+          chips += `<span class="day-chip chip-missing">${d}</span>`;
+        }
+      }
+      html+=`<div style="font-size:12px;font-weight:600;margin:8px 0 4px;">${s} ${esSoloHabil ? '<span style="font-weight:normal; font-size:11px; color:var(--text-dim);">(Solo días hábiles)</span>' : ''} ${miss?'('+miss+' faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`;
+    });
     html+='</div>';
   }
 
@@ -2413,5 +2517,134 @@ async function confirmDeleteTermo(index) {
   } catch (err) {
     console.error('Error confirmDeleteTermo:', err);
     showToast('❌ Error de conexión al eliminar', 'error');
+  }
+}
+
+// ── Admin: Días No Hábiles Excepcionales (HRT) ──────────────
+
+async function loadDiasNoHabilesAdmin() {
+  const container = document.getElementById('hrt-list-container');
+  if (!container) return;
+  
+  container.innerHTML = `
+    <div style="text-align: center; padding: 12px; color: var(--text-dim);">
+      <div class="spinner visible" style="display:inline-block; margin-bottom: 8px;"></div>
+      <div>Cargando días no hábiles...</div>
+    </div>
+  `;
+
+  try {
+    const list = await apiGet({ action: 'getDiasNoHabilesHRT' });
+    if (!list || !list.length) {
+      container.innerHTML = `<div style="font-size:13px; color:var(--text-dim); text-align:center; padding:12px;">No hay fechas excepcionales registradas.</div>`;
+      return;
+    }
+
+    let html = `
+      <div style="overflow-x:auto;">
+        <table class="records-table" style="width:100%; font-size:13px;">
+          <thead>
+            <tr>
+              <th>Fecha No Hábil</th>
+              <th style="text-align:right;">Acción</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+
+    list.forEach(item => {
+      html += `
+        <tr>
+          <td><strong>📅 ${escapeHtml(item.fecha)}</strong></td>
+          <td style="text-align:right;">
+            <button class="btn btn-sm btn-danger" style="padding:4px 10px; font-size:12px;" onclick="deleteDiaNoHabilHRTAdmin('${escapeHtml(item.fecha)}')">
+              🗑️ Quitar
+            </button>
+          </td>
+        </tr>
+      `;
+    });
+
+    html += `</tbody></table></div>`;
+    container.innerHTML = html;
+  } catch (err) {
+    console.error('Error loadDiasNoHabilesAdmin:', err);
+    container.innerHTML = `<div class="alert-banner alert-danger visible">Error al cargar fechas no hábiles.</div>`;
+  }
+}
+
+async function addDiaNoHabilHRTAdmin() {
+  const fechaInput = document.getElementById('hrt-fecha');
+  const pwdInput = document.getElementById('hrt-admin-pwd');
+  const errDiv = document.getElementById('hrt-admin-error');
+  const succDiv = document.getElementById('hrt-admin-success');
+
+  errDiv.style.display = 'none';
+  succDiv.style.display = 'none';
+
+  const fecha = fechaInput.value;
+  const pwd = pwdInput.value;
+
+  if (!fecha) {
+    errDiv.textContent = 'Debe seleccionar una fecha.';
+    errDiv.style.display = 'block';
+    return;
+  }
+  if (!pwd) {
+    errDiv.textContent = 'Debe ingresar la contraseña de administrador.';
+    errDiv.style.display = 'block';
+    return;
+  }
+
+  setLoading('btn-add-hrt', 'spinner-hrt-admin', null, true);
+
+  try {
+    const res = await apiPost({
+      action: 'saveDiaNoHabilHRT',
+      fecha: fecha,
+      pwd: pwd
+    });
+
+    if (res && res.success) {
+      succDiv.textContent = '✅ ' + res.message;
+      succDiv.style.display = 'block';
+      fechaInput.value = '';
+      pwdInput.value = '';
+      loadDiasNoHabilesAdmin();
+      if (typeof prefetchDashboard === 'function') prefetchDashboard();
+    } else {
+      errDiv.textContent = '❌ ' + (res.error || 'Error al guardar día no hábil');
+      errDiv.style.display = 'block';
+    }
+  } catch (err) {
+    console.error('Error addDiaNoHabilHRTAdmin:', err);
+    errDiv.textContent = '❌ Error de conexión al guardar';
+    errDiv.style.display = 'block';
+  }
+
+  setLoading('btn-add-hrt', 'spinner-hrt-admin', null, false);
+}
+
+async function deleteDiaNoHabilHRTAdmin(fechaStr) {
+  const pwd = prompt(`Para quitar la fecha ${fechaStr}, ingrese la contraseña de administrador:`);
+  if (!pwd) return;
+
+  try {
+    const res = await apiPost({
+      action: 'deleteDiaNoHabilHRT',
+      fecha: fechaStr,
+      pwd: pwd
+    });
+
+    if (res && res.success) {
+      showToast('✅ ' + res.message);
+      loadDiasNoHabilesAdmin();
+      if (typeof prefetchDashboard === 'function') prefetchDashboard();
+    } else {
+      showToast('❌ ' + (res.error || 'Error al quitar fecha'), 'error');
+    }
+  } catch (err) {
+    console.error('Error deleteDiaNoHabilHRTAdmin:', err);
+    showToast('❌ Error de conexión al quitar fecha', 'error');
   }
 }

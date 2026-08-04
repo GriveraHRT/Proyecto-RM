@@ -259,6 +259,8 @@ function doGet(e) {
       case 'getModulosActivos': return jsonResponse(getModulosActivos());
       case 'getRecentTermo':    return jsonResponse(getRecentTermo(e.parameter.limit));
       case 'getDiasNoHabilesHRT': return jsonResponse(getDiasNoHabilesHRT());
+      case 'runSetupTriggers':  return jsonResponse({ success: true, message: setupTriggers() });
+      case 'testTriggerConsolidado': return jsonResponse({ success: true, result: triggerAlertaConsolidadaTermo() });
       case 'SETUP_INIT_TA':     return jsonResponse(setup());
       case 'REINIT':            return jsonResponse(reinitialize());
       default:                  return jsonResponse({ error: 'Acción no reconocida: ' + action });
@@ -291,6 +293,8 @@ function doPost(e) {
       case 'marcarRevisado':      return jsonResponse(marcarRevisado(data));
       case 'saveNotificaciones':  return jsonResponse(saveNotificaciones(data));
       case 'sendTestNotificacion': return jsonResponse(sendTestNotificacion(data));
+      case 'runSetupTriggers':    return jsonResponse({ success: true, message: setupTriggers() });
+      case 'testTriggerConsolidado': return jsonResponse({ success: true, result: triggerAlertaConsolidadaTermo() });
       case 'saveDxH900Registro':  return jsonResponse(saveDxH900Registro(data));
       case 'saveElimMuestras':    return jsonResponse(saveElimMuestras(data));
       case 'saveModulosActivos': return jsonResponse(saveModulosActivos(data));
@@ -1827,10 +1831,10 @@ function setupTriggers() {
     return isNaN(h) ? defaultHour : h;
   };
 
-  const hourRecordatorio = parseHour('termo', 8);
+  const hourRecordatorio = 8;
   const hourMantencion = parseHour('centrifugas', 9);
   const hourDatosFaltantes = 20;
-  const hourAlertaTermo = parseHour('termo', 8);
+  const hourAlertaTermo = 8;
 
   // Trigger diario para recordatorio de mes anterior (solo actúa el día 1)
   ScriptApp.newTrigger('triggerRecordatorioMesAnterior')

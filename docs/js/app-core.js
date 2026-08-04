@@ -36,7 +36,7 @@ function isModuloActivo(k){if(!state.modulosActivos)return true;return state.mod
 function applyModulosVisibilidad(){if(!state.modulosActivos)return;try{localStorage.setItem('modulosActivos',JSON.stringify(state.modulosActivos))}catch(e){};document.querySelectorAll('#bottom-nav .nav-item[data-section]').forEach(el=>{const s=el.getAttribute('data-section');if(s==='dashboard'||s==='admin'){el.style.display=''}else{el.style.display=isModuloActivo(s)?'':'none'}});const statMap={'termo':'stat-termo','centrifugas':'stat-cent','mesones':'stat-limp','refri-temp':'stat-refri','limp-refri':'stat-limp-refri','conductividad':'stat-conduct','cobas':'stat-cobas'};Object.entries(statMap).forEach(([k,id])=>{const el=document.getElementById(id);if(el){const c=el.closest('.stat-card');if(c)c.style.display=isModuloActivo(k)?'':'none'}});document.querySelectorAll('.stats-row').forEach(row=>{const vis=Array.from(row.querySelectorAll('.stat-card')).filter(c=>c.style.display!=='none');row.style.display=vis.length>0?'':'none'});if(state.dashData&&typeof renderDashContent==='function'){renderDashContent(state.dashData)}if(state.dashData&&typeof renderTables==='function'){renderTables(state.dashData)}}
 
 // Navigation
-function navigateTo(s){document.querySelectorAll('.section').forEach(el=>el.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));const sec=document.getElementById('section-'+s);if(sec)sec.classList.add('active');const navBtn=document.querySelector(`[data-section="${s}"]`);if(navBtn)navBtn.classList.add('active');if(s==='dashboard')loadDashboard();if(s==='admin'){initRevAdminSelectors();loadNotificacionesAdmin();if(typeof loadModulosAdmin==='function')loadModulosAdmin()}if(s==='dxh900'){loadDxH900HistorialForm()}if(s==='elim-muestras'){loadElimMuestrasHistorialForm()}if(s==='termo'){if(typeof checkDuplicateTermo==='function')checkDuplicateTermo();if(typeof loadRecentTermo==='function')loadRecentTermo();}if(s==='centrifugas'&&typeof checkDuplicateCentrifugas==='function')checkDuplicateCentrifugas();if(s==='mesones'&&typeof checkDuplicateMesones==='function')checkDuplicateMesones();if(s==='elim-muestras'&&typeof checkDuplicateElimMuestras==='function')checkDuplicateElimMuestras();}
+function navigateTo(s){document.querySelectorAll('.section').forEach(el=>el.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));const sec=document.getElementById('section-'+s);if(sec)sec.classList.add('active');const navBtn=document.querySelector(`[data-section="${s}"]`);if(navBtn)navBtn.classList.add('active');if(s==='dashboard')loadDashboard();if(s==='admin'){initRevAdminSelectors();loadNotificacionesAdmin();if(typeof loadModulosAdmin==='function')loadModulosAdmin();if(typeof loadDiasNoHabilesAdmin==='function')loadDiasNoHabilesAdmin();}if(s==='dxh900'){loadDxH900HistorialForm()}if(s==='elim-muestras'){loadElimMuestrasHistorialForm()}if(s==='termo'){if(typeof checkDuplicateTermo==='function')checkDuplicateTermo();if(typeof loadRecentTermo==='function')loadRecentTermo();}if(s==='centrifugas'&&typeof checkDuplicateCentrifugas==='function')checkDuplicateCentrifugas();if(s==='mesones'&&typeof checkDuplicateMesones==='function')checkDuplicateMesones();if(s==='elim-muestras'&&typeof checkDuplicateElimMuestras==='function')checkDuplicateElimMuestras();}
 
 // AM/PM — Termo (ambiental)
 function setAmPm(v){state.ampm=v;document.getElementById('btn-am').className='ampm-btn'+(v==='AM'?' selected-AM':'');document.getElementById('btn-pm').className='ampm-btn'+(v==='PM'?' selected-PM':'');if(typeof checkDuplicateTermo==='function')checkDuplicateTermo();}
@@ -177,7 +177,7 @@ async function loadMaestros(){
     state.etiquetadoras=data.etiquetadoras||[];
     if(data.modulosActivos){state.modulosActivos=data.modulosActivos}
     applyModulosVisibilidad();
-    state.dashMaestros={areas:state.areas,centrifugas:state.centrifugas,salas:state.salas,refrigeradores:state.refrigeradores,refriLimpieza:state.refriLimpieza};
+    state.dashMaestros = data;
     populateSelect('termo-area',state.areas,'Seleccionar área…');
     populateSelect('admin-select',state.areas,'— Seleccionar —');
     populateChips('cent-chips',state.centrifugas);
@@ -228,7 +228,12 @@ async function loadMaestros(){
       {id: "ZD421-222", nombreReal: "ZD421-1", nombrePractico: "Rotuladora Hematología", modelo: "ZD421", tipoConexion: "Ethernet", direccionIp: "10.10.1.50", piso: "Piso 1", ubicacion: "Hematología", comentario: "Zebra ZD421 Red"},
       {id: "ZD220-333", nombreReal: "ZD220-1", nombrePractico: "Rotuladora Microbiología", modelo: "ZD220", tipoConexion: "USB", direccionIp: "No aplica", piso: "Piso 2", ubicacion: "Microbiología", comentario: "Zebra ZD220 USB"}
     ];
-    state.dashMaestros={areas:state.areas,centrifugas:state.centrifugas,salas:state.salas,refrigeradores:state.refrigeradores,refriLimpieza:state.refriLimpieza};
+    state.dashMaestros={
+      areas:state.areas,centrifugas:state.centrifugas,salas:state.salas,refrigeradores:state.refrigeradores,refriLimpieza:state.refriLimpieza,
+      areasDetailed: state.areas.map(a=>({nombre:a, horarioTurno:'si'})),
+      centrifugasDetailed: state.centrifugas.map(c=>({nombre:c, horarioTurno:['Centrífuga 18','Centrífuga 14','Centrífuga 9','Centrífuga 6','Centrífuga 8','Centrífuga 12','Centrífuga 11'].includes(c)?'no':'si'})),
+      salasDetailed: state.salas.map(s=>({nombre:s, horarioTurno:'si'}))
+    };
     
     populateSelect('termo-area',state.areas,'Seleccionar área…');
     populateSelect('admin-select',state.areas,'— Seleccionar —');
