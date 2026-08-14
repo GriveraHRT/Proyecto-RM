@@ -351,6 +351,7 @@ function doGet(e) {
       case 'getPersonal':         return jsonResponse(getPersonal());
       case 'savePersonal':        return jsonResponse(savePersonal(e.parameter));
       case 'deletePersonal':      return jsonResponse(deletePersonal(e.parameter));
+      case 'seedMaestroPersonal': return jsonResponse(seedMaestroPersonal(e.parameter.initials || e.parameter.list));
       case 'migrarInicialesAHistoricos': return jsonResponse(migrarInicialesAHistoricos());
       case 'setupMaestroPersonal': return jsonResponse(setupMaestroPersonal());
       case 'runSetupTriggers':  return jsonResponse({ success: true, message: setupTriggers() });
@@ -416,6 +417,7 @@ function doPost(e) {
       case 'getPersonal':         return jsonResponse(getPersonal());
       case 'savePersonal':        return jsonResponse(savePersonal(data));
       case 'deletePersonal':      return jsonResponse(deletePersonal(data));
+      case 'seedMaestroPersonal': return jsonResponse(seedMaestroPersonal(data.initials || data.list));
       case 'migrarInicialesAHistoricos': return jsonResponse(migrarInicialesAHistoricos());
       case 'setupMaestroPersonal': return jsonResponse(setupMaestroPersonal());
       default:                    return jsonResponse({ error: 'Acción no reconocida: ' + data.action });
@@ -747,6 +749,35 @@ function deletePersonal(data) {
     }
   }
   return { success: false, error: 'Funcionario no encontrado.' };
+}
+
+function seedMaestroPersonal(initialsList) {
+  if (!initialsList) return { success: false, error: 'Lista vacía' };
+  if (typeof initialsList === 'string') {
+    initialsList = initialsList.split(',').map(s => s.trim());
+  }
+  const sheet = getSheet(SHEETS.PERSONAL);
+  if (!sheet) return { success: false, error: 'Hoja Maestro Personal no encontrada' };
+  const rows = sheet.getDataRange().getValues();
+  const existing = new Set(rows.slice(1).map(r => String(r[0] || '').trim().toUpperCase()));
+  const fechaStr = formatFechaValue(new Date());
+  let added = 0;
+  
+  initialsList.forEach(init => {
+    const clean = String(init || '').trim().toUpperCase();
+    if (clean && !existing.has(clean)) {
+      sheet.appendRow([clean, '', '', 'SI', fechaStr]);
+      try {
+        sheet.getRange(sheet.getLastRow(), 1).setNumberFormat('@');
+        sheet.getRange(sheet.getLastRow(), 5).setNumberFormat('@');
+      } catch(e) {}
+      existing.add(clean);
+      added++;
+    }
+  });
+  
+  clearAllCaches();
+  return { success: true, added: added, total: sheet.getLastRow() - 1 };
 }
 
 function migrarInicialesAHistoricos() {
@@ -3042,23 +3073,23 @@ function getEtiquetadoras() {
 }
 
 function getEtiquetadoraHistorial(etName) {
-  if (!etName) return [];
-  const cacheKey = getCacheKey('et_hist', etName);
+  const cacheKey = getCacheKey('et_hist', etName || 'ALL');
   let cached = getCachedJson(cacheKey);
   if (cached) {
     return cached;
   }
   const data = getSheet(SHEETS.ETIQUETADORAS_REG).getDataRange().getValues();
   const result = data.slice(1)
-    .filter(r => r[4] && String(r[4]) === etName)
+    .filter(r => r[4] && (!etName || String(r[4]) === etName))
     .map(r => {
       let fechaStr = getFechaFromRow(r);
       return {
         fecha: fechaStr,
-        nombrePractico: String(r[5]),
-        accion: String(r[6]),
-        descripcion: String(r[7]),
-        responsable: String(r[8])
+        etiquetadora: String(r[4] || ''),
+        nombrePractico: String(r[5] || ''),
+        accion: String(r[6] || ''),
+        descripcion: String(r[7] || ''),
+        responsable: String(r[8] || '')
       };
     });
   setCachedJson(cacheKey, result, 3600); // 1 hour cache
