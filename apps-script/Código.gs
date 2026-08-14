@@ -56,7 +56,8 @@ const SHEETS = {
   NOTIFICACIONES:       'Maestro Notificaciones',
   DXH900_REG:       'Reg. Reparaciones DxH 900 Urgencias',
   ELIM_MUESTRAS:    'Reg. Eliminación Muestras',
-  DIAS_NO_HABILES_HRT: 'Maestro Días No Hábiles HRT'
+  DIAS_NO_HABILES_HRT: 'Maestro Días No Hábiles HRT',
+  PERSONAL:         'Maestro Personal'
 };
 
 const COBAS_PERIODIC_TASKS = {
@@ -331,6 +332,8 @@ function doGet(e) {
       case 'getRecentConductividad': return jsonResponse(getRecentConductividad(e.parameter.limit));
       case 'getRecentCobas':        return jsonResponse(getRecentCobas(e.parameter.limit));
       case 'getDiasNoHabilesHRT': return jsonResponse(getDiasNoHabilesHRT());
+      case 'getPersonal':         return jsonResponse(getPersonal());
+      case 'setupMaestroPersonal': return jsonResponse(setupMaestroPersonal());
       case 'runSetupTriggers':  return jsonResponse({ success: true, message: setupTriggers() });
       case 'testTriggerConsolidado': return jsonResponse({ success: true, result: triggerAlertaConsolidadaTermo() });
       case 'testTriggerDatosNoRellenados': return jsonResponse({ success: true, result: triggerDatosNoRellenados(e.parameter.hour ? parseInt(e.parameter.hour,10) : null) });
@@ -391,6 +394,8 @@ function doPost(e) {
       case 'getDiasNoHabilesHRT': return jsonResponse(getDiasNoHabilesHRT());
       case 'saveDiaNoHabilHRT':   return jsonResponse(saveDiaNoHabilHRT(data));
       case 'deleteDiaNoHabilHRT': return jsonResponse(deleteDiaNoHabilHRT(data));
+      case 'getPersonal':         return jsonResponse(getPersonal());
+      case 'setupMaestroPersonal': return jsonResponse(setupMaestroPersonal());
       default:                    return jsonResponse({ error: 'Acción no reconocida: ' + data.action });
     }
   } catch (err) {
@@ -574,6 +579,79 @@ function deleteDiaNoHabilHRT(data) {
   return { success: false, error: 'No se encontró la fecha especificada.' };
 }
 
+function getPersonal() {
+  try {
+    const sheet = getSheet(SHEETS.PERSONAL);
+    if (!sheet) return [];
+    const rows = sheet.getDataRange().getValues();
+    if (rows.length <= 1) return [];
+
+    return rows.slice(1).filter(r => r[0]).map(r => ({
+      iniciales: String(r[0]).trim().toUpperCase(),
+      nombre: String(r[1] || '').trim(),
+      estamento: String(r[2] || '').trim(),
+      activo: String(r[3] || 'SI').trim().toUpperCase(),
+      fecha: formatFechaValue(r[4])
+    }));
+  } catch (e) {
+    Logger.log('Error en getPersonal: ' + e.toString());
+    return [];
+  }
+}
+
+function setupMaestroPersonal() {
+  try {
+    const ss = getSpreadsheet();
+    let sheet = ss.getSheetByName(SHEETS.PERSONAL);
+    let isNew = false;
+    if (!sheet) {
+      sheet = ss.insertSheet(SHEETS.PERSONAL);
+      isNew = true;
+    }
+    ensureSheetHeadersAndVisibility(sheet);
+
+    try {
+      sheet.getRange(1, 1, Math.max(sheet.getMaxRows(), 100), 1).setNumberFormat('@');
+      sheet.getRange(1, 5, Math.max(sheet.getMaxRows(), 100), 1).setNumberFormat('@');
+    } catch (e) {}
+
+    const lastRow = sheet.getLastRow();
+    const initialsList = [
+      'AHC', 'ATR', 'AVV', 'BAA', 'BCM', 'BGG', 'CCS', 'CGR', 'CRA', 'DMA',
+      'DRV', 'EAV', 'ESM', 'EVC', 'FSV', 'GAG', 'GRC', 'LPS', 'MCM', 'MEA',
+      'MGE', 'MMA', 'MMT', 'MRB', 'MRD', 'NRG', 'RAA', 'RBM', 'RCL', 'RJL',
+      'SDA', 'SRR', 'TAL'
+    ];
+
+    if (lastRow <= 1) {
+      const todayStr = formatFechaValue(new Date());
+      const rowsToInsert = initialsList.map(init => [
+        init,
+        '',
+        'Tecnólogo Médico',
+        'SI',
+        todayStr
+      ]);
+      sheet.getRange(2, 1, rowsToInsert.length, 5).setValues(rowsToInsert);
+      clearSheetCache('maestros_all', 0, 0);
+      return {
+        success: true,
+        message: 'Maestro Personal creado y precargado con 33 funcionarios.',
+        count: rowsToInsert.length
+      };
+    }
+
+    return {
+      success: true,
+      message: 'Maestro Personal ya contiene ' + (lastRow - 1) + ' registros.',
+      count: lastRow - 1
+    };
+  } catch (err) {
+    Logger.log('Error en setupMaestroPersonal: ' + err.toString());
+    return { success: false, error: err.toString() };
+  }
+}
+
 /** Devuelve todos los maestros en una sola llamada para optimizar carga */
 function getMaestros() {
   const cacheKey = 'maestros_all_v3';
@@ -582,6 +660,7 @@ function getMaestros() {
     cached.modulosActivos = getModulosActivos();
     cached.isTodayHabit = esDiaHabil(new Date());
     cached.serverTime = getServerTime();
+    cached.personal = getPersonal();
     return cached;
   }
   
@@ -592,6 +671,7 @@ function getMaestros() {
     areasDetailed: getAreasDetailed(),
     centrifugasDetailed: getCentrifugasDetailed(),
     salasDetailed: getSalasDetailed(),
+    personal: getPersonal(),
     isTodayHabit: esDiaHabil(new Date()),
     acciones: getAcciones(),
     refrigeradores: getRefrigeradores(),
@@ -2607,7 +2687,8 @@ function getSheetDefs() {
     { name: SHEETS.ACCIONES,    headers: ['Acción'] },
     { name: SHEETS.ETIQUETADORAS_MASTER, headers: ['Nombre Real','ID','Nombre Práctico','Modelo','Tipo de Conexión','Dirección IP','Piso','Ubicación','Comentario'] },
     { name: SHEETS.NOTIFICACIONES, headers: ['Registro','Clave','Destinatarios','Pausado','Hora'] },
-    { name: SHEETS.DIAS_NO_HABILES_HRT, headers: ['Fecha (dd/mm/aaaa)','Motivo','Registrado Por'] }
+    { name: SHEETS.DIAS_NO_HABILES_HRT, headers: ['Fecha (dd/mm/aaaa)','Motivo','Registrado Por'] },
+    { name: SHEETS.PERSONAL, headers: ['Iniciales','Nombre Completo','Estamento','Activo','Fecha de registro'] }
   ];
 }
 
@@ -2703,6 +2784,10 @@ function initializeSpreadsheet() {
         '--'                             // Comentario
       ]);
     }
+  }
+
+  if (newlyCreated[SHEETS.PERSONAL]) {
+    setupMaestroPersonal();
   }
 
   if (newlyCreated[SHEETS.NOTIFICACIONES] || getSheet(SHEETS.NOTIFICACIONES).getLastRow() <= 1) {
