@@ -409,6 +409,22 @@ function getNombreResponsable(rawVal) {
   return match && match.nombre ? match.nombre : trimmed;
 }
 
+function getInicialesResponsable(val) {
+  if (!val) return '';
+  const trimmed = String(val).trim();
+  if (!state.personal || !state.personal.length) {
+    if (trimmed.length <= 4) return trimmed.toUpperCase();
+    return trimmed.split(/\s+/).map(w => w[0]).join('').toUpperCase().substring(0, 3);
+  }
+  const upper = trimmed.toUpperCase();
+  const matchByInitials = state.personal.find(p => p.iniciales === upper);
+  if (matchByInitials) return matchByInitials.iniciales;
+  const matchByName = state.personal.find(p => p.nombre && p.nombre.toUpperCase() === upper);
+  if (matchByName) return matchByName.iniciales;
+  if (trimmed.length <= 4) return upper;
+  return trimmed.split(/\s+/).map(w => w[0]).join('').toUpperCase().substring(0, 3);
+}
+
 function updateResponsableFeedback(inputEl) {
   if (!inputEl) return;
   const val = inputEl.value.trim().toUpperCase();
@@ -473,7 +489,12 @@ async function ensureResponsableRegistered(rawInitials) {
       nameInput.value = '';
       setTimeout(() => nameInput.focus(), 150);
     }
-    if (modal) modal.style.display = 'flex';
+    if (modal) {
+      const card = modal.querySelector('.modal-card, .nuevo-personal-card') || modal.firstElementChild;
+      if (card) card.style.display = 'block';
+      modal.style.display = 'flex';
+      modal.style.zIndex = '10000';
+    }
   });
 }
 

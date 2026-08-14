@@ -8,13 +8,13 @@ document.getElementById('form-termo').addEventListener('submit',async e=>{
     showToast('⚠️ No es posible registrar el turno PM antes de las 12:00 hrs del día de hoy.', 'error');
     return;
   }
+  const respVal = document.getElementById('termo-resp').value.trim().toUpperCase();
+  if (!(await ensureResponsableRegistered(respVal))) return;
   const dup = await checkDuplicateTermo();
   if (dup) {
     const confirmed = await showDuplicateConfirmModal(dup);
     if (!confirmed) return;
   }
-  const respVal = document.getElementById('termo-resp').value.trim().toUpperCase();
-  if (!(await ensureResponsableRegistered(respVal))) return;
   const obsVal = document.getElementById('termo-obs').value;
   const issues=isOutOfRange();
   if(issues){const ac=document.getElementById('termo-accion').value;if(!ac){showOutOfRangePopup(issues);return}}
@@ -41,13 +41,13 @@ document.getElementById('form-centrifugas').addEventListener('submit',async e=>{
   const obsVal=document.getElementById('cent-obs').value;
   const sel=getSelectedChips('cent-chips');
   if(!sel.length){showToast('Seleccione al menos una centrífuga','error');return}
+  const respVal = document.getElementById('cent-resp').value.trim().toUpperCase();
+  if (!(await ensureResponsableRegistered(respVal))) return;
   const dup = await checkDuplicateCentrifugas();
   if (dup) {
     const confirmed = await showDuplicateConfirmModal(dup);
     if (!confirmed) return;
   }
-  const respVal = document.getElementById('cent-resp').value.trim().toUpperCase();
-  if (!(await ensureResponsableRegistered(respVal))) return;
   setLoading('btn-cent-submit','spinner-cent','btn-cent-text',true);
   try{
     const r=await apiPost({action:'saveCentrifuga',fecha:document.getElementById('cent-fecha').value,centrifugas:sel,responsable:document.getElementById('cent-resp').value,tipo_mantencion:document.getElementById('cent-tipo').value,observaciones:obsVal});
@@ -71,13 +71,13 @@ document.getElementById('form-mesones').addEventListener('submit',async e=>{
   const obsVal=document.getElementById('meson-obs').value;
   const sel=getSelectedChips('meson-chips');
   if(!sel.length){showToast('Seleccione al menos una sala','error');return}
+  const respVal = document.getElementById('meson-resp').value.trim().toUpperCase();
+  if (!(await ensureResponsableRegistered(respVal))) return;
   const dup = await checkDuplicateMesones();
   if (dup) {
     const confirmed = await showDuplicateConfirmModal(dup);
     if (!confirmed) return;
   }
-  const respVal = document.getElementById('meson-resp').value.trim().toUpperCase();
-  if (!(await ensureResponsableRegistered(respVal))) return;
   setLoading('btn-meson-submit','spinner-meson','btn-meson-text',true);
   try{
     const r=await apiPost({action:'saveMesones',fecha:document.getElementById('meson-fecha').value,salas:sel,responsable:document.getElementById('meson-resp').value,observaciones:obsVal});
@@ -620,13 +620,13 @@ function renderTables(reg){
   const c=document.getElementById('dash-tables');
   if(!c||!reg) return;
   let html='';
-  if(isModuloActivo('termo'))html+=renderTableCard('🌡️ Temp. Ambiental',reg.termo||[],['Día','Turno','Área','Temp°','Hum%','Resp','Acción','Obs'],r=>[r.dia,r.turno,r.area,r.temperatura,r.humedad,getNombreResponsable(r.responsable),r.accion_correctiva||'',r.observaciones]);
-  if(isModuloActivo('centrifugas'))html+=renderTableCard('⚙️ Centrífugas',reg.centrifugas||[],['Día','Centrífuga','Resp','Tipo','Obs'],r=>[r.dia,r.centrifuga,getNombreResponsable(r.responsable),r.tipo_mantencion,r.observaciones]);
-  if(isModuloActivo('mesones'))html+=renderTableCard('🧽 Mesones',reg.mesones||[],['Día','Sala','Resp','Obs'],r=>[r.dia,r.sala,getNombreResponsable(r.responsable),r.observaciones]);
-  if(isModuloActivo('refri-temp'))html+=renderTableCard('🧊 Temp. Refrigeradores',reg.refriTemp||[],['Día','Turno','Equipo','Temp°','Resp','Obs'],r=>[r.dia,r.turno,r.equipo,r.temperatura,getNombreResponsable(r.responsable),r.observaciones]);
-  if(isModuloActivo('limp-refri'))html+=renderTableCard('🧹 Limpieza Refrigeradores',reg.limpiezaRefri||[],['Día','Tipo','Equipo','Resp','Obs'],r=>[r.dia,r.tipo_mantencion,r.equipo,getNombreResponsable(r.responsable),r.observaciones]);
-  if(isModuloActivo('conductividad'))html+=renderTableCard('💧 Conductividad',reg.conductividad||[],['Día','Turno','µS/cm','Resp','Obs'],r=>[r.dia,r.turno,r.conductividad,getNombreResponsable(r.responsable),r.observaciones]);
-  if(isModuloActivo('cobas'))html+=renderTableCard('🔬 Mantención Cobas',reg.cobas||[],['Día','Equipo','Resp','Frecuencia','Actividad','Obs'],r=>[r.dia,r.equipo,getNombreResponsable(r.responsable),r.frecuencia,r.actividad,r.observaciones||'']);
+  if(isModuloActivo('termo'))html+=renderTableCard('🌡️ Temp. Ambiental',reg.termo||[],['Día','Turno','Área','Temp°','Hum%','Resp','Acción','Obs'],r=>[r.dia,r.turno,r.area,r.temperatura,r.humedad,getInicialesResponsable(r.responsable),r.accion_correctiva||'',r.observaciones]);
+  if(isModuloActivo('centrifugas'))html+=renderTableCard('⚙️ Centrífugas',reg.centrifugas||[],['Día','Centrífuga','Resp','Tipo','Obs'],r=>[r.dia,r.centrifuga,getInicialesResponsable(r.responsable),r.tipo_mantencion,r.observaciones]);
+  if(isModuloActivo('mesones'))html+=renderTableCard('🧽 Mesones',reg.mesones||[],['Día','Sala','Resp','Obs'],r=>[r.dia,r.sala,getInicialesResponsable(r.responsable),r.observaciones]);
+  if(isModuloActivo('refri-temp'))html+=renderTableCard('🧊 Temp. Refrigeradores',reg.refriTemp||[],['Día','Turno','Equipo','Temp°','Resp','Obs'],r=>[r.dia,r.turno,r.equipo,r.temperatura,getInicialesResponsable(r.responsable),r.observaciones]);
+  if(isModuloActivo('limp-refri'))html+=renderTableCard('🧹 Limpieza Refrigeradores',reg.limpiezaRefri||[],['Día','Tipo','Equipo','Resp','Obs'],r=>[r.dia,r.tipo_mantencion,r.equipo,getInicialesResponsable(r.responsable),r.observaciones]);
+  if(isModuloActivo('conductividad'))html+=renderTableCard('💧 Conductividad',reg.conductividad||[],['Día','Turno','µS/cm','Resp','Obs'],r=>[r.dia,r.turno,r.conductividad,getInicialesResponsable(r.responsable),r.observaciones]);
+  if(isModuloActivo('cobas'))html+=renderTableCard('🔬 Mantención Cobas',reg.cobas||[],['Día','Equipo','Resp','Frecuencia','Actividad','Obs'],r=>[r.dia,r.equipo,getInicialesResponsable(r.responsable),r.frecuencia,r.actividad,r.observaciones||'']);
   c.innerHTML=html;
 }
 function renderTableCard(title,rows,headers,mapper){if(!rows.length)return`<div class="card card-sm" style="margin-bottom:16px;"><strong>${title}</strong><div style="color:var(--text-dim);font-size:13px;margin-top:8px;">Sin registros en este período.</div></div>`;const thead=`<tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr>`;const tbody=rows.map(r=>`<tr>${mapper(r).map(v=>`<td>${v??''}</td>`).join('')}</tr>`).join('');return`<div class="card" style="margin-bottom:16px;padding:16px 12px;"><strong style="font-family:'Outfit';font-size:15px;">${title}</strong><span style="color:var(--text-dim);font-size:12px;margin-left:8px;">${rows.length} registros</span><div class="records-table-wrap" style="margin-top:12px;"><table class="records-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table></div></div>`}
@@ -1603,7 +1603,7 @@ async function loadEtiquetadoraBitacora(name) {
         <div style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.04); font-size:13px; line-height:1.4;">
           <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-weight:700;">
             <span style="color:var(--primary-color);">${r.accion}</span>
-            <span style="color:var(--text-dim); font-size:11px;">📅 ${fechaFormateada} — 👤 ${r.responsable}</span>
+            <span style="color:var(--text-dim); font-size:11px;" title="${getNombreResponsable(r.responsable)}">📅 ${fechaFormateada} — 👤 ${getInicialesResponsable(r.responsable)}</span>
           </div>
           <div style="color:var(--text-color); font-weight:400; font-size:12.5px;">${r.descripcion}</div>
         </div>
@@ -1864,7 +1864,7 @@ async function loadDxH900HistorialForm() {
         <div style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.04); font-size:13px; line-height:1.4;">
           <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-weight:700;">
             <span style="color:var(--primary-color);">🔧 Especialista: ${r.especialista}</span>
-            <span style="color:var(--text-dim); font-size:11px;">📅 ${fechaFormateada} — 👤 ${r.usuario_responsable}</span>
+            <span style="color:var(--text-dim); font-size:11px;" title="${getNombreResponsable(r.usuario_responsable)}">📅 ${fechaFormateada} — 👤 ${getInicialesResponsable(r.usuario_responsable)}</span>
           </div>
           <div style="color:var(--text-color); font-weight:400; font-size:12.5px;">${r.descripcion}</div>
         </div>
@@ -1978,9 +1978,9 @@ async function loadElimMuestrasHistorialForm() {
         <div style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.04); font-size:13px; line-height:1.4;">
           <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-weight:700;">
             <span style="color:var(--primary-color);">🗑️ ${r.muestras_eliminadas}</span>
-            <span style="color:var(--text-dim); font-size:11px;">📅 ${r.fecha} — 👤 ${r.responsable}</span>
+            <span style="color:var(--text-dim); font-size:11px;" title="${getNombreResponsable(r.responsable)}">📅 ${r.fecha} — 👤 ${getInicialesResponsable(r.responsable)}</span>
           </div>
-          ${r.revisado_por ? `<div style="font-size:11px; color:#10B981; margin-top:2px;">✓ Revisado por ${r.revisado_por} (${r.fecha_revision})</div>` : ''}
+          ${r.revisado_por ? `<div style="font-size:11px; color:#10B981; margin-top:2px;">✓ Revisado por ${getInicialesResponsable(r.revisado_por)} (${r.fecha_revision})</div>` : ''}
         </div>
       `).join('');
       list.style.display = 'block';
@@ -2496,7 +2496,7 @@ function renderRecentTermoTable(records) {
         <td style="padding: 8px 4px; font-size: 0.82rem;">${r.area || '-'}</td>
         <td style="padding: 8px 4px; text-align: center; white-space: nowrap;">${tempBadge}</td>
         <td style="padding: 8px 4px; text-align: center; white-space: nowrap;">${humBadge}</td>
-        <td style="padding: 8px 4px; text-align: center; font-weight:700; letter-spacing:1px; white-space: nowrap;">${r.responsable}</td>
+        <td style="padding: 8px 4px; text-align: center; font-weight:700; letter-spacing:1px; white-space: nowrap;" title="${getNombreResponsable(r.responsable)}">${getInicialesResponsable(r.responsable)}</td>
         <td style="padding: 8px 4px; text-align: center; white-space: nowrap;">
           <button type="button" class="btn btn-secondary" style="padding: 4px 6px; font-size: 0.75rem;" onclick="openEditTermoModal(${idx})" title="Editar registro">✏️ Edit</button>
           <button type="button" class="btn btn-danger" style="padding: 4px 6px; font-size: 0.75rem; margin-left: 2px;" onclick="confirmDeleteTermo(${idx})" title="Eliminar registro">🗑️ Elim</button>
@@ -2827,7 +2827,7 @@ function renderRecentCentrifugasTable(records) {
     <tr style="border-bottom: 1px solid #f1f5f9;">
       <td style="padding: 8px 4px; white-space: nowrap;"><strong>${formatDDMMYYYY(r.fecha)}</strong></td>
       <td style="padding: 8px 4px; font-weight:600;">${r.centrifuga || '-'}</td>
-      <td style="padding: 8px 4px; text-align: center; font-weight:700; letter-spacing:1px; white-space: nowrap;">${r.responsable}</td>
+      <td style="padding: 8px 4px; text-align: center; font-weight:700; letter-spacing:1px; white-space: nowrap;" title="${getNombreResponsable(r.responsable)}">${getInicialesResponsable(r.responsable)}</td>
       <td style="padding: 8px 4px; text-align: center; white-space: nowrap;"><span class="chip" style="font-size:0.75rem;">${r.tipo_mantencion}</span></td>
       <td style="padding: 8px 4px; text-align: center; white-space: nowrap;">
         <button type="button" class="btn btn-secondary" style="padding: 4px 6px; font-size: 0.75rem;" onclick="openEditCentrifugaModal(${idx})" title="Editar">✏️ Edit</button>
@@ -2961,7 +2961,7 @@ function renderRecentMesonesTable(records) {
     <tr style="border-bottom: 1px solid #f1f5f9;">
       <td style="padding: 8px 4px; white-space: nowrap;"><strong>${formatDDMMYYYY(r.fecha)}</strong></td>
       <td style="padding: 8px 4px; font-weight:600;">${r.sala || '-'}</td>
-      <td style="padding: 8px 4px; text-align: center; font-weight:700; letter-spacing:1px; white-space: nowrap;">${r.responsable}</td>
+      <td style="padding: 8px 4px; text-align: center; font-weight:700; letter-spacing:1px; white-space: nowrap;" title="${getNombreResponsable(r.responsable)}">${getInicialesResponsable(r.responsable)}</td>
       <td style="padding: 8px 4px; text-align: center; white-space: nowrap;">
         <button type="button" class="btn btn-secondary" style="padding: 4px 6px; font-size: 0.75rem;" onclick="openEditMesonModal(${idx})" title="Editar">✏️ Edit</button>
         <button type="button" class="btn btn-danger" style="padding: 4px 6px; font-size: 0.75rem; margin-left: 2px;" onclick="confirmDeleteMeson(${idx})" title="Eliminar">🗑️ Elim</button>
@@ -3094,7 +3094,7 @@ function renderRecentRefriTempTable(records) {
         <td style="padding: 8px 4px; white-space: nowrap;"><strong>${formatDDMMYYYY(r.fecha)}</strong> <span style="font-size:0.75rem; color:#64748b;">(${turnoBadge})</span></td>
         <td style="padding: 8px 4px; font-weight:600;">${r.equipo || '-'}</td>
         <td style="padding: 8px 4px; text-align: center; font-weight:700; color:#16a34a; white-space: nowrap;">${r.temperatura} °C</td>
-        <td style="padding: 8px 4px; text-align: center; font-weight:700; letter-spacing:1px; white-space: nowrap;">${r.responsable}</td>
+        <td style="padding: 8px 4px; text-align: center; font-weight:700; letter-spacing:1px; white-space: nowrap;" title="${getNombreResponsable(r.responsable)}">${getInicialesResponsable(r.responsable)}</td>
         <td style="padding: 8px 4px; font-size: 0.82rem;">${[r.accion_correctiva, r.observaciones].filter(Boolean).join(' - ') || '-'}</td>
         <td style="padding: 8px 4px; text-align: center; white-space: nowrap;">
           <button type="button" class="btn btn-secondary" style="padding: 4px 6px; font-size: 0.75rem;" onclick="openEditRefriTempModal(${idx})" title="Editar">✏️ Edit</button>
@@ -3245,7 +3245,7 @@ function renderRecentLimpRefriTable(records) {
       <td style="padding: 8px 4px; white-space: nowrap;"><strong>${formatDDMMYYYY(r.fecha)}</strong></td>
       <td style="padding: 8px 4px;"><span class="chip" style="font-size:0.75rem;">${r.tipo_mantencion}</span></td>
       <td style="padding: 8px 4px; font-weight:600;">${r.equipo || '-'}</td>
-      <td style="padding: 8px 4px; text-align: center; font-weight:700; letter-spacing:1px; white-space: nowrap;">${r.responsable}</td>
+      <td style="padding: 8px 4px; text-align: center; font-weight:700; letter-spacing:1px; white-space: nowrap;" title="${getNombreResponsable(r.responsable)}">${getInicialesResponsable(r.responsable)}</td>
       <td style="padding: 8px 4px; font-size: 0.82rem;">${r.observaciones || '-'}</td>
       <td style="padding: 8px 4px; text-align: center; white-space: nowrap;">
         <button type="button" class="btn btn-secondary" style="padding: 4px 6px; font-size: 0.75rem;" onclick="openEditLimpRefriModal(${idx})" title="Editar">✏️ Edit</button>
@@ -3386,7 +3386,7 @@ function renderRecentConductividadTable(records) {
       <tr style="border-bottom: 1px solid #f1f5f9;">
         <td style="padding: 8px 4px; white-space: nowrap;"><strong>${formatDDMMYYYY(r.fecha)}</strong> <span style="font-size:0.75rem; color:#64748b;">(${turnoBadge})</span></td>
         <td style="padding: 8px 4px; text-align: center; white-space: nowrap;">${badge}</td>
-        <td style="padding: 8px 4px; text-align: center; font-weight:700; letter-spacing:1px; white-space: nowrap;">${r.responsable}</td>
+        <td style="padding: 8px 4px; text-align: center; font-weight:700; letter-spacing:1px; white-space: nowrap;" title="${getNombreResponsable(r.responsable)}">${getInicialesResponsable(r.responsable)}</td>
         <td style="padding: 8px 4px; font-size: 0.82rem;">${r.observaciones || '-'}</td>
         <td style="padding: 8px 4px; text-align: center; white-space: nowrap;">
           <button type="button" class="btn btn-secondary" style="padding: 4px 6px; font-size: 0.75rem;" onclick="openEditConductividadModal(${idx})" title="Editar">✏️ Edit</button>
@@ -3521,7 +3521,7 @@ function renderRecentCobasTable(records) {
     <tr style="border-bottom: 1px solid #f1f5f9;">
       <td style="padding: 8px 4px; white-space: nowrap;"><strong>${formatDDMMYYYY(r.fecha)}</strong></td>
       <td style="padding: 8px 4px; font-weight:600;">${r.equipo || '-'}</td>
-      <td style="padding: 8px 4px; text-align: center; font-weight:700; letter-spacing:1px; white-space: nowrap;">${r.responsable}</td>
+      <td style="padding: 8px 4px; text-align: center; font-weight:700; letter-spacing:1px; white-space: nowrap;" title="${getNombreResponsable(r.responsable)}">${getInicialesResponsable(r.responsable)}</td>
       <td style="padding: 8px 4px;"><span class="chip" style="font-size:0.75rem;">${r.frecuencia || '-'}</span></td>
       <td style="padding: 8px 4px; font-size: 0.82rem;">${r.actividad || '-'}</td>
       <td style="padding: 8px 4px; font-size: 0.82rem;">${r.observaciones || '-'}</td>

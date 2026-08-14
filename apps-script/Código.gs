@@ -162,6 +162,22 @@ function clearSheetCache(keyPrefix, mes, anio) {
   clearCacheKeys([cacheKey]);
 }
 
+function clearAllCaches() {
+  try {
+    const keys = ['maestros_all', 'maestros_all_v3', 'sugerencias_historicas', 'dxh900_hist', 'config_modulos_activos'];
+    const now = new Date();
+    const curMes = now.getMonth() + 1;
+    const curAnio = now.getFullYear();
+    ['termo', 'centrifugas', 'mesones', 'refriTemp', 'limpiezaRefri', 'conductividad', 'cobas', 'elimMuestras'].forEach(k => {
+      keys.push(getCacheKey('regs', k, curMes, curAnio));
+      keys.push(getCacheKey('regs', k, curMes === 1 ? 12 : curMes - 1, curMes === 1 ? curAnio - 1 : curAnio));
+    });
+    CacheService.getScriptCache().removeAll(keys);
+  } catch (e) {
+    Logger.log('Error en clearAllCaches: ' + e.toString());
+  }
+}
+
 const SPREADSHEET_ID_DEFAULT = '1HzHcRriBtPGQxTfFrZSntVeM8ujQHWnGFuyWrJo6KUQ';
 
 function getSpreadsheet() {
@@ -335,6 +351,7 @@ function doGet(e) {
       case 'getPersonal':         return jsonResponse(getPersonal());
       case 'savePersonal':        return jsonResponse(savePersonal(e.parameter));
       case 'deletePersonal':      return jsonResponse(deletePersonal(e.parameter));
+      case 'migrarInicialesAHistoricos': return jsonResponse(migrarInicialesAHistoricos());
       case 'setupMaestroPersonal': return jsonResponse(setupMaestroPersonal());
       case 'runSetupTriggers':  return jsonResponse({ success: true, message: setupTriggers() });
       case 'testTriggerConsolidado': return jsonResponse({ success: true, result: triggerAlertaConsolidadaTermo() });
@@ -399,6 +416,7 @@ function doPost(e) {
       case 'getPersonal':         return jsonResponse(getPersonal());
       case 'savePersonal':        return jsonResponse(savePersonal(data));
       case 'deletePersonal':      return jsonResponse(deletePersonal(data));
+      case 'migrarInicialesAHistoricos': return jsonResponse(migrarInicialesAHistoricos());
       case 'setupMaestroPersonal': return jsonResponse(setupMaestroPersonal());
       default:                    return jsonResponse({ error: 'Acción no reconocida: ' + data.action });
     }
@@ -729,6 +747,59 @@ function deletePersonal(data) {
     }
   }
   return { success: false, error: 'Funcionario no encontrado.' };
+}
+
+function migrarInicialesAHistoricos() {
+  const ss = getSpreadsheet();
+  const personal = getPersonal();
+  const map = {};
+  personal.forEach(p => {
+    if (p.iniciales && p.nombre) {
+      map[p.iniciales.toUpperCase().trim()] = p.nombre.toUpperCase().trim();
+    }
+  });
+
+  const allSheets = ss.getSheets();
+  const report = {};
+  let totalReplaced = 0;
+
+  allSheets.forEach(sheet => {
+    const sheetName = sheet.getName();
+    // No migrar dentro de hojas Maestro (excepto si son registros)
+    if (sheetName.startsWith('Maestro')) return;
+
+    const lastRow = sheet.getLastRow();
+    const lastCol = sheet.getLastColumn();
+    if (lastRow <= 1 || lastCol === 0) return;
+
+    const range = sheet.getRange(1, 1, lastRow, lastCol);
+    const data = range.getValues();
+    let replacedInSheet = 0;
+
+    for (let r = 1; r < data.length; r++) {
+      for (let c = 0; c < data[r].length; c++) {
+        const val = String(data[r][c] || '').trim().toUpperCase();
+        if (val && map[val]) {
+          data[r][c] = map[val];
+          replacedInSheet++;
+          totalReplaced++;
+        }
+      }
+    }
+
+    if (replacedInSheet > 0) {
+      range.setValues(data);
+    }
+    report[sheetName] = replacedInSheet;
+  });
+
+  clearAllCaches();
+  return {
+    success: true,
+    message: `Migración completada. Se reemplazaron ${totalReplaced} registros históricos en Google Sheets.`,
+    totalReplaced: totalReplaced,
+    detalle: report
+  };
 }
 
 /** Devuelve todos los maestros en una sola llamada para optimizar carga */
