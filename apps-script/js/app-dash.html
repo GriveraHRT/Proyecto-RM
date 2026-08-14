@@ -640,9 +640,17 @@ function initRevAdminSelectors(){
   const mesEl=document.getElementById('rev-admin-mes');
   const anioEl=document.getElementById('rev-admin-anio');
   if(!mesEl||!anioEl)return;
-  mesEl.innerHTML=ms.map((m,i)=>`<option value="${i+1}"${i+1===state.dashMes?' selected':''}>${m}</option>`).join('');
+
+  // Pre-seleccionar mes y año anterior por defecto (revisión retrospectiva)
+  const d=new Date();
+  d.setDate(1);
+  d.setMonth(d.getMonth()-1);
+  const defMes=d.getMonth()+1;
+  const defAnio=d.getFullYear();
+
+  mesEl.innerHTML=ms.map((m,i)=>`<option value="${i+1}"${i+1===defMes?' selected':''}>${m}</option>`).join('');
   const y=new Date().getFullYear();
-  anioEl.innerHTML=[y-1,y,y+1].map(a=>`<option value="${a}"${a===state.dashAnio?' selected':''}>${a}</option>`).join('');
+  anioEl.innerHTML=[y-1,y,y+1].map(a=>`<option value="${a}"${a===defAnio?' selected':''}>${a}</option>`).join('');
   loadRevStatus();
 }
 function toggleAllRevChips(){
@@ -659,7 +667,7 @@ async function loadRevStatus(){
   try{
     const rev=await apiGet({action:'getRevisiones',mes:mes,anio:anio});
     const revisados=rev.revisados||[];
-    const ALL_TYPES=[{key:'termo',name:'🌡️ Temp. Ambiental'},{key:'centrifugas',name:'⚙️ Centrífugas'},{key:'mesones',name:'🧽 Mesones'},{key:'refriTemp',name:'🧊 Temp. Refri.'},{key:'limpRefri',name:'🧹 Limp. Refri.'},{key:'conductividad',name:'💧 Conductividad'},{key:'cobas',name:'🔬 Mantención Cobas'}];
+    const ALL_TYPES=[{key:'termo',name:'🌡️ Temp. Ambiental'},{key:'centrifugas',name:'⚙️ Centrífugas'},{key:'mesones',name:'🧽 Mesones'},{key:'refriTemp',name:'🧊 Temp. Refri.'},{key:'limpRefri',name:'🧹 Limp. Refri.'},{key:'conductividad',name:'💧 Conductividad'},{key:'cobas',name:'🔬 Mantención Cobas'},{key:'elimMuestras',name:'🗑️ Elim. Muestras'}];
     let html='<div class="rev-status-title">Estado de revisión del mes</div><div class="status-grid">';
     ALL_TYPES.forEach(t=>{
       const done=revisados.indexOf(t.key)!==-1;
