@@ -238,6 +238,41 @@ function getFechaRegistroFormatted(d) {
   }
 }
 
+function getServerTime() {
+  const tz = 'America/Santiago';
+  const now = new Date();
+  const dateStr = Utilities.formatDate(now, tz, 'yyyy-MM-dd');
+  const hour = parseInt(Utilities.formatDate(now, tz, 'HH'), 10);
+  const minute = parseInt(Utilities.formatDate(now, tz, 'mm'), 10);
+  return {
+    dateStr: dateStr,
+    hour: hour,
+    minute: minute,
+    timestamp: now.getTime(),
+    timezone: tz
+  };
+}
+
+function validarFechaNoFutura(fechaInput, ampmInput) {
+  if (!fechaInput) return null;
+  const st = getServerTime();
+  const parsed = parseFecha(fechaInput);
+  if (!parsed || !parsed.anio || !parsed.mes || !parsed.dia) return null;
+  const fechaISO = `${String(parsed.anio).padStart(4, '0')}-${String(parsed.mes).padStart(2, '0')}-${String(parsed.dia).padStart(2, '0')}`;
+  
+  if (fechaISO > st.dateStr) {
+    return `❌ No es posible registrar datos con fecha futura (${formatFechaDDMMYYYY(parsed)} > fecha actual ${st.dateStr.split('-').reverse().join('/')}).`;
+  }
+  
+  if (fechaISO === st.dateStr && ampmInput) {
+    const ampmUpper = String(ampmInput).toUpperCase().trim();
+    if ((ampmUpper === 'PM' || ampmUpper === 'TARDE') && st.hour < 12) {
+      return `❌ No es posible registrar o actualizar el turno PM antes de las 12:00 hrs del día de hoy.`;
+    }
+  }
+  return null;
+}
+
 function jsonResponse(obj) {
   return ContentService
     .createTextOutput(JSON.stringify(obj))
@@ -282,6 +317,7 @@ function doGet(e) {
       case 'getRegistros':      return jsonResponse(getRegistros(e.parameter.mes, e.parameter.anio));
       case 'getRevisiones':     return jsonResponse(getRevision(e.parameter.mes, e.parameter.anio));
       case 'getMaestros':       return jsonResponse(getMaestros());
+      case 'getServerTime':     return jsonResponse(getServerTime());
       case 'getEtiquetadoras':  return jsonResponse(getEtiquetadoras());
       case 'getEtiquetadoraHistorial': return jsonResponse(getEtiquetadoraHistorial(e.parameter.etiquetadora));
       case 'getNotificaciones': return jsonResponse(getNotificaciones());
@@ -297,6 +333,12 @@ function doGet(e) {
       case 'getDiasNoHabilesHRT': return jsonResponse(getDiasNoHabilesHRT());
       case 'runSetupTriggers':  return jsonResponse({ success: true, message: setupTriggers() });
       case 'testTriggerConsolidado': return jsonResponse({ success: true, result: triggerAlertaConsolidadaTermo() });
+      case 'testTriggerDatosNoRellenados': return jsonResponse({ success: true, result: triggerDatosNoRellenados(e.parameter.hour ? parseInt(e.parameter.hour,10) : null) });
+      case 'testTriggerMantencionSemanal': return jsonResponse({ success: true, result: triggerMantencionSemanal(e.parameter.to || null) });
+      case 'applyConfig': return jsonResponse(applyNotificationConfig(e.parameter.hour, e.parameter.to));
+      case 'getProjectTriggersInfo': return jsonResponse(getProjectTriggersInfo());
+      case 'scheduleAutoTest': return jsonResponse(scheduleAutoTriggerInMinutes(e.parameter.minutes || 2));
+      case 'getTriggerLogs': return jsonResponse(getTriggerLogs());
       case 'SETUP_INIT_TA':     return jsonResponse(setup());
       case 'REINIT':            return jsonResponse(reinitialize());
       default:                  return jsonResponse({ error: 'Acción no reconocida: ' + action });
@@ -539,6 +581,7 @@ function getMaestros() {
   if (cached && cached.centrifugasDetailed && cached.areasDetailed && cached.salasDetailed) {
     cached.modulosActivos = getModulosActivos();
     cached.isTodayHabit = esDiaHabil(new Date());
+    cached.serverTime = getServerTime();
     return cached;
   }
   
@@ -555,7 +598,8 @@ function getMaestros() {
     refriLimpieza: getRefriLimpieza(),
     etiquetadoras: getEtiquetadoras(),
     sugerencias: getSugerenciasHistoricas(),
-    modulosActivos: getModulosActivos()
+    modulosActivos: getModulosActivos(),
+    serverTime: getServerTime()
   };
   
   setCachedJson(cacheKey, data, CACHE_TTL_MAESTROS);
@@ -617,9 +661,11 @@ function saveTermo(data) {
   if (!data.responsable || !data.temperatura || !data.humedad || !data.fecha || !data.area) {
     return { success: false, error: 'Faltan campos obligatorios.' };
   }
+  const ampm = data.ampm || (new Date().getHours() < 12 ? 'AM' : 'PM');
+  const errFuture = validarFechaNoFutura(data.fecha, ampm);
+  if (errFuture) return { success: false, error: errFuture };
   const f = parseFecha(data.fecha);
   const ts = getFechaRegistroFormatted();
-  const ampm = data.ampm || (new Date().getHours() < 12 ? 'AM' : 'PM');
   const turno = ampm === 'AM' ? 'Mañana' : 'Tarde';
   const accion = data.accion_correctiva || '';
 
@@ -878,6 +924,8 @@ function updateCentrifuga(data) {
   if (!data.rowIndex || !data.responsable || !data.fecha || !data.centrifuga) {
     return { success: false, error: 'Faltan campos obligatorios para actualizar.' };
   }
+  const errFuture = validarFechaNoFutura(data.fecha);
+  if (errFuture) return { success: false, error: errFuture };
   const targetRow = findRowIndexByTimestamp(SHEETS.CENT_REG, data.rowIndex, data.fecha_registro, 9);
   if (targetRow < 2) return { success: false, error: 'No se encontró el registro para actualizar.' };
 
@@ -912,6 +960,8 @@ function updateMeson(data) {
   if (!data.rowIndex || !data.responsable || !data.fecha || !data.sala) {
     return { success: false, error: 'Faltan campos obligatorios para actualizar.' };
   }
+  const errFuture = validarFechaNoFutura(data.fecha);
+  if (errFuture) return { success: false, error: errFuture };
   const targetRow = findRowIndexByTimestamp(SHEETS.MESONES, data.rowIndex, data.fecha_registro, 8);
   if (targetRow < 2) return { success: false, error: 'No se encontró el registro para actualizar.' };
 
@@ -945,6 +995,9 @@ function updateRefriTemp(data) {
   if (!data.rowIndex || !data.responsable || !data.fecha || !data.equipo || data.temperatura === undefined) {
     return { success: false, error: 'Faltan campos obligatorios para actualizar.' };
   }
+  const ampm = data.ampm || (data.turno === 'Mañana' ? 'AM' : 'PM');
+  const errFuture = validarFechaNoFutura(data.fecha, ampm);
+  if (errFuture) return { success: false, error: errFuture };
   const targetRow = findRowIndexByTimestamp(SHEETS.REFRI_REG, data.rowIndex, data.fecha_registro, 12);
   if (targetRow < 2) return { success: false, error: 'No se encontró el registro para actualizar.' };
 
@@ -982,6 +1035,8 @@ function updateLimpRefri(data) {
   if (!data.rowIndex || !data.responsable || !data.fecha || !data.equipo) {
     return { success: false, error: 'Faltan campos obligatorios para actualizar.' };
   }
+  const errFuture = validarFechaNoFutura(data.fecha);
+  if (errFuture) return { success: false, error: errFuture };
   const targetRow = findRowIndexByTimestamp(SHEETS.LIMP_REFRI, data.rowIndex, data.fecha_registro, 9);
   if (targetRow < 2) return { success: false, error: 'No se encontró el registro para actualizar.' };
 
@@ -1016,6 +1071,9 @@ function updateConductividad(data) {
   if (!data.rowIndex || !data.responsable || !data.fecha || data.conductividad === undefined) {
     return { success: false, error: 'Faltan campos obligatorios para actualizar.' };
   }
+  const ampm = data.ampm || (data.turno === 'Mañana' ? 'AM' : 'PM');
+  const errFuture = validarFechaNoFutura(data.fecha, ampm);
+  if (errFuture) return { success: false, error: errFuture };
   const targetRow = findRowIndexByTimestamp(SHEETS.CONDUCT_REG, data.rowIndex, data.fecha_registro, 9);
   if (targetRow < 2) return { success: false, error: 'No se encontró el registro para actualizar.' };
 
@@ -1050,6 +1108,8 @@ function updateCobas(data) {
   if (!data.rowIndex || !data.responsable || !data.fecha || !data.equipo) {
     return { success: false, error: 'Faltan campos obligatorios para actualizar.' };
   }
+  const errFuture = validarFechaNoFutura(data.fecha);
+  if (errFuture) return { success: false, error: errFuture };
   const targetRow = findRowIndexByTimestamp(SHEETS.COBAS_REG, data.rowIndex, data.fecha_registro, 10);
   if (targetRow < 2) return { success: false, error: 'No se encontró el registro para actualizar.' };
 
@@ -1112,6 +1172,10 @@ function updateTermo(data) {
     return { success: false, error: 'Faltan campos obligatorios para actualizar.' };
   }
 
+  const ampm = data.ampm || (data.turno === 'Mañana' ? 'AM' : 'PM');
+  const errFuture = validarFechaNoFutura(data.fecha, ampm);
+  if (errFuture) return { success: false, error: errFuture };
+
   const targetRow = findTermoRowIndex(data.rowIndex, data.fecha_registro);
   if (targetRow < 2) {
     return { success: false, error: 'No se encontró el registro para actualizar.' };
@@ -1122,7 +1186,6 @@ function updateTermo(data) {
   const oldAnio = sheet.getRange(targetRow, 4).getValue();
 
   const f = parseFecha(data.fecha);
-  const ampm = data.ampm || (data.turno === 'Mañana' ? 'AM' : 'PM');
   const turno = ampm === 'AM' ? 'Mañana' : 'Tarde';
   const temp = parseFloat(data.temperatura);
   const hum = parseFloat(data.humedad);
@@ -1175,6 +1238,8 @@ function saveCentrifuga(data) {
   if (!data.responsable || !data.fecha) {
     return { success: false, error: 'Faltan campos obligatorios.' };
   }
+  const errFuture = validarFechaNoFutura(data.fecha);
+  if (errFuture) return { success: false, error: errFuture };
   const centrifugas = data.centrifugas || (data.centrifuga ? [data.centrifuga] : []);
   if (centrifugas.length === 0) {
     return { success: false, error: 'Seleccione al menos una centrífuga.' };
@@ -1203,6 +1268,8 @@ function saveMesones(data) {
   if (!data.responsable || !data.fecha) {
     return { success: false, error: 'Faltan campos obligatorios.' };
   }
+  const errFuture = validarFechaNoFutura(data.fecha);
+  if (errFuture) return { success: false, error: errFuture };
   const salas = data.salas || (data.sala ? [data.sala] : []);
   if (salas.length === 0) {
     return { success: false, error: 'Seleccione al menos una sala.' };
@@ -1230,9 +1297,11 @@ function saveRefriTemp(data) {
   if (!data.responsable || !data.temperatura || !data.fecha || !data.equipo) {
     return { success: false, error: 'Faltan campos obligatorios.' };
   }
+  const ampm = data.ampm || (new Date().getHours() < 12 ? 'AM' : 'PM');
+  const errFuture = validarFechaNoFutura(data.fecha, ampm);
+  if (errFuture) return { success: false, error: errFuture };
   const f = parseFecha(data.fecha);
   const ts = getFechaRegistroFormatted();
-  const ampm = data.ampm || (new Date().getHours() < 12 ? 'AM' : 'PM');
   const turno = ampm === 'AM' ? 'Mañana' : 'Tarde';
   const accion = data.accion_correctiva || '';
   const temp = parseFloat(data.temperatura);
@@ -1283,6 +1352,8 @@ function saveLimpiezaRefri(data) {
   if (!data.responsable || !data.fecha || !data.tipo_mantencion) {
     return { success: false, error: 'Faltan campos obligatorios.' };
   }
+  const errFuture = validarFechaNoFutura(data.fecha);
+  if (errFuture) return { success: false, error: errFuture };
   const equipos = data.equipos || [];
   if (equipos.length === 0) {
     return { success: false, error: 'Seleccione al menos un equipo.' };
@@ -1311,9 +1382,11 @@ function saveConductividad(data) {
   if (!data.responsable || !data.fecha || data.conductividad === undefined || data.conductividad === '') {
     return { success: false, error: 'Faltan campos obligatorios.' };
   }
+  const ampm = data.ampm || (new Date().getHours() < 12 ? 'AM' : 'PM');
+  const errFuture = validarFechaNoFutura(data.fecha, ampm);
+  if (errFuture) return { success: false, error: errFuture };
   const f = parseFecha(data.fecha);
   const ts = getFechaRegistroFormatted();
-  const ampm = data.ampm || (new Date().getHours() < 12 ? 'AM' : 'PM');
   const turno = ampm === 'AM' ? 'Mañana' : 'Tarde';
   const cond = parseFloat(data.conductividad);
 
@@ -1353,6 +1426,8 @@ function saveCobas(data) {
   if (!data.responsable || !data.fecha || !data.equipo || !data.actividades || !data.actividades.length) {
     return { success: false, error: 'Faltan campos obligatorios.' };
   }
+  const errFuture = validarFechaNoFutura(data.fecha);
+  if (errFuture) return { success: false, error: errFuture };
   const f = parseFecha(data.fecha);
   const ts = getFechaRegistroFormatted();
   const sheet = getSheet(SHEETS.COBAS_REG);
@@ -1822,7 +1897,50 @@ function triggerRecordatorioMesAnterior() {
 
 // ── Email — Datos No Rellenados (Trigger Diario) ──────────────
 
-function triggerDatosNoRellenados() {
+function triggerDatosNoRellenados(e) {
+  try {
+    logTriggerExecution('triggerDatosNoRellenados_STARTED', e, 'Ejecución iniciada');
+  } catch(errLog) {}
+
+  const chileDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }));
+  const chileHour = chileDate.getHours();
+
+  let targetHour = null;
+  if (typeof e === 'number') {
+    targetHour = e;
+  } else if (e && typeof e.hour === 'number') {
+    targetHour = e.hour;
+  } else {
+    targetHour = chileHour;
+  }
+
+  const notifs = getNotificaciones();
+  
+  // Filtrar notificaciones activas correspondientes al horario actual (o a todas si targetHour no está especificado)
+  const activeForHour = {};
+  notifs.forEach(n => {
+    if (n.pausado) return;
+    if (!n.destinatarios || !n.destinatarios.trim()) return;
+
+    const parts = (n.hora || '20:00').split(':');
+    const h = parseInt(parts[0], 10);
+    
+    const matchesHour = (targetHour === null) || isNaN(h) || (h === targetHour) || 
+      (Math.abs(h - targetHour) <= 1) || 
+      (h === 23 && targetHour === 0) || 
+      (h === 0 && targetHour === 23) ||
+      (h === chileHour);
+      
+    if (matchesHour) {
+      activeForHour[n.clave] = n;
+    }
+  });
+
+  if (Object.keys(activeForHour).length === 0) {
+    Logger.log('No hay notificaciones pendientes programadas para la hora: ' + (targetHour !== null ? targetHour + ':00' : 'todas'));
+    return ['No hay notificaciones pendientes programadas para la hora.'];
+  }
+
   const hoy = new Date();
   const dia = hoy.getDate();
   const mes = hoy.getMonth() + 1;
@@ -1837,113 +1955,138 @@ function triggerDatosNoRellenados() {
 
   const reg = getRegistros(mes, anio);
 
-  // Gather missing items per key
+  // Recopilar elementos faltantes solo para los formularios activos en este horario
   const missingByRegister = {};
 
-  // Temperatura/Humedad faltantes
-  const termoFaltantes = [];
-  areasDetailed.forEach(item => {
-    if (!esHab && item.horarioTurno === 'no') return;
-    const area = item.nombre;
-    ['Mañana', 'Tarde'].forEach(turno => {
-      const existe = reg.termo.some(r => parseInt(r.dia) === dia && r.area === area && r.turno === turno);
-      if (!existe) termoFaltantes.push(area + ' (' + turno + ')');
+  // 1. Temperatura/Humedad faltantes ('termo')
+  if (activeForHour['termo']) {
+    const termoFaltantes = [];
+    areasDetailed.forEach(item => {
+      if (!esHab && item.horarioTurno === 'no') return;
+      const area = item.nombre;
+      ['Mañana', 'Tarde'].forEach(turno => {
+        const existe = reg.termo.some(r => parseInt(r.dia) === dia && r.area === area && r.turno === turno);
+        if (!existe) termoFaltantes.push(area + ' (' + turno + ')');
+      });
     });
-  });
-  if (termoFaltantes.length > 0) {
-    missingByRegister['termo'] = { name: '🌡️ Temperatura/Humedad Ambiental', items: termoFaltantes };
-  }
-
-  // Centrífugas faltantes (solo mantenimiento Diario)
-  const centFaltantes = [];
-  centrifugasDetailed.forEach(item => {
-    if (!esHab && item.horarioTurno === 'no') return;
-    const c = item.nombre;
-    const existe = reg.centrifugas.some(r => parseInt(r.dia) === dia && r.centrifuga === c && r.tipo_mantencion === 'Diaria');
-    if (!existe) centFaltantes.push(c);
-  });
-  if (centFaltantes.length > 0) {
-    missingByRegister['centrifugas'] = { name: '⚙️ Centrífugas (Diaria)', items: centFaltantes };
-  }
-
-  // Mesones faltantes
-  const mesonFaltantes = [];
-  salasDetailed.forEach(item => {
-    if (!esHab && item.horarioTurno === 'no') return;
-    const s = item.nombre;
-    const existe = reg.mesones.some(r => parseInt(r.dia) === dia && r.sala === s);
-    if (!existe) mesonFaltantes.push(s);
-  });
-  if (mesonFaltantes.length > 0) {
-    missingByRegister['mesones'] = { name: '🧽 Limpieza de Mesones', items: mesonFaltantes };
-  }
-
-  // Temp Refrigeradores faltantes (AM y PM)
-  const refriFaltantes = [];
-  refrigeradores.forEach(r => {
-    ['Mañana', 'Tarde'].forEach(turno => {
-      const existe = reg.refriTemp.some(rt => parseInt(rt.dia) === dia && rt.equipo === r.equipo && rt.turno === turno);
-      if (!existe) refriFaltantes.push(r.equipo + ' (' + turno + ')');
-    });
-  });
-  if (refriFaltantes.length > 0) {
-    missingByRegister['refriTemp'] = { name: '🧊 Temp. Refrigeradores', items: refriFaltantes };
-  }
-
-  // Conductividad faltantes (AM y PM)
-  const condFaltantes = [];
-  ['Mañana', 'Tarde'].forEach(turno => {
-    const existe = reg.conductividad.some(c => parseInt(c.dia) === dia && c.turno === turno);
-    if (!existe) condFaltantes.push('Conductividad (' + turno + ')');
-  });
-  if (condFaltantes.length > 0) {
-    missingByRegister['conductividad'] = { name: '💧 Conductividad Agua', items: condFaltantes };
-  }
-
-  // Cobas diarias faltantes
-  const cobasFaltantes = [];
-  const cobasEquipos = ['Cobas 1', 'Cobas 2'];
-  const cobasHoy = reg.cobas ? reg.cobas.filter(r => parseInt(r.dia) === dia) : [];
-  cobasEquipos.forEach(eq => {
-    const existe = cobasHoy.some(r => r.equipo === eq && r.frecuencia === 'Diaria');
-    if (!existe) {
-      cobasFaltantes.push(eq + ': Mantención Diaria');
+    if (termoFaltantes.length > 0) {
+      missingByRegister['termo'] = { name: '🌡️ Temperatura/Humedad Ambiental', items: termoFaltantes, notif: activeForHour['termo'] };
     }
-  });
-  if (cobasFaltantes.length > 0) {
-    missingByRegister['cobas'] = { name: '🔬 Mantención Cobas (Diaria)', items: cobasFaltantes };
   }
 
-  // Eliminación de Muestras faltante (diaria)
-  const elimHoy = reg.elimMuestras ? reg.elimMuestras.filter(r => parseInt(r.dia) === dia) : [];
-  if (elimHoy.length === 0) {
-    missingByRegister['elimMuestras'] = { name: '🗑️ Registro de Eliminación de Muestras', items: ['Eliminación de Muestras del día'] };
+  // 2. Centrífugas faltantes ('centrifugas')
+  if (activeForHour['centrifugas']) {
+    const centFaltantes = [];
+    centrifugasDetailed.forEach(item => {
+      if (!esHab && item.horarioTurno === 'no') return;
+      const c = item.nombre;
+      const existe = reg.centrifugas.some(r => parseInt(r.dia) === dia && r.centrifuga === c && r.tipo_mantencion === 'Diaria');
+      if (!existe) centFaltantes.push(c);
+    });
+    if (centFaltantes.length > 0) {
+      missingByRegister['centrifugas'] = { name: '⚙️ Centrífugas (Diaria)', items: centFaltantes, notif: activeForHour['centrifugas'] };
+    }
   }
 
-  // Map to recipient emails
-  const emailBuckets = {};
+  // 3. Mesones faltantes ('mesones')
+  if (activeForHour['mesones']) {
+    const mesonFaltantes = [];
+    salasDetailed.forEach(item => {
+      if (!esHab && item.horarioTurno === 'no') return;
+      const s = item.nombre;
+      const existe = reg.mesones.some(r => parseInt(r.dia) === dia && r.sala === s);
+      if (!existe) mesonFaltantes.push(s);
+    });
+    if (mesonFaltantes.length > 0) {
+      missingByRegister['mesones'] = { name: '🧽 Limpieza de Mesones', items: mesonFaltantes, notif: activeForHour['mesones'] };
+    }
+  }
+
+  // 4. Temp Refrigeradores faltantes ('refriTemp')
+  if (activeForHour['refriTemp']) {
+    const refriFaltantes = [];
+    refrigeradores.forEach(r => {
+      ['Mañana', 'Tarde'].forEach(turno => {
+        const existe = reg.refriTemp.some(rt => parseInt(rt.dia) === dia && rt.equipo === r.equipo && rt.turno === turno);
+        if (!existe) refriFaltantes.push(r.equipo + ' (' + turno + ')');
+      });
+    });
+    if (refriFaltantes.length > 0) {
+      missingByRegister['refriTemp'] = { name: '🧊 Temp. Refrigeradores', items: refriFaltantes, notif: activeForHour['refriTemp'] };
+    }
+  }
+
+  // 5. Conductividad faltantes ('conductividad')
+  if (activeForHour['conductividad']) {
+    const condFaltantes = [];
+    ['Mañana', 'Tarde'].forEach(turno => {
+      const existe = reg.conductividad.some(c => parseInt(c.dia) === dia && c.turno === turno);
+      if (!existe) condFaltantes.push('Conductividad (' + turno + ')');
+    });
+    if (condFaltantes.length > 0) {
+      missingByRegister['conductividad'] = { name: '💧 Conductividad Agua', items: condFaltantes, notif: activeForHour['conductividad'] };
+    }
+  }
+
+  // 6. Cobas diarias faltantes ('cobas')
+  if (activeForHour['cobas']) {
+    const cobasFaltantes = [];
+    const cobasEquipos = ['Cobas 1', 'Cobas 2'];
+    const cobasHoy = reg.cobas ? reg.cobas.filter(r => parseInt(r.dia) === dia) : [];
+    cobasEquipos.forEach(eq => {
+      const existe = cobasHoy.some(r => r.equipo === eq && r.frecuencia === 'Diaria');
+      if (!existe) {
+        cobasFaltantes.push(eq + ': Mantención Diaria');
+      }
+    });
+    if (cobasFaltantes.length > 0) {
+      missingByRegister['cobas'] = { name: '🔬 Mantención Cobas (Diaria)', items: cobasFaltantes, notif: activeForHour['cobas'] };
+    }
+  }
+
+  // 7. Eliminación de Muestras faltante ('elimMuestras')
+  if (activeForHour['elimMuestras']) {
+    const elimHoy = reg.elimMuestras ? reg.elimMuestras.filter(r => parseInt(r.dia) === dia) : [];
+    if (elimHoy.length === 0) {
+      missingByRegister['elimMuestras'] = { name: '🗑️ Registro de Eliminación de Muestras', items: ['Eliminación de Muestras del día'], notif: activeForHour['elimMuestras'] };
+    }
+  }
+
+  // Agrupar por destinatarios exactos (normalizados)
+  const recipientGroups = {};
 
   Object.keys(missingByRegister).forEach(clave => {
-    const recipientsStr = getEmailRecipients(clave);
-    if (!recipientsStr) return; // Paused or no recipients
+    const regData = missingByRegister[clave];
+    const rawRecipients = regData.notif.destinatarios;
+    if (!rawRecipients) return;
+
+    const emailList = rawRecipients.split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+    if (emailList.length === 0) return;
+
+    // Clave de grupo normalizada con correos ordenados
+    const sortedKey = emailList.slice().sort().join(',');
+    const cleanTo = emailList.join(', ');
     
-    const emails = recipientsStr.split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
-    emails.forEach(email => {
-      if (!emailBuckets[email]) emailBuckets[email] = [];
-      emailBuckets[email].push(missingByRegister[clave]);
-    });
+    if (!recipientGroups[sortedKey]) {
+      recipientGroups[sortedKey] = {
+        recipientsOriginal: cleanTo,
+        itemsList: []
+      };
+    }
+    recipientGroups[sortedKey].itemsList.push(regData);
   });
 
   const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                  'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
-  // Send consolidated emails
-  Object.keys(emailBuckets).forEach(email => {
-    const list = emailBuckets[email];
-    if (list.length === 0) return;
+  // Enviar correos consolidados por grupo de destinatarios
+  const sentLogs = [];
+  Object.keys(recipientGroups).forEach(groupKey => {
+    const group = recipientGroups[groupKey];
+    if (group.itemsList.length === 0) return;
 
     let detailText = '';
-    list.forEach(regInfo => {
+    group.itemsList.forEach(regInfo => {
       detailText += '\n' + regInfo.name + ':\n' + regInfo.items.map(f => '  • ' + f).join('\n') + '\n';
     });
 
@@ -1960,104 +2103,221 @@ function triggerDatosNoRellenados() {
       'Registros Mensuales — Laboratorio Clínico — Hospital de Talca\n';
 
     try {
-      MailApp.sendEmail({ to: email, subject: subject, body: body });
-    } catch (e) {
-      Logger.log('Error enviando correo diario a ' + email + ': ' + e.toString());
+      MailApp.sendEmail({ to: group.recipientsOriginal, subject: subject, body: body });
+      const logMsg = 'Correo de registros pendientes enviado a (' + group.recipientsOriginal + ') a las ' + (targetHour !== null ? targetHour : 'varias') + ':00 hrs.';
+      Logger.log(logMsg);
+      sentLogs.push(logMsg);
+    } catch (err) {
+      const errMsg = 'Error enviando correo de registros pendientes a (' + group.recipientsOriginal + '): ' + err.toString();
+      Logger.log(errMsg);
+      sentLogs.push(errMsg);
     }
   });
+  logTriggerExecution('triggerDatosNoRellenados', e, sentLogs);
+  return sentLogs;
+}
+
+function isNotificationActive(clave) {
+  try {
+    const list = getNotificaciones();
+    const found = list.find(n => n.clave === clave);
+    if (found) {
+      return !found.pausado && !!(found.destinatarios && found.destinatarios.trim());
+    }
+  } catch(e) {}
+  return true;
+}
+
+function parseDateFromRow(row) {
+  if (!row) return null;
+  
+  // 1. Prioridad: Columnas numéricas explícitas de Día (row[1]), Mes (row[2]), Año (row[3])
+  const d = parseInt(row[1], 10);
+  const m = parseInt(row[2], 10);
+  const y = parseInt(row[3], 10);
+  if (!isNaN(d) && !isNaN(m) && !isNaN(y) && d >= 1 && d <= 31 && m >= 1 && m <= 12 && y > 1900) {
+    return new Date(y, m - 1, d);
+  }
+  
+  // 2. String dd/mm/yyyy o yyyy-mm-dd en row[0]
+  if (row[0] && !(row[0] instanceof Date)) {
+    const str = String(row[0]).trim();
+    const slashParts = str.split('/');
+    if (slashParts.length === 3) {
+      const parsed = new Date(parseInt(slashParts[2], 10), parseInt(slashParts[1], 10) - 1, parseInt(slashParts[0], 10));
+      if (!isNaN(parsed.getTime())) return parsed;
+    }
+    const dashParts = str.split('-');
+    if (dashParts.length === 3) {
+      const parsed = new Date(parseInt(dashParts[0], 10), parseInt(dashParts[1], 10) - 1, parseInt(dashParts[2], 10));
+      if (!isNaN(parsed.getTime())) return parsed;
+    }
+  }
+
+  // 3. Fallback: Objeto Date en row[0]
+  if (row[0] instanceof Date && !isNaN(row[0].getTime())) {
+    return row[0];
+  }
+
+  return null;
 }
 
 // ── Email — Alerta Mantenciones Semanales Vencidas ────────────
 
-function triggerMantencionSemanal() {
+function triggerMantencionSemanal(overrideRecipient) {
   const hoy = new Date();
   const missingByRegister = {};
-
-  MANTENCIONES_SEMANALES.forEach(function(mant) {
+  
+  // 1. Verificar Centrífugas (Semanal) por cada centrífuga individual solo si está activo
+  if (isNotificationActive('centrifugas')) {
+    const centrifugasOverdue = [];
     try {
-      const sheet = getSpreadsheet().getSheetByName(mant.hoja);
-      if (!sheet) return;
-      const rows = sheet.getDataRange().getValues();
-      let ultimaFecha = null;
-
-      for (var i = 1; i < rows.length; i++) {
-        // Aplicar filtro específico del tipo de mantención
-        if (mant.filtro && !mant.filtro(rows[i])) continue;
-
-        // Parsear fecha dd/mm/yyyy
-        var fechaStr = String(rows[i][mant.colFecha]);
-        var partes = fechaStr.split('/');
-        if (partes.length === 3) {
-          var fecha = new Date(parseInt(partes[2]), parseInt(partes[1]) - 1, parseInt(partes[0]));
-          if (!ultimaFecha || fecha > ultimaFecha) {
-            ultimaFecha = fecha;
+      const listCentrifugas = getCentrifugas(); // e.g. ['Centrífuga 1', 'Centrífuga 2', ...]
+      const sheetCent = getSheet(SHEETS.CENT_REG);
+      const rowsCent = sheetCent ? sheetCent.getDataRange().getValues() : [];
+      
+      listCentrifugas.forEach(cName => {
+        let ultimaFecha = null;
+        for (let i = 1; i < rowsCent.length; i++) {
+          const row = rowsCent[i];
+          const eqName = String(row[4] || '').trim();
+          const tipoMant = String(row[6] || '').trim();
+          
+          if (eqName === cName && tipoMant === 'Semanal') {
+            const f = parseDateFromRow(row);
+            if (f && (!ultimaFecha || f > ultimaFecha)) {
+              ultimaFecha = f;
+            }
           }
         }
-      }
 
-      let isOverdue = false;
-      let diasSinRegistro = '';
-      let ultimaFechaStr = 'Nunca';
-
-      if (!ultimaFecha) {
-        isOverdue = true;
-        diasSinRegistro = '∞ (sin registros)';
-      } else {
-        var diffMs = hoy.getTime() - ultimaFecha.getTime();
-        var diffDias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-        if (diffDias > 7) {
+        let isOverdue = false;
+        let statusText = '';
+        if (!ultimaFecha) {
           isOverdue = true;
-          diasSinRegistro = diffDias + ' días';
-          ultimaFechaStr = formatFechaValue(ultimaFecha);
+          statusText = 'Último registro: Nunca (sin registros desde 01/08/2026)';
+        } else {
+          const diffMs = hoy.getTime() - ultimaFecha.getTime();
+          const diffDias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+          if (diffDias > 7) {
+            isOverdue = true;
+            statusText = 'Último registro: ' + formatFechaValue(ultimaFecha) + ' (hace ' + diffDias + ' días)';
+          }
         }
-      }
 
-      if (isOverdue) {
-        let clave = '';
-        if (mant.nombre.indexOf('Centrífugas') !== -1) clave = 'centrifugas';
-        else if (mant.nombre.indexOf('Limpieza Refrigeradores') !== -1) clave = 'limpRefri';
-        
-        if (clave) {
-          missingByRegister[clave] = {
-            nombre: mant.nombre,
-            ultimaFecha: ultimaFechaStr,
-            diasSinRegistro: diasSinRegistro
-          };
+        if (isOverdue) {
+          centrifugasOverdue.push('  • ' + cName + ': ' + statusText);
         }
+      });
+
+      if (centrifugasOverdue.length > 0) {
+        missingByRegister['centrifugas'] = {
+          title: '⚙️ Centrífugas — Mantención Semanal Pendiente (' + centrifugasOverdue.length + ' equipo(s)):',
+          items: centrifugasOverdue
+        };
       }
     } catch (e) {
-      Logger.log('Error verificado mantención ' + mant.nombre + ': ' + e.toString());
+      Logger.log('Error evaluando mantención semanal de centrífugas: ' + e.toString());
     }
-  });
+  }
 
-  // Group by email
-  const emailBuckets = {};
+  // 2. Verificar Limpieza Refrigeradores (Semanal externa) por cada equipo individual solo si está activo
+  if (isNotificationActive('limpRefri')) {
+    const refriLimpOverdue = [];
+    try {
+      const listRefri = getRefriLimpieza(); // e.g. ['R1', 'R2', ...]
+      const sheetLimp = getSheet(SHEETS.LIMP_REFRI);
+      const rowsLimp = sheetLimp ? sheetLimp.getDataRange().getValues() : [];
+      
+      listRefri.forEach(rName => {
+        let ultimaFecha = null;
+        for (let i = 1; i < rowsLimp.length; i++) {
+          const row = rowsLimp[i];
+          const tipoMant = String(row[4] || '').trim();
+          const eqName = String(row[5] || '').trim();
+          
+          if (eqName === rName && tipoMant === 'Semanal (externa)') {
+            const f = parseDateFromRow(row);
+            if (f && (!ultimaFecha || f > ultimaFecha)) {
+              ultimaFecha = f;
+            }
+          }
+        }
+
+        let isOverdue = false;
+        let statusText = '';
+        if (!ultimaFecha) {
+          isOverdue = true;
+          statusText = 'Último registro: Nunca (sin registros desde 01/08/2026)';
+        } else {
+          const diffMs = hoy.getTime() - ultimaFecha.getTime();
+          const diffDias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+          if (diffDias > 7) {
+            isOverdue = true;
+            statusText = 'Último registro: ' + formatFechaValue(ultimaFecha) + ' (hace ' + diffDias + ' días)';
+          }
+        }
+
+        if (isOverdue) {
+          refriLimpOverdue.push('  • ' + rName + ': ' + statusText);
+        }
+      });
+
+      if (refriLimpOverdue.length > 0) {
+        missingByRegister['limpRefri'] = {
+          title: '🧊 Limpieza Refrigeradores — Semanal Externa Pendiente (' + refriLimpOverdue.length + ' equipo(s)):',
+          items: refriLimpOverdue
+        };
+      }
+    } catch (e) {
+      Logger.log('Error evaluando limpieza semanal de refrigeradores: ' + e.toString());
+    }
+  }
+
+  if (Object.keys(missingByRegister).length === 0) {
+    Logger.log('No hay mantenciones semanales vencidas.');
+    return ['No hay mantenciones semanales vencidas.'];
+  }
+
+  // Enviar correos según los destinatarios de cada clave
+  const sentLogs = [];
+  const recipientGroups = {};
 
   Object.keys(missingByRegister).forEach(clave => {
-    const recipientsStr = getEmailRecipients(clave);
-    if (!recipientsStr) return; // Paused or empty
-    
-    const emails = recipientsStr.split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
-    emails.forEach(email => {
-      if (!emailBuckets[email]) emailBuckets[email] = [];
-      emailBuckets[email].push(missingByRegister[clave]);
-    });
+    let recipientsStr = overrideRecipient || getEmailRecipients(clave);
+    if (!recipientsStr) return;
+
+    const emailList = recipientsStr.split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+    if (emailList.length === 0) return;
+
+    const sortedKey = emailList.slice().sort().join(',');
+    const cleanTo = emailList.join(', ');
+
+    if (!recipientGroups[sortedKey]) {
+      recipientGroups[sortedKey] = {
+        to: cleanTo,
+        itemsList: []
+      };
+    }
+    recipientGroups[sortedKey].itemsList.push(missingByRegister[clave]);
   });
 
-  // Send emails
-  Object.keys(emailBuckets).forEach(email => {
-    const vencidas = emailBuckets[email];
-    if (vencidas.length === 0) return;
+  Object.keys(recipientGroups).forEach(groupKey => {
+    const group = recipientGroups[groupKey];
+    if (group.itemsList.length === 0) return;
 
-    var detail = vencidas.map(function(v) {
-      return '  • ' + v.nombre + '\n    Último registro: ' + v.ultimaFecha + '\n    Días sin registro: ' + v.diasSinRegistro;
-    }).join('\n\n');
+    let totalCount = 0;
+    let detailText = '';
+    group.itemsList.forEach(info => {
+      totalCount += info.items.length;
+      detailText += '\n' + info.title + '\n' + info.items.join('\n') + '\n';
+    });
 
-    var subject = '🔔 [Registros Lab] Mantenciones semanales vencidas (' + vencidas.length + ')';
-    var body = 'Estimado/a,\n\n' +
-      'Las siguientes mantenciones semanales bajo su responsabilidad llevan más de 7 días sin registrarse:\n\n' +
-      detail + '\n\n' +
-      'Por favor, realice las mantenciones pendientes a la brevedad.\n\n' +
+    const subject = '🔔 [Registros Lab] Mantenciones semanales vencidas (' + totalCount + ' pendiente(s))';
+    const body = 'Estimado/a,\n\n' +
+      'Las siguientes mantenciones semanales específicas bajo su responsabilidad llevan más de 7 días sin registrarse:\n' +
+      detailText + '\n' +
+      'Por favor, realice las mantenciones pendientes y regístrelas en el aplicativo a la brevedad.\n\n' +
       'Enlace al aplicativo:\n' + APP_URL + '\n\n' +
       'Enlace a los registros:\n' + SHEET_URL + '\n\n' +
       '---\n' +
@@ -2065,9 +2325,14 @@ function triggerMantencionSemanal() {
       'Registros Mensuales — Laboratorio Clínico — Hospital de Talca\n';
 
     try {
-      MailApp.sendEmail({ to: email, subject: subject, body: body });
+      MailApp.sendEmail({ to: group.to, subject: subject, body: body });
+      const logMsg = 'Correo de mantención semanal enviado a (' + group.to + ') con ' + totalCount + ' ítem(s) vencido(s).';
+      Logger.log(logMsg);
+      sentLogs.push(logMsg);
     } catch (e) {
-      Logger.log('Error enviando correo semanal a ' + email + ': ' + e.toString());
+      const errorMsg = 'Error enviando correo de mantención semanal a (' + group.to + '): ' + e.toString();
+      Logger.log(errorMsg);
+      sentLogs.push(errorMsg);
     }
   });
 
@@ -2077,6 +2342,8 @@ function triggerMantencionSemanal() {
   } catch(e) {
     Logger.log('Error en triggerAlertaMantencionesCobas: ' + e.toString());
   }
+
+  return sentLogs;
 }
 
 function sendAlertaMantencionSemanal(vencidas) {
@@ -2248,7 +2515,6 @@ function setupTriggers() {
 
   const hourRecordatorio = 8;
   const hourMantencion = parseHour('centrifugas', 9);
-  const hourDatosFaltantes = 20;
   const hourAlertaTermo = 8;
 
   // Trigger diario para recordatorio de mes anterior (solo actúa el día 1)
@@ -2256,6 +2522,7 @@ function setupTriggers() {
     .timeBased()
     .atHour(hourRecordatorio)
     .everyDays(1)
+    .inTimezone('America/Santiago')
     .create();
 
   // Trigger diario para mantenciones semanales vencidas
@@ -2263,13 +2530,7 @@ function setupTriggers() {
     .timeBased()
     .atHour(hourMantencion)
     .everyDays(1)
-    .create();
-
-  // Trigger diario para datos no rellenados del día
-  ScriptApp.newTrigger('triggerDatosNoRellenados')
-    .timeBased()
-    .atHour(hourDatosFaltantes)
-    .everyDays(1)
+    .inTimezone('America/Santiago')
     .create();
 
   // Trigger diario para alerta consolidada de temperatura/humedad fuera de rango del día anterior (08:30)
@@ -2277,10 +2538,37 @@ function setupTriggers() {
     .timeBased()
     .atHour(hourAlertaTermo)
     .everyDays(1)
+    .inTimezone('America/Santiago')
     .create();
 
-  Logger.log('Triggers configurados correctamente.');
-  return 'Triggers configurados: triggerRecordatorioMesAnterior (' + String(hourRecordatorio).padStart(2,'0') + ':00), triggerMantencionSemanal (' + String(hourMantencion).padStart(2,'0') + ':00), triggerDatosNoRellenados (' + String(hourDatosFaltantes).padStart(2,'0') + ':00), triggerAlertaConsolidadaTermo (' + String(hourAlertaTermo).padStart(2,'0') + ':30)';
+  // Triggers diarios para datos no rellenados del día según las horas configuradas en Maestro Notificaciones
+  const pendingHours = new Set();
+  notifs.forEach(n => {
+    if (!n.pausado && n.destinatarios && n.destinatarios.trim()) {
+      const parts = (n.hora || '20:00').split(':');
+      const h = parseInt(parts[0], 10);
+      if (!isNaN(h) && h >= 0 && h <= 23) {
+        pendingHours.add(h);
+      }
+    }
+  });
+
+  const configuredHours = Array.from(pendingHours);
+  if (configuredHours.length === 0) {
+    configuredHours.push(20);
+  }
+
+  configuredHours.forEach(h => {
+    ScriptApp.newTrigger('triggerDatosNoRellenados')
+      .timeBased()
+      .atHour(h)
+      .everyDays(1)
+      .inTimezone('America/Santiago')
+      .create();
+  });
+
+  Logger.log('Triggers configurados correctamente para las horas: ' + configuredHours.join(', '));
+  return 'Triggers configurados: triggerRecordatorioMesAnterior (' + String(hourRecordatorio).padStart(2,'0') + ':00), triggerMantencionSemanal (' + String(hourMantencion).padStart(2,'0') + ':00), triggerDatosNoRellenados (horas: ' + configuredHours.map(h => String(h).padStart(2,'0') + ':00').join(', ') + '), triggerAlertaConsolidadaTermo (' + String(hourAlertaTermo).padStart(2,'0') + ':30)';
 }
 
 // ── Inicialización del Spreadsheet ───────────────────────────
@@ -2450,7 +2738,7 @@ function initializeSpreadsheet() {
 }
 
 function setup() {
-  const ss = SpreadsheetApp.create('Proyecto RM');
+  const ss = SpreadsheetApp.create('Registros Mensuales Laboratorio HRT');
   const id = ss.getId();
   PropertiesService.getScriptProperties().setProperty('SPREADSHEET_ID', id);
   initializeSpreadsheet();
@@ -2542,6 +2830,8 @@ function saveEtiquetadoraRegistro(data) {
   if (!data.etiquetadora || !data.accion || !data.descripcion || !data.responsable) {
     return { success: false, error: 'Faltan campos obligatorios.' };
   }
+  const errFuture = validarFechaNoFutura(data.fecha);
+  if (errFuture) return { success: false, error: errFuture };
   const f = parseFecha(data.fecha || new Date().toISOString().split('T')[0]);
   const ts = getFechaRegistroFormatted();
   
@@ -2697,9 +2987,9 @@ function getNotificaciones() {
   const existingClaves = data.slice(1).map(r => String(r[1]));
   
   const defaults = [
-    ['Temperatura Ambiental', 'termo', 'grivera@hospitaldetalca.cl', 'FALSE', '08:30'],
-    ['Mantenimiento Centrífugas', 'centrifugas', 'grivera@hospitaldetalca.cl', 'FALSE', '09:00'],
-    ['Limpieza Mesones', 'mesones', 'grivera@hospitaldetalca.cl', 'FALSE', '20:00'],
+    ['Temperatura Ambiental', 'termo', 'grivera@hospitaldetalca.cl', 'FALSE', '23:00'],
+    ['Mantenimiento Centrífugas', 'centrifugas', 'grivera@hospitaldetalca.cl', 'FALSE', '23:00'],
+    ['Limpieza Mesones', 'mesones', 'grivera@hospitaldetalca.cl', 'FALSE', '23:00'],
     ['Temperatura Refrigeradores', 'refriTemp', 'grivera@hospitaldetalca.cl', 'FALSE', '20:00'],
     ['Limpieza Refrigeradores', 'limpRefri', 'grivera@hospitaldetalca.cl', 'FALSE', '09:00'],
     ['Conductividad del Agua', 'conductividad', 'grivera@hospitaldetalca.cl', 'FALSE', '20:00'],
@@ -2720,7 +3010,7 @@ function getNotificaciones() {
     data = sheet.getDataRange().getValues();
     displayData = sheet.getDataRange().getDisplayValues();
   }
-  
+
   return data.slice(1).map((r, idx) => {
     const rawVal = r[4];
     const dispVal = displayData && displayData[idx + 1] ? displayData[idx + 1][4] : '';
@@ -2730,10 +3020,17 @@ function getNotificaciones() {
       const defItem = defaults.find(d => d[1] === String(r[1]));
       horaStr = defItem ? defItem[4] : '08:00';
     }
+
+    const cleanDestinatarios = String(r[2] || '')
+      .split(',')
+      .map(e => e.trim().toLowerCase())
+      .filter(Boolean)
+      .join(', ');
+
     return {
       registro: String(r[0]),
       clave: String(r[1]),
-      destinatarios: String(r[2]),
+      destinatarios: cleanDestinatarios,
       pausado: String(r[3]).toUpperCase() === 'TRUE',
       hora: horaStr
     };
@@ -2867,6 +3164,8 @@ function saveDxH900Registro(data) {
   if (!data.usuario_responsable || !data.descripcion || !data.especialista) {
     return { success: false, error: 'Faltan campos obligatorios.' };
   }
+  const errFuture = validarFechaNoFutura(data.fecha);
+  if (errFuture) return { success: false, error: errFuture };
   const f = parseFecha(data.fecha || new Date().toISOString().split('T')[0]);
   const ts = getFechaRegistroFormatted();
   
@@ -2923,6 +3222,8 @@ function saveElimMuestras(data) {
   if (!/^[A-Z]{3}$/.test(resp)) {
     return { success: false, error: 'El responsable debe constar de 3 siglas alfabéticas.' };
   }
+  const errFuture = validarFechaNoFutura(data.fecha);
+  if (errFuture) return { success: false, error: errFuture };
   const f = parseFecha(data.fecha);
   const ts = getFechaRegistroFormatted();
 
@@ -2986,6 +3287,101 @@ function saveModulosActivos(data) {
   } catch (e) {
     return { success: false, error: 'Error al guardar módulos: ' + e.toString() };
   }
+}
+
+function applyNotificationConfig(targetHourStr, recipientsStr) {
+  const targetHour = targetHourStr ? String(targetHourStr).trim() : '10:00';
+  const recipients = recipientsStr ? String(recipientsStr).trim() : 'grivera@hospitaldetalca.cl';
+  
+  const notifs = getNotificaciones();
+  const targetKeys = ['termo', 'centrifugas', 'mesones'];
+  const updated = notifs.map(n => {
+    if (targetKeys.indexOf(n.clave) !== -1) {
+      return {
+        registro: n.registro,
+        clave: n.clave,
+        destinatarios: recipients,
+        pausado: false,
+        hora: targetHour
+      };
+    }
+    return n;
+  });
+  
+  const sheet = getSheet(SHEETS.NOTIFICACIONES);
+  if (sheet) {
+    const lastRow = sheet.getLastRow();
+    if (lastRow > 1) sheet.deleteRows(2, lastRow - 1);
+    sheet.getRange(1, 5, Math.max(updated.length + 1, 100), 1).setNumberFormat('@');
+    updated.forEach(n => {
+      sheet.appendRow([
+        n.registro,
+        n.clave,
+        n.destinatarios,
+        n.pausado ? 'TRUE' : 'FALSE',
+        "'" + n.hora
+      ]);
+    });
+  }
+  
+  const triggerMsg = setupTriggers();
+  return { 
+    success: true, 
+    message: 'Configuración actualizada para ' + targetHour + ' y destinatarios: ' + recipients,
+    triggers: triggerMsg
+  };
+}
+
+function getProjectTriggersInfo() {
+  const triggers = ScriptApp.getProjectTriggers();
+  return triggers.map(t => ({
+    handlerFunction: t.getHandlerFunction(),
+    triggerSource: t.getTriggerSource().toString(),
+    eventType: t.getEventType().toString(),
+    uniqueId: t.getUniqueId()
+  }));
+}
+
+function logTriggerExecution(fnName, eventObj, resultOrErr) {
+  try {
+    const timestamp = new Date().toLocaleString('es-CL', { timeZone: 'America/Santiago' });
+    const logEntry = {
+      timestamp: timestamp,
+      fn: fnName,
+      event: eventObj ? JSON.stringify(eventObj) : 'null',
+      result: resultOrErr ? JSON.stringify(resultOrErr) : 'none'
+    };
+    const key = 'LAST_TRIGGER_LOGS';
+    const raw = PropertiesService.getScriptProperties().getProperty(key);
+    let logs = [];
+    if (raw) {
+      try { logs = JSON.parse(raw); } catch(e) {}
+    }
+    logs.unshift(logEntry);
+    if (logs.length > 20) logs = logs.slice(0, 20);
+    PropertiesService.getScriptProperties().setProperty(key, JSON.stringify(logs));
+  } catch(e) {}
+}
+
+function getTriggerLogs() {
+  const key = 'LAST_TRIGGER_LOGS';
+  const raw = PropertiesService.getScriptProperties().getProperty(key);
+  if (!raw) return [];
+  try { return JSON.parse(raw); } catch(e) { return [{ error: raw }]; }
+}
+
+function scheduleAutoTriggerInMinutes(minutes) {
+  const m = parseInt(minutes, 10) || 2;
+  const trigger = ScriptApp.newTrigger('triggerDatosNoRellenados')
+    .timeBased()
+    .after(m * 60 * 1000)
+    .inTimezone('America/Santiago')
+    .create();
+  return { 
+    success: true, 
+    message: 'Activador automático programado para dispararse en ' + m + ' minuto(s) de forma 100% automática por Google.',
+    triggerId: trigger.getUniqueId()
+  };
 }
 
 

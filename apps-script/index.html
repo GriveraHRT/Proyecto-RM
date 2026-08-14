@@ -10,8 +10,8 @@
   <link rel="shortcut icon" type="image/png" href="https://griverahrt.github.io/Proyecto-RM/img/favicon.png" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600&display=swap" media="print" onload="this.media='all'" />
   <script>
-    // Se autodetecta y define la URL del Web App en tiempo de ejecución
-    var API_URL = '<?!= ScriptApp.getService().getUrl() ?>';
+    // URL pública fija del Web App para asegurar compatibilidad CORS en cualquier entorno
+    var API_URL = 'https://script.google.com/macros/s/AKfycbxuqcui0-hjJ721uMWZk3w-4l2fVCaBWQgdMJqVMb5Pno339Jqetq4r62p3-1gGBUvFOg/exec';
     // Se reciben los parámetros pasados al doGet desde Apps Script
     window.QR_PARAMS = <?!= JSON.stringify(parameter) ?>;
   </script>

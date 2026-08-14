@@ -3,14 +3,51 @@ if (typeof API_URL === 'undefined') {
   var API_URL = 'https://script.google.com/macros/s/AKfycbxuqcui0-hjJ721uMWZk3w-4l2fVCaBWQgdMJqVMb5Pno339Jqetq4r62p3-1gGBUvFOg/exec';
 }
 const PREANALISIS=[1,2,3,4,5,18,19];
-const state={areas:[],centrifugas:[],salas:[],acciones:[],refrigeradores:[],refriLimpieza:[],cobasObs:[],ampm:'AM',ampmRefri:'AM',ampmConduct:'AM',qrInstance:null,qrTab:'areas',dashMes:new Date().getMonth()+1,dashAnio:new Date().getFullYear(),dashTab:'diario',dashData:null,dashMaestros:null,dashCache:null,maestrosPromise:null,modulosActivos:null};
+const state={areas:[],centrifugas:[],salas:[],acciones:[],refrigeradores:[],refriLimpieza:[],cobasObs:[],ampm:'AM',ampmRefri:'AM',ampmConduct:'AM',qrInstance:null,qrTab:'areas',dashMes:new Date().getMonth()+1,dashAnio:new Date().getFullYear(),dashTab:'diario',dashData:null,dashMaestros:null,dashCache:null,maestrosPromise:null,modulosActivos:null,serverTimeOffset:0};
+
+function getServerNow() {
+  return new Date(Date.now() + (state.serverTimeOffset || 0));
+}
 
 function today() {
-  const d = new Date();
+  const d = getServerNow();
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+function updateServerTimeOffset(st) {
+  if (!st || !st.timestamp) return;
+  state.serverTimeOffset = st.timestamp - Date.now();
+  enforceMaxDateInputs();
+}
+
+function enforceMaxDateInputs() {
+  const maxDate = today();
+  document.querySelectorAll('input[type="date"]').forEach(inp => {
+    inp.setAttribute('max', maxDate);
+  });
+}
+
+function validateDateInputNotFuture(inputEl) {
+  if (!inputEl || !inputEl.value) return true;
+  const maxDate = today();
+  if (inputEl.value > maxDate) {
+    showToast('❌ No es posible seleccionar fechas futuras.', 'error');
+    inputEl.value = maxDate;
+    return false;
+  }
+  return true;
+}
+
+function isPmAllowedForDate(fechaVal) {
+  const serverToday = today();
+  if (!fechaVal || fechaVal < serverToday) return true;
+  if (fechaVal === serverToday) {
+    return getServerNow().getHours() >= 12;
+  }
+  return false;
 }
 
 function formatDDMMYYYY(val) {
@@ -31,8 +68,8 @@ function formatDDMMYYYY(val) {
   }
   return strVal;
 }
-function showToast(m,t='success'){const el=document.getElementById('toast');el.textContent=m;el.className=`show toast-${t}`;setTimeout(()=>{el.className=''},3200)}
-function setLoading(b,s,t,l){document.getElementById(b).disabled=l;document.getElementById(s).classList.toggle('visible',l);document.getElementById(t).style.display=l?'none':''}
+function showToast(m,t='success'){const el=document.getElementById('toast');if(el){el.textContent=m;el.className=`show toast-${t}`;setTimeout(()=>{el.className=''},3200)}}
+function setLoading(b,s,t,l){const btn=document.getElementById(b);if(btn)btn.disabled=l;const spin=document.getElementById(s);if(spin)spin.classList.toggle('visible',l);const txt=document.getElementById(t);if(txt)txt.style.display=l?'none':''}
 async function fetchWithTimeout(url, options = {}, timeout = 25000) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
@@ -45,11 +82,17 @@ async function fetchWithTimeout(url, options = {}, timeout = 25000) {
     throw error;
   }
 }
-async function apiGet(p){const u=new URL(API_URL);Object.entries(p).forEach(([k,v])=>u.searchParams.set(k,v));const r=await fetchWithTimeout(u.toString(),{redirect:'follow'});if(!r.ok)throw new Error(`HTTP ${r.status}`);return r.json()}
+async function apiGet(p){const u=new URL(API_URL);Object.entries(p).forEach(([k,v])=>u.searchParams.set(k,v));u.searchParams.set('_t',Date.now());const r=await fetchWithTimeout(u.toString(),{redirect:'follow'});if(!r.ok)throw new Error(`HTTP ${r.status}`);return r.json()}
 async function apiPost(b){const r=await fetchWithTimeout(API_URL,{method:'POST',redirect:'follow',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(b)});if(!r.ok)throw new Error(`HTTP ${r.status}`);return r.json()}
 
 // Clock
-function updateClock(){const n=new Date(),h=n.getHours(),m=n.getMinutes(),ap=h<12?'AM':'PM';document.getElementById('clock-time').textContent=String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');const b=document.getElementById('header-ampm-badge');b.textContent=ap;b.className=`ampm-${ap}`;const d=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'],ms=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];document.getElementById('clock-date').textContent=`${d[n.getDay()]} ${n.getDate()} ${ms[n.getMonth()]} ${n.getFullYear()}`}
+function updateClock(){
+  const n=getServerNow(),h=n.getHours(),m=n.getMinutes(),ap=h<12?'AM':'PM';
+  const elTime=document.getElementById('clock-time');if(elTime)elTime.textContent=String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
+  const b=document.getElementById('header-ampm-badge');if(b){b.textContent=ap;b.className=`ampm-${ap}`}
+  const d=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'],ms=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const elDate=document.getElementById('clock-date');if(elDate)elDate.textContent=`${d[n.getDay()]} ${n.getDate()} ${ms[n.getMonth()]} ${n.getFullYear()}`;
+}
 setInterval(updateClock,1000);updateClock();
 
 // Theme
@@ -64,14 +107,56 @@ function applyModulosVisibilidad(){if(!state.modulosActivos)return;try{localStor
 function navigateTo(s){document.querySelectorAll('.section').forEach(el=>el.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));const sec=document.getElementById('section-'+s);if(sec)sec.classList.add('active');const navBtn=document.querySelector(`[data-section="${s}"]`);if(navBtn)navBtn.classList.add('active');if(s==='dashboard')loadDashboard();if(s==='admin'){initRevAdminSelectors();loadNotificacionesAdmin();if(typeof loadModulosAdmin==='function')loadModulosAdmin();if(typeof loadDiasNoHabilesAdmin==='function')loadDiasNoHabilesAdmin();}if(s==='dxh900'){loadDxH900HistorialForm()}if(s==='elim-muestras'){loadElimMuestrasHistorialForm()}if(s==='termo'){if(typeof checkDuplicateTermo==='function')checkDuplicateTermo();if(typeof loadRecentTermo==='function')loadRecentTermo();}if(s==='centrifugas'){if(typeof checkDuplicateCentrifugas==='function')checkDuplicateCentrifugas();if(typeof loadRecentCentrifugas==='function')loadRecentCentrifugas();}if(s==='mesones'){if(typeof checkDuplicateMesones==='function')checkDuplicateMesones();if(typeof loadRecentMesones==='function')loadRecentMesones();}if(s==='refri-temp'&&typeof loadRecentRefriTemp==='function')loadRecentRefriTemp();if(s==='limp-refri'&&typeof loadRecentLimpRefri==='function')loadRecentLimpRefri();if(s==='conductividad'&&typeof loadRecentConductividad==='function')loadRecentConductividad();if(s==='cobas'&&typeof loadRecentCobas==='function')loadRecentCobas();if(s==='elim-muestras'&&typeof checkDuplicateElimMuestras==='function')checkDuplicateElimMuestras();}
 
 // AM/PM — Termo (ambiental)
-function setAmPm(v){state.ampm=v;document.getElementById('btn-am').className='ampm-btn'+(v==='AM'?' selected-AM':'');document.getElementById('btn-pm').className='ampm-btn'+(v==='PM'?' selected-PM':'');if(typeof checkDuplicateTermo==='function')checkDuplicateTermo();}
-function autoSetAmPm(){const ap=new Date().getHours()<12?'AM':'PM';setAmPm(ap);setAmPmRefri(ap);setAmPmConduct(ap)}
+function setAmPm(v){
+  const fechaEl = document.getElementById('termo-fecha');
+  const fechaVal = fechaEl ? fechaEl.value : today();
+  if (v === 'PM' && !isPmAllowedForDate(fechaVal)) {
+    showToast('⚠️ No es posible registrar el turno PM antes de las 12:00 hrs del día de hoy.', 'error');
+    v = 'AM';
+  }
+  state.ampm=v;
+  const btnAm = document.getElementById('btn-am');
+  const btnPm = document.getElementById('btn-pm');
+  if (btnAm) btnAm.className='ampm-btn'+(v==='AM'?' selected-AM':'');
+  if (btnPm) btnPm.className='ampm-btn'+(v==='PM'?' selected-PM':'');
+  if(typeof checkDuplicateTermo==='function')checkDuplicateTermo();
+}
+function autoSetAmPm(){
+  const ap = getServerNow().getHours() < 12 ? 'AM' : 'PM';
+  setAmPm(ap);
+  setAmPmRefri(ap);
+  setAmPmConduct(ap);
+}
 
 // AM/PM — Refrigeradores
-function setAmPmRefri(v){state.ampmRefri=v;document.getElementById('btn-refri-am').className='ampm-btn'+(v==='AM'?' selected-AM':'');document.getElementById('btn-refri-pm').className='ampm-btn'+(v==='PM'?' selected-PM':'')}
+function setAmPmRefri(v){
+  const fechaEl = document.getElementById('refri-fecha');
+  const fechaVal = fechaEl ? fechaEl.value : today();
+  if (v === 'PM' && !isPmAllowedForDate(fechaVal)) {
+    showToast('⚠️ No es posible registrar el turno PM antes de las 12:00 hrs del día de hoy.', 'error');
+    v = 'AM';
+  }
+  state.ampmRefri=v;
+  const btnAm = document.getElementById('btn-refri-am');
+  const btnPm = document.getElementById('btn-refri-pm');
+  if (btnAm) btnAm.className='ampm-btn'+(v==='AM'?' selected-AM':'');
+  if (btnPm) btnPm.className='ampm-btn'+(v==='PM'?' selected-PM':'');
+}
 
 // AM/PM — Conductividad
-function setAmPmConduct(v){state.ampmConduct=v;document.getElementById('btn-conduct-am').className='ampm-btn'+(v==='AM'?' selected-AM':'');document.getElementById('btn-conduct-pm').className='ampm-btn'+(v==='PM'?' selected-PM':'')}
+function setAmPmConduct(v){
+  const fechaEl = document.getElementById('conduct-fecha');
+  const fechaVal = fechaEl ? fechaEl.value : today();
+  if (v === 'PM' && !isPmAllowedForDate(fechaVal)) {
+    showToast('⚠️ No es posible registrar el turno PM antes de las 12:00 hrs del día de hoy.', 'error');
+    v = 'AM';
+  }
+  state.ampmConduct=v;
+  const btnAm = document.getElementById('btn-conduct-am');
+  const btnPm = document.getElementById('btn-conduct-pm');
+  if (btnAm) btnAm.className='ampm-btn'+(v==='AM'?' selected-AM':'');
+  if (btnPm) btnPm.className='ampm-btn'+(v==='PM'?' selected-PM':'');
+}
 
 // ── Range check — Termo (ambiental) ──────────────────────────
 function checkRangos(){
@@ -193,6 +278,8 @@ async function loadMaestros(){
   state.maestrosPromise = (async () => {
     try{
       const data=await apiGet({action:'getMaestros'});
+      if (data.serverTime) updateServerTimeOffset(data.serverTime);
+      enforceMaxDateInputs();
       state.areas=data.areas||[];
     state.centrifugas=data.centrifugas||[];
     state.salas=data.salas||[];

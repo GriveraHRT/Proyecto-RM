@@ -2,6 +2,12 @@
 // Forms — Termo
 document.getElementById('form-termo').addEventListener('submit',async e=>{
   e.preventDefault();
+  const fechaEl = document.getElementById('termo-fecha');
+  if (!validateDateInputNotFuture(fechaEl)) return;
+  if (fechaEl.value === today() && state.ampm === 'PM' && getServerNow().getHours() < 12) {
+    showToast('⚠️ No es posible registrar el turno PM antes de las 12:00 hrs del día de hoy.', 'error');
+    return;
+  }
   const dup = await checkDuplicateTermo();
   if (dup) {
     const confirmed = await showDuplicateConfirmModal(dup);
@@ -28,6 +34,8 @@ document.getElementById('form-termo').addEventListener('submit',async e=>{
 // Forms — Centrífugas
 document.getElementById('form-centrifugas').addEventListener('submit',async e=>{
   e.preventDefault();
+  const fechaEl = document.getElementById('cent-fecha');
+  if (!validateDateInputNotFuture(fechaEl)) return;
   const obsVal=document.getElementById('cent-obs').value;
   const sel=getSelectedChips('cent-chips');
   if(!sel.length){showToast('Seleccione al menos una centrífuga','error');return}
@@ -54,6 +62,8 @@ document.getElementById('form-centrifugas').addEventListener('submit',async e=>{
 // Forms — Mesones
 document.getElementById('form-mesones').addEventListener('submit',async e=>{
   e.preventDefault();
+  const fechaEl = document.getElementById('meson-fecha');
+  if (!validateDateInputNotFuture(fechaEl)) return;
   const obsVal=document.getElementById('meson-obs').value;
   const sel=getSelectedChips('meson-chips');
   if(!sel.length){showToast('Seleccione al menos una sala','error');return}
@@ -80,6 +90,12 @@ document.getElementById('form-mesones').addEventListener('submit',async e=>{
 // Forms — Temp Refrigeradores
 document.getElementById('form-refri-temp').addEventListener('submit',async e=>{
   e.preventDefault();
+  const fechaEl = document.getElementById('refri-fecha');
+  if (!validateDateInputNotFuture(fechaEl)) return;
+  if (fechaEl.value === today() && state.ampmRefri === 'PM' && getServerNow().getHours() < 12) {
+    showToast('⚠️ No es posible registrar el turno PM antes de las 12:00 hrs del día de hoy.', 'error');
+    return;
+  }
   const obsVal = document.getElementById('refri-obs').value;
   const issues=isOutOfRangeRefri();
   if(issues){const ac=document.getElementById('refri-accion').value;if(!ac){showOutOfRangePopup(issues);return}}
@@ -93,11 +109,31 @@ document.getElementById('form-refri-temp').addEventListener('submit',async e=>{
 });
 
 // Forms — Limpieza Refrigeradores
-document.getElementById('form-limp-refri').addEventListener('submit',async e=>{e.preventDefault();const obsVal=document.getElementById('limp-refri-obs').value;const sel=getSelectedChips('limp-refri-chips');if(!sel.length){showToast('Seleccione al menos un equipo','error');return}setLoading('btn-limp-refri-submit','spinner-limp-refri','btn-limp-refri-text',true);try{const r=await apiPost({action:'saveLimpiezaRefri',fecha:document.getElementById('limp-refri-fecha').value,equipos:sel,responsable:document.getElementById('limp-refri-resp').value,tipo_mantencion:document.getElementById('limp-refri-tipo').value,observaciones:obsVal});if(r.success){addDatalistOption('list-limp-refri-obs',obsVal);showToast('✅ '+r.message);e.target.reset();document.getElementById('limp-refri-fecha').value=today();document.getElementById('limp-refri-tipo').value='Semanal (externa)';updateInfoLimpRefri();document.querySelectorAll('#limp-refri-chips .chip-item').forEach(c=>c.classList.remove('selected'));prefetchDashboard();if(typeof loadRecentLimpRefri==='function')loadRecentLimpRefri();}else showToast('❌ '+r.error,'error')}catch(err){showToast('❌ Error de conexión','error')}setLoading('btn-limp-refri-submit','spinner-limp-refri','btn-limp-refri-text',false)});
+document.getElementById('form-limp-refri').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const fechaEl = document.getElementById('limp-refri-fecha');
+  if (!validateDateInputNotFuture(fechaEl)) return;
+  const obsVal=document.getElementById('limp-refri-obs').value;
+  const sel=getSelectedChips('limp-refri-chips');
+  if(!sel.length){showToast('Seleccione al menos un equipo','error');return}
+  setLoading('btn-limp-refri-submit','spinner-limp-refri','btn-limp-refri-text',true);
+  try{
+    const r=await apiPost({action:'saveLimpiezaRefri',fecha:document.getElementById('limp-refri-fecha').value,equipos:sel,responsable:document.getElementById('limp-refri-resp').value,tipo_mantencion:document.getElementById('limp-refri-tipo').value,observaciones:obsVal});
+    if(r.success){addDatalistOption('list-limp-refri-obs',obsVal);showToast('✅ '+r.message);e.target.reset();document.getElementById('limp-refri-fecha').value=today();document.getElementById('limp-refri-tipo').value='Semanal (externa)';updateInfoLimpRefri();document.querySelectorAll('#limp-refri-chips .chip-item').forEach(c=>c.classList.remove('selected'));prefetchDashboard();if(typeof loadRecentLimpRefri==='function')loadRecentLimpRefri();}
+    else showToast('❌ '+r.error,'error')
+  }catch(err){showToast('❌ Error de conexión','error')}
+  setLoading('btn-limp-refri-submit','spinner-limp-refri','btn-limp-refri-text',false)
+});
 
 // Forms — Conductividad
 document.getElementById('form-conductividad').addEventListener('submit',async e=>{
   e.preventDefault();
+  const fechaEl = document.getElementById('conduct-fecha');
+  if (!validateDateInputNotFuture(fechaEl)) return;
+  if (fechaEl.value === today() && state.ampmConduct === 'PM' && getServerNow().getHours() < 12) {
+    showToast('⚠️ No es posible registrar el turno PM antes de las 12:00 hrs del día de hoy.', 'error');
+    return;
+  }
   const obsVal = document.getElementById('conduct-obs').value;
   setLoading('btn-conduct-submit','spinner-conduct','btn-conduct-text',true);
   try{
@@ -1755,32 +1791,37 @@ async function saveEtiquetadoraBitacora(e) {
 
 // Init
 async function init(){
-  document.getElementById('termo-fecha').value=today();
-  document.getElementById('cent-fecha').value=today();
-  document.getElementById('meson-fecha').value=today();
-  document.getElementById('refri-fecha').value=today();
-  document.getElementById('limp-refri-fecha').value=today();
-  document.getElementById('conduct-fecha').value=today();
-  if(document.getElementById('et-bitacora-fecha')) {
-    document.getElementById('et-bitacora-fecha').value=today();
-  }
-  if(document.getElementById('cobas-fecha')) {
-    document.getElementById('cobas-fecha').value=today();
-  }
-  if(document.getElementById('dxh-fecha')) {
-    document.getElementById('dxh-fecha').value=today();
-  }
-  autoSetAmPm();
-  updateInfoCentrifuga();
-  updateInfoLimpRefri();
-  initCobasChecklist();
-  initDashSelectors();
+  enforceMaxDateInputs();
+  document.addEventListener('change', function(e) {
+    if (e.target && e.target.type === 'date') {
+      validateDateInputNotFuture(e.target);
+    }
+  });
+
+  const elTermo = document.getElementById('termo-fecha'); if (elTermo) elTermo.value = today();
+  const elCent = document.getElementById('cent-fecha'); if (elCent) elCent.value = today();
+  const elMeson = document.getElementById('meson-fecha'); if (elMeson) elMeson.value = today();
+  const elRefri = document.getElementById('refri-fecha'); if (elRefri) elRefri.value = today();
+  const elLimpRefri = document.getElementById('limp-refri-fecha'); if (elLimpRefri) elLimpRefri.value = today();
+  const elConduct = document.getElementById('conduct-fecha'); if (elConduct) elConduct.value = today();
+  const elBitacora = document.getElementById('et-bitacora-fecha'); if (elBitacora) elBitacora.value = today();
+  const elCobas = document.getElementById('cobas-fecha'); if (elCobas) elCobas.value = today();
+  const elDxh = document.getElementById('dxh-fecha'); if (elDxh) elDxh.value = today();
+
+  try { autoSetAmPm(); } catch(e){}
+  try { updateInfoCentrifuga(); } catch(e){}
+  try { updateInfoLimpRefri(); } catch(e){}
+  try { initCobasChecklist(); } catch(e){}
+  try { initDashSelectors(); } catch(e){}
+
   // Load maestros and dashboard in parallel to improve load times
   const maestrosPromise = loadMaestros();
   const dashboardPromise = loadDashboard();
   
   await Promise.all([maestrosPromise, dashboardPromise]);
+  enforceMaxDateInputs();
   checkUrlParams();
+  if (typeof loadRecentTermo === 'function') loadRecentTermo();
 }
 init();
 
@@ -2518,10 +2559,16 @@ function checkEditTermoRangos() {
 
 async function submitEditTermo(e) {
   e.preventDefault();
+  const fechaInput = document.getElementById('edit-termo-fecha');
+  if (!validateDateInputNotFuture(fechaInput)) return;
   const rowIndex = parseInt(document.getElementById('edit-termo-rowindex').value);
   const fechaReg = document.getElementById('edit-termo-fecha-reg').value;
   const fechaVal = document.getElementById('edit-termo-fecha').value;
   const turnoVal = document.getElementById('edit-termo-turno').value;
+  if (fechaVal === today() && (turnoVal === 'Tarde' || turnoVal === 'PM') && getServerNow().getHours() < 12) {
+    showToast('⚠️ No es posible registrar el turno PM antes de las 12:00 hrs del día de hoy.', 'error');
+    return;
+  }
   const areaVal = document.getElementById('edit-termo-area').value;
   const tempVal = document.getElementById('edit-termo-temp').value;
   const humVal = document.getElementById('edit-termo-hum').value;
@@ -2797,6 +2844,8 @@ function openEditCentrifugaModal(idx) {
 
 async function submitEditCentrifuga(e) {
   e.preventDefault();
+  const fechaInput = document.getElementById('edit-cent-fecha');
+  if (!validateDateInputNotFuture(fechaInput)) return;
   const rowIndex = parseInt(document.getElementById('edit-cent-rowindex').value);
   const fechaReg = document.getElementById('edit-cent-fecha-reg').value;
   const fechaVal = document.getElementById('edit-cent-fecha').value;
@@ -2926,6 +2975,8 @@ function openEditMesonModal(idx) {
 
 async function submitEditMeson(e) {
   e.preventDefault();
+  const fechaInput = document.getElementById('edit-meson-fecha');
+  if (!validateDateInputNotFuture(fechaInput)) return;
   const rowIndex = parseInt(document.getElementById('edit-meson-rowindex').value);
   const fechaReg = document.getElementById('edit-meson-fecha-reg').value;
   const fechaVal = document.getElementById('edit-meson-fecha').value;
@@ -3066,10 +3117,16 @@ function openEditRefriTempModal(idx) {
 
 async function submitEditRefriTemp(e) {
   e.preventDefault();
+  const fechaInput = document.getElementById('edit-refri-fecha');
+  if (!validateDateInputNotFuture(fechaInput)) return;
   const rowIndex = parseInt(document.getElementById('edit-refri-rowindex').value);
   const fechaReg = document.getElementById('edit-refri-fecha-reg').value;
   const fechaVal = document.getElementById('edit-refri-fecha').value;
   const turnoVal = document.getElementById('edit-refri-turno').value;
+  if (fechaVal === today() && (turnoVal === 'Tarde' || turnoVal === 'PM') && getServerNow().getHours() < 12) {
+    showToast('⚠️ No es posible registrar el turno PM antes de las 12:00 hrs del día de hoy.', 'error');
+    return;
+  }
   const equipoVal = document.getElementById('edit-refri-equipo').value;
   const tempVal = document.getElementById('edit-refri-temp-val').value;
   const accVal = document.getElementById('edit-refri-accion').value;
@@ -3202,6 +3259,8 @@ function openEditLimpRefriModal(idx) {
 
 async function submitEditLimpRefri(e) {
   e.preventDefault();
+  const fechaInput = document.getElementById('edit-limp-refri-fecha');
+  if (!validateDateInputNotFuture(fechaInput)) return;
   const rowIndex = parseInt(document.getElementById('edit-limp-refri-rowindex').value);
   const fechaReg = document.getElementById('edit-limp-refri-fecha-reg').value;
   const fechaVal = document.getElementById('edit-limp-refri-fecha').value;
@@ -3337,10 +3396,16 @@ function openEditConductividadModal(idx) {
 
 async function submitEditConductividad(e) {
   e.preventDefault();
+  const fechaInput = document.getElementById('edit-conduct-fecha');
+  if (!validateDateInputNotFuture(fechaInput)) return;
   const rowIndex = parseInt(document.getElementById('edit-conduct-rowindex').value);
   const fechaReg = document.getElementById('edit-conduct-fecha-reg').value;
   const fechaVal = document.getElementById('edit-conduct-fecha').value;
   const turnoVal = document.getElementById('edit-conduct-turno').value;
+  if (fechaVal === today() && (turnoVal === 'Tarde' || turnoVal === 'PM') && getServerNow().getHours() < 12) {
+    showToast('⚠️ No es posible registrar el turno PM antes de las 12:00 hrs del día de hoy.', 'error');
+    return;
+  }
   const valVal = document.getElementById('edit-conduct-valor').value;
   const respVal = document.getElementById('edit-conduct-resp').value;
   const obsVal = document.getElementById('edit-conduct-obs').value;
@@ -3467,6 +3532,8 @@ function openEditCobasModal(idx) {
 
 async function submitEditCobas(e) {
   e.preventDefault();
+  const fechaInput = document.getElementById('edit-cobas-fecha');
+  if (!validateDateInputNotFuture(fechaInput)) return;
   const rowIndex = parseInt(document.getElementById('edit-cobas-rowindex').value);
   const fechaReg = document.getElementById('edit-cobas-fecha-reg').value;
   const fechaVal = document.getElementById('edit-cobas-fecha').value;
