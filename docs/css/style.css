@@ -532,7 +532,7 @@ body {
   font-size: 13px; color: var(--primary); cursor: pointer;
   margin-bottom: 8px; font-weight: 600;
 }
-.records-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.records-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; contain: content; }
 .records-table {
   width: 100%; border-collapse: collapse;
   font-size: 12px; white-space: nowrap;

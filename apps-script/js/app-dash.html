@@ -362,7 +362,13 @@ async function loadDashboard(forceReload){
   const ddv=document.getElementById('dash-daily-view');if(ddv)ddv.innerHTML='';
   const dmv=document.getElementById('dash-monthly-view');if(dmv)dmv.innerHTML='';
   try{
-    const[reg,rev]=await Promise.all([apiGet({action:'getRegistros',mes:state.dashMes,anio:state.dashAnio}),apiGet({action:'getRevisiones',mes:state.dashMes,anio:state.dashAnio})]);
+    const reg = await apiGet({action:'getRegistros',mes:state.dashMes,anio:state.dashAnio});
+    let rev = reg.revisiones;
+    if (!rev) {
+      try {
+        rev = await apiGet({action:'getRevisiones',mes:state.dashMes,anio:state.dashAnio});
+      } catch(e) {}
+    }
     if(!state.dashMaestros || !state.dashMaestros.centrifugasDetailed){
       if(state.maestrosPromise){
         await state.maestrosPromise;
@@ -2430,21 +2436,26 @@ async function checkDuplicateElimMuestras() {
 }
 
 function initDuplicateCheckListeners() {
+  const debouncedTermo = typeof debounce === 'function' ? debounce(checkDuplicateTermo, 150) : checkDuplicateTermo;
+  const debouncedCent = typeof debounce === 'function' ? debounce(checkDuplicateCentrifugas, 150) : checkDuplicateCentrifugas;
+  const debouncedMeson = typeof debounce === 'function' ? debounce(checkDuplicateMesones, 150) : checkDuplicateMesones;
+  const debouncedElim = typeof debounce === 'function' ? debounce(checkDuplicateElimMuestras, 150) : checkDuplicateElimMuestras;
+
   const termoFecha = document.getElementById('termo-fecha');
   const termoArea = document.getElementById('termo-area');
-  if (termoFecha) { termoFecha.addEventListener('change', checkDuplicateTermo); termoFecha.addEventListener('input', checkDuplicateTermo); }
+  if (termoFecha) { termoFecha.addEventListener('change', checkDuplicateTermo); termoFecha.addEventListener('input', debouncedTermo); }
   if (termoArea) termoArea.addEventListener('change', checkDuplicateTermo);
 
   const centFecha = document.getElementById('cent-fecha');
   const centTipo = document.getElementById('cent-tipo');
-  if (centFecha) { centFecha.addEventListener('change', checkDuplicateCentrifugas); centFecha.addEventListener('input', checkDuplicateCentrifugas); }
+  if (centFecha) { centFecha.addEventListener('change', checkDuplicateCentrifugas); centFecha.addEventListener('input', debouncedCent); }
   if (centTipo) centTipo.addEventListener('change', checkDuplicateCentrifugas);
 
   const mesonFecha = document.getElementById('meson-fecha');
-  if (mesonFecha) { mesonFecha.addEventListener('change', checkDuplicateMesones); mesonFecha.addEventListener('input', checkDuplicateMesones); }
+  if (mesonFecha) { mesonFecha.addEventListener('change', checkDuplicateMesones); mesonFecha.addEventListener('input', debouncedMeson); }
 
   const elimFecha = document.getElementById('elim-fecha');
-  if (elimFecha) { elimFecha.addEventListener('change', checkDuplicateElimMuestras); elimFecha.addEventListener('input', checkDuplicateElimMuestras); }
+  if (elimFecha) { elimFecha.addEventListener('change', checkDuplicateElimMuestras); elimFecha.addEventListener('input', debouncedElim); }
 }
 
 if (document.readyState === 'loading') {
@@ -3631,4 +3642,5 @@ async function confirmDeleteCobas(idx) {
     showToast('❌ Error de conexión al eliminar', 'error');
   }
 }
+
 </script>

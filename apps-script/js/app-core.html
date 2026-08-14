@@ -3,7 +3,38 @@ if (typeof API_URL === 'undefined') {
   var API_URL = 'https://script.google.com/macros/s/AKfycbxuqcui0-hjJ721uMWZk3w-4l2fVCaBWQgdMJqVMb5Pno339Jqetq4r62p3-1gGBUvFOg/exec';
 }
 const PREANALISIS=[1,2,3,4,5,18,19];
-const state={areas:[],centrifugas:[],salas:[],acciones:[],refrigeradores:[],refriLimpieza:[],personal:[],cobasObs:[],ampm:'AM',ampmRefri:'AM',ampmConduct:'AM',qrInstance:null,qrTab:'areas',dashMes:new Date().getMonth()+1,dashAnio:new Date().getFullYear(),dashTab:'diario',dashData:null,dashMaestros:null,dashCache:null,maestrosPromise:null,modulosActivos:null,serverTimeOffset:0};
+const state={
+  areas:[],centrifugas:[],salas:[],acciones:[],refrigeradores:[],refriLimpieza:[],
+  personal:[],personalMap:{},personalByNameMap:{},
+  cobasObs:[],ampm:'AM',ampmRefri:'AM',ampmConduct:'AM',
+  qrInstance:null,qrTab:'areas',
+  dashMes:new Date().getMonth()+1,dashAnio:new Date().getFullYear(),
+  dashTab:'diario',dashData:null,dashMaestros:null,dashCache:null,
+  maestrosPromise:null,modulosActivos:null,serverTimeOffset:0
+};
+
+function debounce(fn, delay = 200) {
+  let timeoutId;
+  return function(...args) {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => fn.apply(this, args), delay);
+  };
+}
+
+function rebuildPersonalIndex() {
+  state.personalMap = {};
+  state.personalByNameMap = {};
+  if (Array.isArray(state.personal)) {
+    state.personal.forEach(p => {
+      if (p.iniciales) {
+        state.personalMap[p.iniciales.toUpperCase().trim()] = p;
+      }
+      if (p.nombre) {
+        state.personalByNameMap[p.nombre.toUpperCase().trim()] = p;
+      }
+    });
+  }
+}
 
 function getServerNow() {
   return new Date(Date.now() + (state.serverTimeOffset || 0));
@@ -270,123 +301,121 @@ function updateInfoLimpRefri(){const t=document.getElementById('limp-refri-tipo'
 const CENT_INFO={Diaria:{title:'🔁 Mantención Diaria',body:'Realizar <strong>limpieza de superficie interior y exterior</strong> de la centrífuga con paño húmedo.'},Semanal:{title:'📅 Mantención Semanal',body:'<strong>Lavar capachos</strong> con solución jabonosa. <strong>Desinfectar rotor, capachos y superficies</strong> con alcohol 70% o Cloro 0.5%.'},Anual:{title:'🔧 Mantención Anual / Según Necesidad',body:'<strong>Desenchufar la centrífuga</strong> antes de intervenir. <strong>Engrasar capachos</strong>. Realizar mantención <strong>preventiva y/o reparativa</strong> completa.'}};
 function updateInfoCentrifuga(){const t=document.getElementById('cent-tipo').value,i=CENT_INFO[t]||CENT_INFO.Diaria;document.getElementById('info-cent-title').textContent=i.title;document.getElementById('info-cent-body').innerHTML=i.body;document.getElementById('info-centrifuga').classList.add('visible')}
 
-// Load masters
-async function loadMaestros(){
-  if (state.maestrosPromise && !state.dashMaestros) {
+function applyMaestrosData(data) {
+  if (!data) return;
+  if (data.serverTime) updateServerTimeOffset(data.serverTime);
+  enforceMaxDateInputs();
+  state.areas = data.areas || [];
+  state.centrifugas = data.centrifugas || [];
+  state.salas = data.salas || [];
+  state.acciones = data.acciones || [];
+  state.refrigeradores = data.refrigeradores || [];
+  state.refriLimpieza = data.refriLimpieza || [];
+  state.etiquetadoras = data.etiquetadoras || [];
+  state.personal = data.personal || [];
+  rebuildPersonalIndex();
+  if (data.modulosActivos) {
+    state.modulosActivos = data.modulosActivos;
+  }
+  applyModulosVisibilidad();
+  state.dashMaestros = data;
+
+  populateSelect('termo-area', state.areas, 'Seleccionar área…');
+  populateSelect('admin-select', state.areas, '— Seleccionar —');
+  populateChips('cent-chips', state.centrifugas);
+  populateChips('meson-chips', state.salas);
+
+  const refriNames = state.refrigeradores.map(r => r.equipo);
+  populateSelect('refri-equipo', refriNames, 'Seleccionar equipo…');
+  populateChips('limp-refri-chips', state.refriLimpieza);
+
+  const acOpts = '<option value="">Seleccionar acción…</option>' + state.acciones.map(a => `<option value="${a}">${a}</option>`).join('');
+  const tAcc = document.getElementById('termo-accion');
+  if (tAcc) tAcc.innerHTML = acOpts;
+  const rAcc = document.getElementById('refri-accion');
+  if (rAcc) rAcc.innerHTML = acOpts;
+
+  if (typeof renderEtiquetadoraDropdown === 'function') {
+    renderEtiquetadoraDropdown();
+  }
+  if (typeof populateEtiquetadoraModelDropdown === 'function') {
+    populateEtiquetadoraModelDropdown();
+  }
+
+  if (data.sugerencias) {
+    populateDatalist('list-termo-obs', data.sugerencias.termoObs || []);
+    populateDatalist('list-cent-obs', data.sugerencias.centObs || []);
+    populateDatalist('list-meson-obs', data.sugerencias.mesonObs || []);
+    populateDatalist('list-refri-obs', data.sugerencias.refriObs || []);
+    populateDatalist('list-limp-refri-obs', data.sugerencias.limpRefriObs || []);
+    populateDatalist('list-conduct-obs', data.sugerencias.conductObs || []);
+    populateDatalist('list-et-comentario', data.sugerencias.etComentario || []);
+    populateDatalist('list-et-bitacora-desc', data.sugerencias.etBitacoraDesc || []);
+    populateDatalist('list-cobas-obs', data.sugerencias.cobasObs || []);
+  }
+  setTimeout(bindResponsableLiveFeedback, 50);
+}
+
+// Load masters with instant sessionStorage hydration
+async function loadMaestros() {
+  if (!state.dashMaestros) {
+    try {
+      const cachedStr = sessionStorage.getItem('dashMaestros');
+      if (cachedStr) {
+        const cached = JSON.parse(cachedStr);
+        applyMaestrosData(cached);
+      }
+    } catch (e) {}
+  }
+
+  if (state.maestrosPromise && state.dashMaestros) {
     return state.maestrosPromise;
   }
-  state.maestrosPromise = (async () => {
-    try{
-      const data=await apiGet({action:'getMaestros'});
-      if (data.serverTime) updateServerTimeOffset(data.serverTime);
-      enforceMaxDateInputs();
-      state.areas=data.areas||[];
-    state.centrifugas=data.centrifugas||[];
-    state.salas=data.salas||[];
-    state.acciones=data.acciones||[];
-    state.refrigeradores=data.refrigeradores||[];
-    state.refriLimpieza=data.refriLimpieza||[];
-    state.etiquetadoras=data.etiquetadoras||[];
-    state.personal=data.personal||[];
-    if(data.modulosActivos){state.modulosActivos=data.modulosActivos}
-    applyModulosVisibilidad();
-    state.dashMaestros = data;
-    populateSelect('termo-area',state.areas,'Seleccionar área…');
-    populateSelect('admin-select',state.areas,'— Seleccionar —');
-    populateChips('cent-chips',state.centrifugas);
-    populateChips('meson-chips',state.salas);
-    // Refrigeradores
-    const refriNames=state.refrigeradores.map(r=>r.equipo);
-    populateSelect('refri-equipo',refriNames,'Seleccionar equipo…');
-    // Limpieza refri
-    populateChips('limp-refri-chips',state.refriLimpieza);
-    // Acciones en ambos formularios
-    const acOpts='<option value="">Seleccionar acción…</option>'+state.acciones.map(a=>`<option value="${a}">${a}</option>`).join('');
-    document.getElementById('termo-accion').innerHTML=acOpts;
-    document.getElementById('refri-accion').innerHTML=acOpts;
-    // Etiquetadoras
-    if (typeof renderEtiquetadoraDropdown === 'function') {
-      renderEtiquetadoraDropdown();
-    }
-    if (typeof populateEtiquetadoraModelDropdown === 'function') {
-      populateEtiquetadoraModelDropdown();
-    }
-    // Cargar Sugerencias
-    if (data.sugerencias) {
-      populateDatalist('list-termo-obs', data.sugerencias.termoObs || []);
-      populateDatalist('list-cent-obs', data.sugerencias.centObs || []);
-      populateDatalist('list-meson-obs', data.sugerencias.mesonObs || []);
-      populateDatalist('list-refri-obs', data.sugerencias.refriObs || []);
-      populateDatalist('list-limp-refri-obs', data.sugerencias.limpRefriObs || []);
-      populateDatalist('list-conduct-obs', data.sugerencias.conductObs || []);
-      populateDatalist('list-et-comentario', data.sugerencias.etComentario || []);
-      populateDatalist('list-et-bitacora-desc', data.sugerencias.etBitacoraDesc || []);
-      populateDatalist('list-cobas-obs', data.sugerencias.cobasObs || []);
-    }
-    setTimeout(bindResponsableLiveFeedback, 100);
-  }catch(e){
-    console.warn('Error cargando maestros de la API, cargando datos locales de prueba...', e);
-    showToast('⚠️ Usando datos de prueba locales (Modo Offline/Pruebas)','info');
-    state.areas = ["Área Química", "Área Hematología", "Área Preanálisis", "Área Microbiología"];
-    state.centrifugas = ["Centrífuga 1", "Centrífuga 2", "Centrífuga 3", "Centrífuga 4", "Centrífuga 5", "Centrífuga 18", "Centrífuga 19"];
-    state.salas = ["Sala Procesos", "Sala Recepción", "Sala Toma Muestras"];
-    state.acciones = ["Avisar a Coordinador", "Llamar a Soporte", "Reiniciar Equipo"];
-    state.refrigeradores = [
-      {equipo: "Refri 1 (2-8°C)", tempMin: 2, tempMax: 8, tipo: "Refrigerador"},
-      {equipo: "Refri 2 (2-8°C)", tempMin: 2, tempMax: 8, tipo: "Refrigerador"},
-      {equipo: "Congelador 1 (-20°C)", tempMin: -25, tempMax: -15, tipo: "Congelador"}
-    ];
-    state.refriLimpieza = ["Refri 1 (2-8°C)", "Refri 2 (2-8°C)", "Congelador 1 (-20°C)"];
-    state.etiquetadoras = [
-      {id: "ZD420-111", nombreReal: "ZD420-1", nombrePractico: "Rotuladora Preanálisis", modelo: "ZD420", tipoConexion: "USB", direccionIp: "No aplica", piso: "Piso 1", ubicacion: "Preanálisis", comentario: "Zebra ZD420 USB"},
-      {id: "ZD421-222", nombreReal: "ZD421-1", nombrePractico: "Rotuladora Hematología", modelo: "ZD421", tipoConexion: "Ethernet", direccionIp: "10.10.1.50", piso: "Piso 1", ubicacion: "Hematología", comentario: "Zebra ZD421 Red"},
-      {id: "ZD220-333", nombreReal: "ZD220-1", nombrePractico: "Rotuladora Microbiología", modelo: "ZD220", tipoConexion: "USB", direccionIp: "No aplica", piso: "Piso 2", ubicacion: "Microbiología", comentario: "Zebra ZD220 USB"}
-    ];
-    state.dashMaestros={
-      areas:state.areas,centrifugas:state.centrifugas,salas:state.salas,refrigeradores:state.refrigeradores,refriLimpieza:state.refriLimpieza,
-      areasDetailed: state.areas.map(a=>({nombre:a, horarioTurno:'si'})),
-      centrifugasDetailed: state.centrifugas.map(c=>({nombre:c, horarioTurno:['Centrífuga 18','Centrífuga 14','Centrífuga 9','Centrífuga 6','Centrífuga 8','Centrífuga 12','Centrífuga 11'].includes(c)?'no':'si'})),
-      salasDetailed: state.salas.map(s=>({nombre:s, horarioTurno:'si'}))
-    };
-    
-    populateSelect('termo-area',state.areas,'Seleccionar área…');
-    populateSelect('admin-select',state.areas,'— Seleccionar —');
-    populateChips('cent-chips',state.centrifugas);
-    populateChips('meson-chips',state.salas);
-    const refriNames=state.refrigeradores.map(r=>r.equipo);
-    populateSelect('refri-equipo',refriNames,'Seleccionar equipo…');
-    populateChips('limp-refri-chips',state.refriLimpieza);
-    const acOpts='<option value="">Seleccionar acción…</option>'+state.acciones.map(a=>`<option value="${a}">${a}</option>`).join('');
-    document.getElementById('termo-accion').innerHTML=acOpts;
-    document.getElementById('refri-accion').innerHTML=acOpts;
-    
-    if (typeof renderEtiquetadoraDropdown === 'function') {
-      renderEtiquetadoraDropdown();
-    }
-    if (typeof populateEtiquetadoraModelDropdown === 'function') {
-      populateEtiquetadoraModelDropdown();
-    }
 
-    const fallbackSugerencias = {
-      termoObs: ["Temperatura estable", "Se activa aire acondicionado", "Puerta abierta temporalmente"],
-      centObs: ["Limpieza diaria conforme", "Rotor lubricado", "Capachos lavados"],
-      mesonObs: ["Desinfección con alcohol 70%", "Mesón limpio"],
-      refriObs: ["Temperatura dentro de rangos", "Control diario realizado"],
-      limpRefriObs: ["Limpieza externa semanal realizada", "Bandejas organizadas"],
-      conductObs: ["Medición conforme", "Filtro purgado"],
-      etComentario: ["Zebra USB OK", "Zebra Ethernet configurada"],
-      etBitacoraDesc: ["Limpieza de cabezal térmico", "Calibración de sensor", "Cambio de rollo de etiquetas Zebra"],
-      cobasObs: ["Mantenimiento diario realizado", "Limpieza conforme", "Servicio técnico preventivo realizado"]
-    };
-    populateDatalist('list-termo-obs', fallbackSugerencias.termoObs);
-    populateDatalist('list-cent-obs', fallbackSugerencias.centObs);
-    populateDatalist('list-meson-obs', fallbackSugerencias.mesonObs);
-    populateDatalist('list-refri-obs', fallbackSugerencias.refriObs);
-    populateDatalist('list-limp-refri-obs', fallbackSugerencias.limpRefriObs);
-    populateDatalist('list-conduct-obs', fallbackSugerencias.conductObs);
-    populateDatalist('list-et-comentario', fallbackSugerencias.etComentario);
-    populateDatalist('list-et-bitacora-desc', fallbackSugerencias.etBitacoraDesc);
-    populateDatalist('list-cobas-obs', fallbackSugerencias.cobasObs);
+  state.maestrosPromise = (async () => {
+    try {
+      const data = await apiGet({ action: 'getMaestros' });
+      try {
+        sessionStorage.setItem('dashMaestros', JSON.stringify(data));
+      } catch (e) {}
+      applyMaestrosData(data);
+    } catch (e) {
+      if (!state.dashMaestros) {
+        console.warn('Error cargando maestros de la API, cargando datos locales de prueba...', e);
+        showToast('⚠️ Usando datos de prueba locales (Modo Offline/Pruebas)', 'info');
+        const fallbackMaestros = {
+          areas: ["Área Química", "Área Hematología", "Área Preanálisis", "Área Microbiología"],
+          centrifugas: ["Centrífuga 1", "Centrífuga 2", "Centrífuga 3", "Centrífuga 4", "Centrífuga 5", "Centrífuga 18", "Centrífuga 19"],
+          salas: ["Sala Procesos", "Sala Recepción", "Sala Toma Muestras"],
+          acciones: ["Avisar a Coordinador", "Llamar a Soporte", "Reiniciar Equipo"],
+          refrigeradores: [
+            {equipo: "Refri 1 (2-8°C)", tempMin: 2, tempMax: 8, tipo: "Refrigerador"},
+            {equipo: "Refri 2 (2-8°C)", tempMin: 2, tempMax: 8, tipo: "Refrigerador"},
+            {equipo: "Congelador 1 (-20°C)", tempMin: -25, tempMax: -15, tipo: "Congelador"}
+          ],
+          refriLimpieza: ["Refri 1 (2-8°C)", "Refri 2 (2-8°C)", "Congelador 1 (-20°C)"],
+          etiquetadoras: [
+            {id: "ZD420-111", nombreReal: "ZD420-1", nombrePractico: "Rotuladora Preanálisis", modelo: "ZD420", tipoConexion: "USB", direccionIp: "No aplica", piso: "Piso 1", ubicacion: "Preanálisis", comentario: "Zebra ZD420 USB"},
+            {id: "ZD421-222", nombreReal: "ZD421-1", nombrePractico: "Rotuladora Hematología", modelo: "ZD421", tipoConexion: "Ethernet", direccionIp: "10.10.1.50", piso: "Piso 1", ubicacion: "Hematología", comentario: "Zebra ZD421 Red"},
+            {id: "ZD220-333", nombreReal: "ZD220-1", nombrePractico: "Rotuladora Microbiología", modelo: "ZD220", tipoConexion: "USB", direccionIp: "No aplica", piso: "Piso 2", ubicacion: "Microbiología", comentario: "Zebra ZD220 USB"}
+          ],
+          areasDetailed: ["Área Química", "Área Hematología", "Área Preanálisis", "Área Microbiología"].map(a => ({nombre: a, horarioTurno: 'si'})),
+          centrifugasDetailed: ["Centrífuga 1", "Centrífuga 2", "Centrífuga 3", "Centrífuga 4", "Centrífuga 5", "Centrífuga 18", "Centrífuga 19"].map(c => ({nombre: c, horarioTurno: ['Centrífuga 18','Centrífuga 14','Centrífuga 9','Centrífuga 6','Centrífuga 8','Centrífuga 12','Centrífuga 11'].includes(c) ? 'no' : 'si'})),
+          salasDetailed: ["Sala Procesos", "Sala Recepción", "Sala Toma Muestras"].map(s => ({nombre: s, horarioTurno: 'si'})),
+          sugerencias: {
+            termoObs: ["Temperatura estable", "Se activa aire acondicionado", "Puerta abierta temporalmente"],
+            centObs: ["Limpieza diaria conforme", "Rotor lubricado", "Capachos lavados"],
+            mesonObs: ["Desinfección con alcohol 70%", "Mesón limpio"],
+            refriObs: ["Temperatura dentro de rangos", "Control diario realizado"],
+            limpRefriObs: ["Limpieza externa semanal realizada", "Bandejas organizadas"],
+            conductObs: ["Medición conforme", "Filtro purgado"],
+            etComentario: ["Zebra USB OK", "Zebra Ethernet configurada"],
+            etBitacoraDesc: ["Limpieza de cabezal térmico", "Calibración de sensor", "Cambio de rollo de etiquetas Zebra"],
+            cobasObs: ["Mantenimiento diario realizado", "Limpieza conforme", "Servicio técnico preventivo realizado"]
+          }
+        };
+        applyMaestrosData(fallbackMaestros);
+      }
     }
   })();
   return state.maestrosPromise;
@@ -400,28 +429,28 @@ function centNum(name){const m=name.match(/(\d+)/);return m?parseInt(m[1]):0}
 function getSelectedChips(id){return Array.from(document.querySelectorAll(`#${id} .chip-item.selected`)).map(i=>i.dataset.value)}
 function toggleGrupoPreanalisis(){const btn=document.getElementById('btn-grupo-preanalisis');const active=btn.classList.toggle('active');const chips=document.querySelectorAll('#cent-chips .chip-item');chips.forEach(c=>{const v=c.dataset.value;const num=centNum(v);const isP=PREANALISIS.includes(num);if(isP){if(active){c.classList.add('selected')}else{c.classList.remove('selected')}}});if(typeof checkDuplicateCentrifugas==='function')checkDuplicateCentrifugas();}
 
-// ── Personal & Responsables Helpers ───────────────────────────
+// ── Personal & Responsables Helpers (Optimized O(1) Hash Map) ─
 function getNombreResponsable(rawVal) {
   if (!rawVal) return '';
   const trimmed = String(rawVal).trim();
   const upper = trimmed.toUpperCase();
-  if (!state.personal || !state.personal.length) return trimmed;
-  const match = state.personal.find(p => p.iniciales === upper && p.activo !== 'NO');
-  return match && match.nombre ? match.nombre : trimmed;
+  if (state.personalMap && state.personalMap[upper]) {
+    const p = state.personalMap[upper];
+    if (p.activo !== 'NO' && p.nombre) return p.nombre;
+  }
+  return trimmed;
 }
 
 function getInicialesResponsable(val) {
   if (!val) return '';
   const trimmed = String(val).trim();
-  if (!state.personal || !state.personal.length) {
-    if (trimmed.length <= 4) return trimmed.toUpperCase();
-    return trimmed.split(/\s+/).map(w => w[0]).join('').toUpperCase().substring(0, 3);
-  }
   const upper = trimmed.toUpperCase();
-  const matchByInitials = state.personal.find(p => p.iniciales === upper);
-  if (matchByInitials) return matchByInitials.iniciales;
-  const matchByName = state.personal.find(p => p.nombre && p.nombre.toUpperCase() === upper);
-  if (matchByName) return matchByName.iniciales;
+  if (state.personalMap && state.personalMap[upper]) {
+    return state.personalMap[upper].iniciales;
+  }
+  if (state.personalByNameMap && state.personalByNameMap[upper]) {
+    return state.personalByNameMap[upper].iniciales;
+  }
   if (trimmed.length <= 4) return upper;
   return trimmed.split(/\s+/).map(w => w[0]).join('').toUpperCase().substring(0, 3);
 }
@@ -538,6 +567,7 @@ async function handleGuardarNuevoPersonal(e) {
       } else {
         state.personal.push({ iniciales, nombre, estamento, activo: 'SI' });
       }
+      rebuildPersonalIndex();
       document.querySelectorAll('input[id$="-resp"], input[id$="-responsable"], #elim-responsable').forEach(inp => {
         if (inp.value.trim().toUpperCase() === iniciales) updateResponsableFeedback(inp);
       });
@@ -703,8 +733,8 @@ function checkUrlParams(){
 function prefetchDashboard(){
   const mes=state.dashMes,anio=state.dashAnio;
   const key=mes+'-'+anio;
-  Promise.all([apiGet({action:'getRegistros',mes:mes,anio:anio}),apiGet({action:'getRevisiones',mes:mes,anio:anio})]).then(function(results){
-    const reg=results[0],rev=results[1];
+  apiGet({action:'getRegistros',mes:mes,anio:anio}).then(function(reg){
+    const rev = reg.revisiones || null;
     state.dashCache={key:key,data:reg,rev:rev,timestamp:Date.now()};
   }).catch(function(){/* silent fail */});
 }
@@ -722,4 +752,5 @@ function updateCacheIndicator(){
   else{el.textContent='hace '+mins+' min';el.className='cache-indicator cache-stale'}
   el.style.display='inline-block';
 }
+
 </script>

@@ -119,6 +119,12 @@ const COBAS_PERIODIC_TASKS = {
 // Caching settings
 const CACHE_TTL_MAESTROS = 1800; // 30 minutes
 const CACHE_TTL_REGISTROS = 21600; // 6 hours
+const CACHE_TTL_RECENT = 300; // 5 minutes
+
+// Execution-level memoization to avoid reopening sheets in the same request
+let _execSpreadsheet = null;
+let _execSheetCache = {};
+let _execPersonalCache = null;
 
 function getCacheKey(prefix, ...parts) {
   return prefix + '_' + parts.join('_');
@@ -158,19 +164,32 @@ function clearCacheKeys(keys) {
 }
 
 function clearSheetCache(keyPrefix, mes, anio) {
-  const cacheKey = getCacheKey('regs', keyPrefix, mes, anio);
-  clearCacheKeys([cacheKey]);
+  const keys = [
+    getCacheKey('regs', keyPrefix, mes, anio),
+    getCacheKey('recent', keyPrefix)
+  ];
+  clearCacheKeys(keys);
 }
 
 function clearAllCaches() {
   try {
-    const keys = ['maestros_all', 'maestros_all_v3', 'sugerencias_historicas', 'dxh900_hist', 'config_modulos_activos', getCacheKey('et_hist', 'ALL')];
+    _execPersonalCache = null;
+    const keys = [
+      'maestros_all',
+      'maestros_all_v3',
+      'personal_all_v2',
+      'sugerencias_historicas',
+      'dxh900_hist',
+      'config_modulos_activos',
+      getCacheKey('et_hist', 'ALL')
+    ];
     const now = new Date();
     const curMes = now.getMonth() + 1;
     const curAnio = now.getFullYear();
     ['termo', 'centrifugas', 'mesones', 'refriTemp', 'limpiezaRefri', 'conductividad', 'cobas', 'elimMuestras'].forEach(k => {
       keys.push(getCacheKey('regs', k, curMes, curAnio));
       keys.push(getCacheKey('regs', k, curMes === 1 ? 12 : curMes - 1, curMes === 1 ? curAnio - 1 : curAnio));
+      keys.push(getCacheKey('recent', k));
     });
     try {
       const etSheet = getSheet(SHEETS.ETIQUETADORAS_MASTER);
@@ -190,19 +209,23 @@ function clearAllCaches() {
 const SPREADSHEET_ID_DEFAULT = '1HzHcRriBtPGQxTfFrZSntVeM8ujQHWnGFuyWrJo6KUQ';
 
 function getSpreadsheet() {
+  if (_execSpreadsheet) return _execSpreadsheet;
   let id = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');
   if (!id) {
     id = SPREADSHEET_ID_DEFAULT;
   }
   try {
-    return SpreadsheetApp.openById(id);
+    _execSpreadsheet = SpreadsheetApp.openById(id);
+    return _execSpreadsheet;
   } catch (e) {
     Logger.log('Error abriendo spreadsheet con ID (' + id + '), utilizando ID por defecto: ' + e.toString());
-    return SpreadsheetApp.openById(SPREADSHEET_ID_DEFAULT);
+    _execSpreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID_DEFAULT);
+    return _execSpreadsheet;
   }
 }
 
 function getSheet(name) {
+  if (_execSheetCache[name]) return _execSheetCache[name];
   const ss = getSpreadsheet();
   let sheet = ss.getSheetByName(name);
   if (!sheet) {
@@ -210,6 +233,7 @@ function getSheet(name) {
     initializeSpreadsheet();
     sheet = ss.getSheetByName(name);
   }
+  if (sheet) _execSheetCache[name] = sheet;
   return sheet;
 }
 
@@ -306,12 +330,30 @@ function jsonResponse(obj) {
 }
 
 function insertRowAtTop(sheet, values) {
-  ensureSheetHeadersAndVisibility(sheet);
+  if (sheet.getLastRow() < 1 || sheet.getLastColumn() < 1) {
+    ensureSheetHeadersAndVisibility(sheet);
+  }
   sheet.insertRowAfter(1);
   const range = sheet.getRange(2, 1, 1, values.length);
   range.setValues([values]);
   try {
     sheet.getRange(2, 1).setNumberFormat('@');
+  } catch (e) {}
+  range.setBackground(null).setFontColor(null).setFontWeight("normal");
+}
+
+function insertRowsAtTopBatch(sheet, rowsArray) {
+  if (!rowsArray || rowsArray.length === 0) return;
+  if (sheet.getLastRow() < 1 || sheet.getLastColumn() < 1) {
+    ensureSheetHeadersAndVisibility(sheet);
+  }
+  const count = rowsArray.length;
+  const cols = rowsArray[0].length;
+  sheet.insertRowsAfter(1, count);
+  const range = sheet.getRange(2, 1, count, cols);
+  range.setValues(rowsArray);
+  try {
+    sheet.getRange(2, 1, count, 1).setNumberFormat('@');
   } catch (e) {}
   range.setBackground(null).setFontColor(null).setFontWeight("normal");
 }
@@ -513,15 +555,8 @@ function esDiaHabil(fecha) {
   const fechaStr = `${d}/${m}/${y}`;
 
   try {
-    const sheetHRT = getSheet(SHEETS.DIAS_NO_HABILES_HRT);
-    if (sheetHRT) {
-      const rows = sheetHRT.getDataRange().getValues();
-      for (let i = 1; i < rows.length; i++) {
-        const rFecha = rows[i][0];
-        let fStr = formatFechaValue(rFecha);
-        if (fStr === fechaStr) return false;
-      }
-    }
+    const hrtItems = getDiasNoHabilesHRT();
+    if (hrtItems.some(item => item.fecha === fechaStr)) return false;
   } catch (e) {
     Logger.log('Error al consultar Maestro Días No Hábiles HRT: ' + e.toString());
   }
@@ -540,8 +575,70 @@ function esDiaHabil(fecha) {
   return true;
 }
 
+/** Obtiene todos los días no hábiles (números de día 1..31) de un mes en una sola operación optimizada */
+function getDiasNoHabilesMes(mes, anio) {
+  mes = parseInt(mes);
+  anio = parseInt(anio);
+  const cacheKey = getCacheKey('dias_no_habiles', mes, anio);
+  const cached = getCachedJson(cacheKey);
+  if (cached && Array.isArray(cached)) return cached;
+
+  const daysInMonth = new Date(anio, mes, 0).getDate();
+  const noHabiles = [];
+  const hrtSet = new Set();
+  
+  try {
+    const hrtItems = getDiasNoHabilesHRT();
+    hrtItems.forEach(item => {
+      if (item.fecha) {
+        const parts = item.fecha.split('/');
+        if (parts.length === 3 && parseInt(parts[1]) === mes && parseInt(parts[2]) === anio) {
+          hrtSet.add(parseInt(parts[0]));
+        }
+      }
+    });
+  } catch (e) {
+    Logger.log('Error procesando HRT dias no habiles: ' + e.toString());
+  }
+
+  // Consulta única de eventos de feriados para todo el mes
+  const calHolidayDays = new Set();
+  try {
+    const cal = CalendarApp.getCalendarById('es.cl#holiday@group.v.calendar.google.com');
+    if (cal) {
+      const startDate = new Date(anio, mes - 1, 1, 0, 0, 0);
+      const endDate = new Date(anio, mes, 0, 23, 59, 59);
+      const events = cal.getEvents(startDate, endDate);
+      events.forEach(ev => {
+        const evStart = ev.getStartTime();
+        if (evStart.getMonth() + 1 === mes && evStart.getFullYear() === anio) {
+          calHolidayDays.add(evStart.getDate());
+        }
+      });
+    }
+  } catch (e) {
+    Logger.log('Error consultando Calendar feriados mensual: ' + e.toString());
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dt = new Date(anio, mes - 1, d);
+    const dayOfWeek = dt.getDay();
+    if (dayOfWeek === 0 || dayOfWeek === 6 || hrtSet.has(d) || calHolidayDays.has(d)) {
+      noHabiles.push(d);
+    }
+  }
+
+  setCachedJson(cacheKey, noHabiles, 86400); // 24 hours
+  return noHabiles;
+}
+
 function getDiasNoHabilesHRT() {
+  const cacheKey = 'dias_no_habiles_hrt_list';
+  const cached = getCachedJson(cacheKey);
+  if (cached && Array.isArray(cached)) return cached;
+
   const sheet = getSheet(SHEETS.DIAS_NO_HABILES_HRT);
+  if (!sheet) return [];
   const rows = sheet.getDataRange().getValues();
   if (rows.length <= 1) return [];
 
@@ -556,6 +653,7 @@ function getDiasNoHabilesHRT() {
       registradoPor: String(r[2] || '').trim()
     });
   }
+  setCachedJson(cacheKey, items, CACHE_TTL_MAESTROS);
   return items;
 }
 
@@ -584,7 +682,7 @@ function saveDiaNoHabilHRT(data) {
     sheet.getRange(sheet.getLastRow(), 1).setNumberFormat('@');
   } catch (e) {}
 
-  clearSheetCache('maestros_all', 0, 0);
+  clearCacheKeys(['maestros_all', 'maestros_all_v3', 'dias_no_habiles_hrt_list']);
   return { success: true, message: 'Día no hábil agregado correctamente.' };
 }
 
@@ -606,26 +704,36 @@ function deleteDiaNoHabilHRT(data) {
 
   if (targetIndex !== -1) {
     sheet.deleteRow(targetIndex);
-    clearSheetCache('maestros_all', 0, 0);
+    clearCacheKeys(['maestros_all', 'maestros_all_v3', 'dias_no_habiles_hrt_list']);
     return { success: true, message: 'Día no hábil eliminado correctamente.' };
   }
   return { success: false, error: 'No se encontró la fecha especificada.' };
 }
 
 function getPersonal() {
+  if (_execPersonalCache) return _execPersonalCache;
+  const cacheKey = 'personal_all_v2';
+  const cached = getCachedJson(cacheKey);
+  if (cached && Array.isArray(cached)) {
+    _execPersonalCache = cached;
+    return cached;
+  }
   try {
     const sheet = getSheet(SHEETS.PERSONAL);
     if (!sheet) return [];
     const rows = sheet.getDataRange().getValues();
     if (rows.length <= 1) return [];
 
-    return rows.slice(1).filter(r => r[0]).map(r => ({
+    const list = rows.slice(1).filter(r => r[0]).map(r => ({
       iniciales: String(r[0]).trim().toUpperCase(),
       nombre: String(r[1] || '').trim(),
       estamento: String(r[2] || '').trim(),
       activo: String(r[3] || 'SI').trim().toUpperCase(),
       fecha: formatFechaValue(r[4])
     }));
+    setCachedJson(cacheKey, list, CACHE_TTL_MAESTROS);
+    _execPersonalCache = list;
+    return list;
   } catch (e) {
     Logger.log('Error en getPersonal: ' + e.toString());
     return [];
@@ -666,7 +774,8 @@ function setupMaestroPersonal() {
         todayStr
       ]);
       sheet.getRange(2, 1, rowsToInsert.length, 5).setValues(rowsToInsert);
-      clearSheetCache('maestros_all', 0, 0);
+      clearCacheKeys(['personal_all_v2', 'maestros_all_v3', 'maestros_all']);
+      _execPersonalCache = null;
       return {
         success: true,
         message: 'Maestro Personal creado y precargado con 33 funcionarios.',
@@ -736,7 +845,8 @@ function savePersonal(data) {
     } catch (e) {}
   }
 
-  clearSheetCache('maestros_all', 0, 0);
+  clearCacheKeys(['personal_all_v2', 'maestros_all_v3', 'maestros_all']);
+  _execPersonalCache = null;
   return {
     success: true,
     message: `Funcionario ${nombre} (${iniciales}) registrado correctamente en Maestro Personal.`,
@@ -753,7 +863,8 @@ function deletePersonal(data) {
   for (let i = 1; i < rows.length; i++) {
     if (String(rows[i][0]).trim().toUpperCase() === iniciales) {
       sheet.deleteRow(i + 1);
-      clearSheetCache('maestros_all', 0, 0);
+      clearCacheKeys(['personal_all_v2', 'maestros_all_v3', 'maestros_all']);
+      _execPersonalCache = null;
       return { success: true, message: `Funcionario (${iniciales}) eliminado de Maestro Personal.`, personal: getPersonal() };
     }
   }
@@ -772,18 +883,24 @@ function seedMaestroPersonal(initialsList) {
   const fechaStr = formatFechaValue(new Date());
   let added = 0;
   
+  const newRows = [];
   initialsList.forEach(init => {
     const clean = String(init || '').trim().toUpperCase();
     if (clean && !existing.has(clean)) {
-      sheet.appendRow([clean, '', '', 'SI', fechaStr]);
-      try {
-        sheet.getRange(sheet.getLastRow(), 1).setNumberFormat('@');
-        sheet.getRange(sheet.getLastRow(), 5).setNumberFormat('@');
-      } catch(e) {}
+      newRows.push([clean, '', '', 'SI', fechaStr]);
       existing.add(clean);
       added++;
     }
   });
+  
+  if (newRows.length > 0) {
+    const start = sheet.getLastRow() + 1;
+    sheet.getRange(start, 1, newRows.length, 5).setValues(newRows);
+    try {
+      sheet.getRange(start, 1, newRows.length, 1).setNumberFormat('@');
+      sheet.getRange(start, 5, newRows.length, 1).setNumberFormat('@');
+    } catch(e) {}
+  }
   
   clearAllCaches();
   return { success: true, added: added, total: sheet.getLastRow() - 1 };
@@ -847,8 +964,6 @@ function getMaestros() {
   const cacheKey = 'maestros_all_v3';
   let cached = getCachedJson(cacheKey);
   if (cached && cached.centrifugasDetailed && cached.areasDetailed && cached.salasDetailed) {
-    cached.modulosActivos = getModulosActivos();
-    cached.isTodayHabit = esDiaHabil(new Date());
     cached.serverTime = getServerTime();
     cached.personal = getPersonal();
     return cached;
@@ -884,7 +999,9 @@ function getUniqueColumnValues(sheetName, colIndex) {
     const lastRow = sheet.getLastRow();
     if (lastRow <= 1) return [];
     
-    const values = sheet.getRange(2, colIndex + 1, lastRow - 1, 1).getValues();
+    const startRow = Math.max(2, lastRow - 150);
+    const numRows = lastRow - startRow + 1;
+    const values = sheet.getRange(startRow, colIndex + 1, numRows, 1).getValues();
     const set = new Set();
     for (let i = values.length - 1; i >= 0; i--) {
       const val = String(values[i][0]).trim();
@@ -969,6 +1086,10 @@ function saveTermo(data) {
 
 function getRecentTermo(limit) {
   limit = parseInt(limit) || 20;
+  const cacheKey = getCacheKey('recent', 'termo');
+  const cached = getCachedJson(cacheKey);
+  if (cached && Array.isArray(cached)) return { success: true, records: cached };
+
   const sheet = getSheet(SHEETS.TERMO);
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return { success: true, records: [] };
@@ -979,13 +1100,7 @@ function getRecentTermo(limit) {
 
   const records = data.map((r, idx) => {
     let fechaStr = getFechaFromRow(r);
-
-    let tsStr = '';
-    if (r[11] instanceof Date) {
-      tsStr = getFechaRegistroFormatted(r[11]);
-    } else {
-      tsStr = String(r[11] || '');
-    }
+    let tsStr = r[11] instanceof Date ? getFechaRegistroFormatted(r[11]) : String(r[11] || '');
 
     return {
       rowIndex: 2 + idx,
@@ -1006,11 +1121,16 @@ function getRecentTermo(limit) {
     };
   });
 
+  setCachedJson(cacheKey, records, CACHE_TTL_RECENT);
   return { success: true, records: records };
 }
 
 function getRecentCentrifugas(limit) {
   limit = parseInt(limit) || 20;
+  const cacheKey = getCacheKey('recent', 'centrifugas');
+  const cached = getCachedJson(cacheKey);
+  if (cached && Array.isArray(cached)) return { success: true, records: cached };
+
   const sheet = getSheet(SHEETS.CENT_REG);
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return { success: true, records: [] };
@@ -1031,11 +1151,16 @@ function getRecentCentrifugas(limit) {
       fecha_registro: tsStr
     };
   });
+  setCachedJson(cacheKey, records, CACHE_TTL_RECENT);
   return { success: true, records: records };
 }
 
 function getRecentMesones(limit) {
   limit = parseInt(limit) || 20;
+  const cacheKey = getCacheKey('recent', 'mesones');
+  const cached = getCachedJson(cacheKey);
+  if (cached && Array.isArray(cached)) return { success: true, records: cached };
+
   const sheet = getSheet(SHEETS.MESONES);
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return { success: true, records: [] };
@@ -1055,11 +1180,16 @@ function getRecentMesones(limit) {
       fecha_registro: tsStr
     };
   });
+  setCachedJson(cacheKey, records, CACHE_TTL_RECENT);
   return { success: true, records: records };
 }
 
 function getRecentRefriTemp(limit) {
   limit = parseInt(limit) || 20;
+  const cacheKey = getCacheKey('recent', 'refriTemp');
+  const cached = getCachedJson(cacheKey);
+  if (cached && Array.isArray(cached)) return { success: true, records: cached };
+
   const sheet = getSheet(SHEETS.REFRI_REG);
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return { success: true, records: [] };
@@ -1083,11 +1213,16 @@ function getRecentRefriTemp(limit) {
       fecha_registro: tsStr
     };
   });
+  setCachedJson(cacheKey, records, CACHE_TTL_RECENT);
   return { success: true, records: records };
 }
 
 function getRecentLimpRefri(limit) {
   limit = parseInt(limit) || 20;
+  const cacheKey = getCacheKey('recent', 'limpiezaRefri');
+  const cached = getCachedJson(cacheKey);
+  if (cached && Array.isArray(cached)) return { success: true, records: cached };
+
   const sheet = getSheet(SHEETS.LIMP_REFRI);
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return { success: true, records: [] };
@@ -1108,11 +1243,16 @@ function getRecentLimpRefri(limit) {
       fecha_registro: tsStr
     };
   });
+  setCachedJson(cacheKey, records, CACHE_TTL_RECENT);
   return { success: true, records: records };
 }
 
 function getRecentConductividad(limit) {
   limit = parseInt(limit) || 20;
+  const cacheKey = getCacheKey('recent', 'conductividad');
+  const cached = getCachedJson(cacheKey);
+  if (cached && Array.isArray(cached)) return { success: true, records: cached };
+
   const sheet = getSheet(SHEETS.CONDUCT_REG);
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return { success: true, records: [] };
@@ -1133,11 +1273,16 @@ function getRecentConductividad(limit) {
       fecha_registro: tsStr
     };
   });
+  setCachedJson(cacheKey, records, CACHE_TTL_RECENT);
   return { success: true, records: records };
 }
 
 function getRecentCobas(limit) {
   limit = parseInt(limit) || 20;
+  const cacheKey = getCacheKey('recent', 'cobas');
+  const cached = getCachedJson(cacheKey);
+  if (cached && Array.isArray(cached)) return { success: true, records: cached };
+
   const sheet = getSheet(SHEETS.COBAS_REG);
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return { success: true, records: [] };
@@ -1159,6 +1304,7 @@ function getRecentCobas(limit) {
       fecha_registro: tsStr
     };
   });
+  setCachedJson(cacheKey, records, CACHE_TTL_RECENT);
   return { success: true, records: records };
 }
 
@@ -1516,19 +1662,21 @@ function saveCentrifuga(data) {
   }
   const f = parseFecha(data.fecha);
   const ts = getFechaRegistroFormatted();
+  const respName = resolveNombreResponsable(data.responsable);
   const sheet = getSheet(SHEETS.CENT_REG);
-  centrifugas.forEach(cent => {
-    insertRowAtTop(sheet, [
-      formatFechaDDMMYYYY(f), f.dia, f.mes, f.anio,
-      cent,
-      resolveNombreResponsable(data.responsable),
-      data.tipo_mantencion || 'Diaria',
-      data.observaciones || '',
-      ts,
-      '',  // Revisado_Por
-      ''   // Fecha_Revisión
-    ]);
-  });
+  
+  const rows = centrifugas.map(cent => [
+    formatFechaDDMMYYYY(f), f.dia, f.mes, f.anio,
+    cent,
+    respName,
+    data.tipo_mantencion || 'Diaria',
+    data.observaciones || '',
+    ts,
+    '',  // Revisado_Por
+    ''   // Fecha_Revisión
+  ]);
+  insertRowsAtTopBatch(sheet, rows);
+
   clearSheetCache('centrifugas', f.mes, f.anio);
   return { success: true, message: centrifugas.length + ' registro(s) de Centrífuga guardado(s).' };
 }
@@ -1546,18 +1694,20 @@ function saveMesones(data) {
   }
   const f = parseFecha(data.fecha);
   const ts = getFechaRegistroFormatted();
+  const respName = resolveNombreResponsable(data.responsable);
   const sheet = getSheet(SHEETS.MESONES);
-  salas.forEach(sala => {
-    insertRowAtTop(sheet, [
-      formatFechaDDMMYYYY(f), f.dia, f.mes, f.anio,
-      sala,
-      resolveNombreResponsable(data.responsable),
-      data.observaciones || '',
-      ts,
-      '',  // Revisado_Por
-      ''   // Fecha_Revisión
-    ]);
-  });
+  
+  const rows = salas.map(sala => [
+    formatFechaDDMMYYYY(f), f.dia, f.mes, f.anio,
+    sala,
+    respName,
+    data.observaciones || '',
+    ts,
+    '',  // Revisado_Por
+    ''   // Fecha_Revisión
+  ]);
+  insertRowsAtTopBatch(sheet, rows);
+
   clearSheetCache('mesones', f.mes, f.anio);
   return { success: true, message: salas.length + ' registro(s) de Mesones guardado(s).' };
 }
@@ -1632,19 +1782,21 @@ function saveLimpiezaRefri(data) {
   }
   const f = parseFecha(data.fecha);
   const ts = getFechaRegistroFormatted();
+  const respName = resolveNombreResponsable(data.responsable);
   const sheet = getSheet(SHEETS.LIMP_REFRI);
-  equipos.forEach(eq => {
-    insertRowAtTop(sheet, [
-      formatFechaDDMMYYYY(f), f.dia, f.mes, f.anio,
-      data.tipo_mantencion,
-      eq,
-      resolveNombreResponsable(data.responsable),
-      data.observaciones || '',
-      ts,
-      '',  // Revisado_Por
-      ''   // Fecha_Revisión
-    ]);
-  });
+
+  const rows = equipos.map(eq => [
+    formatFechaDDMMYYYY(f), f.dia, f.mes, f.anio,
+    data.tipo_mantencion,
+    eq,
+    respName,
+    data.observaciones || '',
+    ts,
+    '',  // Revisado_Por
+    ''   // Fecha_Revisión
+  ]);
+  insertRowsAtTopBatch(sheet, rows);
+
   clearSheetCache('limpiezaRefri', f.mes, f.anio);
   return { success: true, message: equipos.length + ' registro(s) de Limpieza Refrigeradores guardado(s).' };
 }
@@ -1777,16 +1929,9 @@ function getRegistros(mes, anio) {
 
   const result = { mes, anio };
 
-  // Calculate non-working days for the requested month
-  const diasNoHabiles = [];
-  const daysInMonth = new Date(anio, mes, 0).getDate();
-  for (let d = 1; d <= daysInMonth; d++) {
-    const fTest = new Date(anio, mes - 1, d);
-    if (!esDiaHabil(fTest)) {
-      diasNoHabiles.push(d);
-    }
-  }
-  result.diasNoHabiles = diasNoHabiles;
+  // Calculate non-working days for the requested month via fast single batch
+  result.diasNoHabiles = getDiasNoHabilesMes(mes, anio);
+  result.revisiones = getRevision(mes, anio);
 
   sheetsToFetch.forEach(cfg => {
     const cacheKey = getCacheKey('regs', cfg.key, mes, anio);
@@ -1900,15 +2045,20 @@ function marcarRevisado(data) {
   return { success: true, message: 'Revisión confirmada por ' + revisor + ': ' + nombresRev };
 }
 
-/** Escribe las iniciales del revisor y fecha en todos los registros de un mes */
+/** Escribe las iniciales del revisor y fecha en todos los registros de un mes en un solo batch */
 function stampRevision(sheet, colMes, colAnio, mes, anio, iniciales, fechaRev, colRevPor, colRevFecha) {
   const data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return;
+  let modified = false;
   for (let i = 1; i < data.length; i++) {
     if (parseInt(data[i][colMes]) === mes && parseInt(data[i][colAnio]) === anio) {
-      // colRevPor y colRevFecha son 0-indexed en el array, pero 1-indexed en getRange
-      sheet.getRange(i + 1, colRevPor + 1).setValue(iniciales);
-      sheet.getRange(i + 1, colRevFecha + 1).setValue(fechaRev);
+      data[i][colRevPor] = iniciales;
+      data[i][colRevFecha] = fechaRev;
+      modified = true;
     }
+  }
+  if (modified) {
+    sheet.getRange(1, 1, data.length, data[0].length).setValues(data);
   }
 }
 
@@ -3249,6 +3399,10 @@ function parseHoraNotificacion(val) {
 }
 
 function getNotificaciones() {
+  const cacheKey = 'notificaciones_all';
+  const cached = getCachedJson(cacheKey);
+  if (cached && Array.isArray(cached)) return cached;
+
   let sheet = getSheet(SHEETS.NOTIFICACIONES);
   if (!sheet) {
     try {
@@ -3290,7 +3444,7 @@ function getNotificaciones() {
     displayData = sheet.getDataRange().getDisplayValues();
   }
 
-  return data.slice(1).map((r, idx) => {
+  const result = data.slice(1).map((r, idx) => {
     const rawVal = r[4];
     const dispVal = displayData && displayData[idx + 1] ? displayData[idx + 1][4] : '';
     let horaStr = parseHoraNotificacion(dispVal) || parseHoraNotificacion(rawVal);
@@ -3314,6 +3468,9 @@ function getNotificaciones() {
       hora: horaStr
     };
   });
+
+  setCachedJson(cacheKey, result, CACHE_TTL_MAESTROS);
+  return result;
 }
 
 function saveNotificaciones(data) {
@@ -3336,20 +3493,26 @@ function saveNotificaciones(data) {
   // Formatear columna 5 como texto plano
   sheet.getRange(1, 5, Math.max(data.notificaciones.length + 1, 100), 1).setNumberFormat('@');
   
-  // Guardar nuevos datos
-  data.notificaciones.forEach(n => {
+  // Guardar nuevos datos en batch
+  const newRows = data.notificaciones.map(n => {
     let horaVal = n.hora ? String(n.hora).trim() : '08:00';
     if (!/^\d{2}:\d{2}$/.test(horaVal)) {
       horaVal = parseHoraNotificacion(horaVal) || '08:00';
     }
-    sheet.appendRow([
+    return [
       n.registro,
       n.clave,
       n.destinatarios || '',
       n.pausado ? 'TRUE' : 'FALSE',
       "'" + horaVal
-    ]);
+    ];
   });
+  
+  if (newRows.length > 0) {
+    sheet.getRange(2, 1, newRows.length, 5).setValues(newRows);
+  }
+
+  clearCacheKeys(['notificaciones_all']);
 
   try {
     setupTriggers();

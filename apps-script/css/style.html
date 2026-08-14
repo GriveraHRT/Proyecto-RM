@@ -533,7 +533,7 @@ body {
   font-size: 13px; color: var(--primary); cursor: pointer;
   margin-bottom: 8px; font-weight: 600;
 }
-.records-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.records-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; contain: content; }
 .records-table {
   width: 100%; border-collapse: collapse;
   font-size: 12px; white-space: nowrap;
@@ -878,12 +878,6 @@ body {
   background: rgba(239,68,68,0.10);
   border-color: rgba(239,68,68,0.3);
   color: var(--danger);
-}
-.day-chip.chip-na {
-  background: rgba(148, 163, 184, 0.15);
-  border-color: rgba(148, 163, 184, 0.35);
-  color: var(--text-dim, #64748b);
-  opacity: 0.75;
 }
 /* ── Alert text fix ────────────────────────────────────────── */
 .alert-banner p { margin: 0; }
@@ -1628,6 +1622,11 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
+[data-theme="dark"] .btn-dup-no:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
 .resp-feedback {
   font-size: 0.78rem;
   font-weight: 600;
@@ -1654,5 +1653,7 @@ body {
 [data-theme="dark"] .resp-feedback.unknown {
   color: #fbbf24;
 }
+
+
 
 </style>
