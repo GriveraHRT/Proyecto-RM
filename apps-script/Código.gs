@@ -164,7 +164,7 @@ function clearSheetCache(keyPrefix, mes, anio) {
 
 function clearAllCaches() {
   try {
-    const keys = ['maestros_all', 'maestros_all_v3', 'sugerencias_historicas', 'dxh900_hist', 'config_modulos_activos'];
+    const keys = ['maestros_all', 'maestros_all_v3', 'sugerencias_historicas', 'dxh900_hist', 'config_modulos_activos', getCacheKey('et_hist', 'ALL')];
     const now = new Date();
     const curMes = now.getMonth() + 1;
     const curAnio = now.getFullYear();
@@ -172,6 +172,15 @@ function clearAllCaches() {
       keys.push(getCacheKey('regs', k, curMes, curAnio));
       keys.push(getCacheKey('regs', k, curMes === 1 ? 12 : curMes - 1, curMes === 1 ? curAnio - 1 : curAnio));
     });
+    try {
+      const etSheet = getSheet(SHEETS.ETIQUETADORAS_MASTER);
+      if (etSheet) {
+        const rows = etSheet.getDataRange().getValues();
+        rows.slice(1).forEach(r => {
+          if (r[0]) keys.push(getCacheKey('et_hist', String(r[0])));
+        });
+      }
+    } catch (e) {}
     CacheService.getScriptCache().removeAll(keys);
   } catch (e) {
     Logger.log('Error en clearAllCaches: ' + e.toString());
