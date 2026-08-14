@@ -333,6 +333,8 @@ function doGet(e) {
       case 'getRecentCobas':        return jsonResponse(getRecentCobas(e.parameter.limit));
       case 'getDiasNoHabilesHRT': return jsonResponse(getDiasNoHabilesHRT());
       case 'getPersonal':         return jsonResponse(getPersonal());
+      case 'savePersonal':        return jsonResponse(savePersonal(e.parameter));
+      case 'deletePersonal':      return jsonResponse(deletePersonal(e.parameter));
       case 'setupMaestroPersonal': return jsonResponse(setupMaestroPersonal());
       case 'runSetupTriggers':  return jsonResponse({ success: true, message: setupTriggers() });
       case 'testTriggerConsolidado': return jsonResponse({ success: true, result: triggerAlertaConsolidadaTermo() });
@@ -395,6 +397,8 @@ function doPost(e) {
       case 'saveDiaNoHabilHRT':   return jsonResponse(saveDiaNoHabilHRT(data));
       case 'deleteDiaNoHabilHRT': return jsonResponse(deleteDiaNoHabilHRT(data));
       case 'getPersonal':         return jsonResponse(getPersonal());
+      case 'savePersonal':        return jsonResponse(savePersonal(data));
+      case 'deletePersonal':      return jsonResponse(deletePersonal(data));
       case 'setupMaestroPersonal': return jsonResponse(setupMaestroPersonal());
       default:                    return jsonResponse({ error: 'Acción no reconocida: ' + data.action });
     }
@@ -652,6 +656,81 @@ function setupMaestroPersonal() {
   }
 }
 
+function resolveNombreResponsable(val) {
+  if (!val) return '';
+  const trimmed = String(val).trim();
+  const upper = trimmed.toUpperCase();
+  
+  try {
+    const personal = getPersonal();
+    const match = personal.find(p => p.iniciales === upper && p.activo !== 'NO');
+    if (match && match.nombre) {
+      return match.nombre;
+    }
+  } catch (e) {
+    Logger.log('Error resolviendo nombre responsable: ' + e.toString());
+  }
+  
+  return trimmed;
+}
+
+function savePersonal(data) {
+  if (!data.iniciales || !data.nombre) {
+    return { success: false, error: 'Debe ingresar iniciales y nombre completo.' };
+  }
+  const iniciales = String(data.iniciales).trim().toUpperCase();
+  const nombre = String(data.nombre).trim().toUpperCase();
+  const estamento = String(data.estamento || 'Tecnólogo Médico').trim();
+  const activo = data.activo ? String(data.activo).trim().toUpperCase() : 'SI';
+  const fechaStr = formatFechaValue(new Date());
+
+  const sheet = getSheet(SHEETS.PERSONAL);
+  if (!sheet) return { success: false, error: 'Hoja Maestro Personal no encontrada.' };
+
+  const rows = sheet.getDataRange().getValues();
+  let foundIndex = -1;
+
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]).trim().toUpperCase() === iniciales) {
+      foundIndex = i + 1;
+      break;
+    }
+  }
+
+  if (foundIndex !== -1) {
+    sheet.getRange(foundIndex, 2, 1, 3).setValues([[nombre, estamento, activo]]);
+  } else {
+    sheet.appendRow([iniciales, nombre, estamento, activo, fechaStr]);
+    try {
+      sheet.getRange(sheet.getLastRow(), 1).setNumberFormat('@');
+      sheet.getRange(sheet.getLastRow(), 5).setNumberFormat('@');
+    } catch (e) {}
+  }
+
+  clearSheetCache('maestros_all', 0, 0);
+  return {
+    success: true,
+    message: `Funcionario ${nombre} (${iniciales}) registrado correctamente en Maestro Personal.`,
+    personal: getPersonal()
+  };
+}
+
+function deletePersonal(data) {
+  if (!data || !data.iniciales) return { success: false, error: 'Iniciales no especificadas.' };
+  const iniciales = String(data.iniciales).trim().toUpperCase();
+  const sheet = getSheet(SHEETS.PERSONAL);
+  if (!sheet) return { success: false, error: 'Hoja no encontrada.' };
+  const rows = sheet.getDataRange().getValues();
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]).trim().toUpperCase() === iniciales) {
+      sheet.deleteRow(i + 1);
+      clearSheetCache('maestros_all', 0, 0);
+      return { success: true, message: `Funcionario (${iniciales}) eliminado de Maestro Personal.`, personal: getPersonal() };
+    }
+  }
+  return { success: false, error: 'Funcionario no encontrado.' };
+}
+
 /** Devuelve todos los maestros en una sola llamada para optimizar carga */
 function getMaestros() {
   const cacheKey = 'maestros_all_v3';
@@ -758,7 +837,7 @@ function saveTermo(data) {
   insertRowAtTop(getSheet(SHEETS.TERMO), [
     formatFechaDDMMYYYY(f),
     f.dia, f.mes, f.anio,
-    data.responsable.toUpperCase().substring(0, 3),
+    resolveNombreResponsable(data.responsable),
     temp,
     hum,
     turno,
@@ -1014,7 +1093,7 @@ function updateCentrifuga(data) {
   sheet.getRange(targetRow, 1, 1, 8).setValues([[
     formatFechaDDMMYYYY(f), f.dia, f.mes, f.anio,
     data.centrifuga,
-    data.responsable.toUpperCase().substring(0, 3),
+    resolveNombreResponsable(data.responsable),
     data.tipo_mantencion || 'Diaria',
     data.observaciones || ''
   ]]);
@@ -1050,7 +1129,7 @@ function updateMeson(data) {
   sheet.getRange(targetRow, 1, 1, 7).setValues([[
     formatFechaDDMMYYYY(f), f.dia, f.mes, f.anio,
     data.sala,
-    data.responsable.toUpperCase().substring(0, 3),
+    resolveNombreResponsable(data.responsable),
     data.observaciones || ''
   ]]);
   clearSheetCache('mesones', f.mes, f.anio);
@@ -1085,7 +1164,7 @@ function updateRefriTemp(data) {
   const f = parseFecha(data.fecha);
   sheet.getRange(targetRow, 1, 1, 11).setValues([[
     formatFechaDDMMYYYY(f), f.dia, f.mes, f.anio,
-    data.responsable.toUpperCase().substring(0, 3),
+    resolveNombreResponsable(data.responsable),
     parseFloat(data.temperatura),
     data.turno || 'Mañana',
     data.equipo,
@@ -1126,7 +1205,7 @@ function updateLimpRefri(data) {
     formatFechaDDMMYYYY(f), f.dia, f.mes, f.anio,
     data.tipo_mantencion || 'Semanal (externa)',
     data.equipo,
-    data.responsable.toUpperCase().substring(0, 3),
+    resolveNombreResponsable(data.responsable),
     data.observaciones || ''
   ]]);
   clearSheetCache('limpiezaRefri', f.mes, f.anio);
@@ -1161,7 +1240,7 @@ function updateConductividad(data) {
   const f = parseFecha(data.fecha);
   sheet.getRange(targetRow, 1, 1, 8).setValues([[
     formatFechaDDMMYYYY(f), f.dia, f.mes, f.anio,
-    data.responsable.toUpperCase().substring(0, 3),
+    resolveNombreResponsable(data.responsable),
     parseFloat(data.conductividad),
     data.turno || 'Mañana',
     data.observaciones || ''
@@ -1198,7 +1277,7 @@ function updateCobas(data) {
   sheet.getRange(targetRow, 1, 1, 9).setValues([[
     formatFechaDDMMYYYY(f), f.dia, f.mes, f.anio,
     data.equipo,
-    data.responsable.toUpperCase().substring(0, 3),
+    resolveNombreResponsable(data.responsable),
     data.frecuencia || '',
     data.actividad || '',
     data.observaciones || ''
@@ -1273,7 +1352,7 @@ function updateTermo(data) {
   sheet.getRange(targetRow, 1, 1, 11).setValues([[
     formatFechaDDMMYYYY(f),
     f.dia, f.mes, f.anio,
-    data.responsable.toUpperCase().substring(0, 3),
+    resolveNombreResponsable(data.responsable),
     temp,
     hum,
     turno,
@@ -1331,7 +1410,7 @@ function saveCentrifuga(data) {
     insertRowAtTop(sheet, [
       formatFechaDDMMYYYY(f), f.dia, f.mes, f.anio,
       cent,
-      data.responsable.toUpperCase().substring(0, 3),
+      resolveNombreResponsable(data.responsable),
       data.tipo_mantencion || 'Diaria',
       data.observaciones || '',
       ts,
@@ -1361,7 +1440,7 @@ function saveMesones(data) {
     insertRowAtTop(sheet, [
       formatFechaDDMMYYYY(f), f.dia, f.mes, f.anio,
       sala,
-      data.responsable.toUpperCase().substring(0, 3),
+      resolveNombreResponsable(data.responsable),
       data.observaciones || '',
       ts,
       '',  // Revisado_Por
@@ -1394,10 +1473,12 @@ function saveRefriTemp(data) {
   const tipo = equipo ? equipo.tipo : 'Refrigerador';
   const tempOOR = temp < tempMin || temp > tempMax;
 
+  const nombreResp = resolveNombreResponsable(data.responsable);
+
   insertRowAtTop(getSheet(SHEETS.REFRI_REG), [
     formatFechaDDMMYYYY(f),
     f.dia, f.mes, f.anio,
-    data.responsable.toUpperCase().substring(0, 3),
+    nombreResp,
     temp,
     turno,
     data.equipo,
@@ -1416,7 +1497,7 @@ function saveRefriTemp(data) {
       sendAlertaRefriTemp({
         equipo: data.equipo, tipo: tipo, turno: turno,
         temperatura: temp, tempMin: tempMin, tempMax: tempMax,
-        responsable: data.responsable.toUpperCase().substring(0, 3),
+        responsable: nombreResp,
         accion_correctiva: accion, fecha: formatFechaDDMMYYYY(f)
       });
     } catch (emailErr) {
@@ -1446,7 +1527,7 @@ function saveLimpiezaRefri(data) {
       formatFechaDDMMYYYY(f), f.dia, f.mes, f.anio,
       data.tipo_mantencion,
       eq,
-      data.responsable.toUpperCase().substring(0, 3),
+      resolveNombreResponsable(data.responsable),
       data.observaciones || '',
       ts,
       '',  // Revisado_Por
@@ -1470,10 +1551,12 @@ function saveConductividad(data) {
   const turno = ampm === 'AM' ? 'Mañana' : 'Tarde';
   const cond = parseFloat(data.conductividad);
 
+  const nombreResp = resolveNombreResponsable(data.responsable);
+
   insertRowAtTop(getSheet(SHEETS.CONDUCT_REG), [
     formatFechaDDMMYYYY(f),
     f.dia, f.mes, f.anio,
-    data.responsable.toUpperCase().substring(0, 3),
+    nombreResp,
     cond,
     turno,
     data.observaciones || '',
@@ -1489,7 +1572,7 @@ function saveConductividad(data) {
     try {
       sendAlertaConductividad({
         conductividad: cond, turno: turno,
-        responsable: data.responsable.toUpperCase().substring(0, 3),
+        responsable: nombreResp,
         fecha: formatFechaDDMMYYYY(f),
         critico: cond > 0.8
       });
@@ -1516,7 +1599,7 @@ function saveCobas(data) {
     insertRowAtTop(sheet, [
       formatFechaDDMMYYYY(f), f.dia, f.mes, f.anio,
       data.equipo,
-      data.responsable.toUpperCase().substring(0, 3),
+      resolveNombreResponsable(data.responsable),
       act.frecuencia,
       act.nombre,
       data.observaciones || '',
@@ -1651,7 +1734,7 @@ function marcarRevisado(data) {
   if (registros.length === 0) {
     return { success: false, error: 'Seleccione al menos un registro para revisar.' };
   }
-  const revisor = (data.revisor || 'REV').toUpperCase().substring(0, 3);
+  const revisor = resolveNombreResponsable(data.revisor || 'REV');
   const mes  = parseInt(data.mes);
   const anio = parseInt(data.anio);
   const sheet = getSheet(SHEETS.REVISIONES);
@@ -2938,7 +3021,7 @@ function saveEtiquetadoraRegistro(data) {
     nombrePractico,
     data.accion,
     data.descripcion,
-    data.responsable.toUpperCase().substring(0, 3),
+    resolveNombreResponsable(data.responsable),
     ts
   ]);
   
@@ -2984,7 +3067,7 @@ function updateEtiquetadoraMaestro(data) {
       newPractico,
       'Cambio de ubicación',
       'Se cambia la ubicación y el nombre práctico de la etiquetadora',
-      data.responsable.toUpperCase().substring(0, 3),
+      resolveNombreResponsable(data.responsable),
       ts
     ]);
     
@@ -3256,7 +3339,7 @@ function saveDxH900Registro(data) {
   
   insertRowAtTop(getSheet(SHEETS.DXH900_REG), [
     formatFechaDDMMYYYY(f), f.dia, f.mes, f.anio,
-    data.usuario_responsable,
+    resolveNombreResponsable(data.usuario_responsable),
     data.descripcion,
     data.especialista,
     ts
@@ -3303,10 +3386,7 @@ function saveElimMuestras(data) {
   if (!data.responsable || !data.fecha || !data.muestras_eliminadas) {
     return { success: false, error: 'Faltan campos obligatorios.' };
   }
-  const resp = String(data.responsable).toUpperCase().trim().substring(0, 3);
-  if (!/^[A-Z]{3}$/.test(resp)) {
-    return { success: false, error: 'El responsable debe constar de 3 siglas alfabéticas.' };
-  }
+  const resp = resolveNombreResponsable(data.responsable);
   const errFuture = validarFechaNoFutura(data.fecha);
   if (errFuture) return { success: false, error: errFuture };
   const f = parseFecha(data.fecha);

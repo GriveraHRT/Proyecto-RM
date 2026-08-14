@@ -2,7 +2,7 @@ if (typeof API_URL === 'undefined') {
   var API_URL = 'https://script.google.com/macros/s/AKfycbxuqcui0-hjJ721uMWZk3w-4l2fVCaBWQgdMJqVMb5Pno339Jqetq4r62p3-1gGBUvFOg/exec';
 }
 const PREANALISIS=[1,2,3,4,5,18,19];
-const state={areas:[],centrifugas:[],salas:[],acciones:[],refrigeradores:[],refriLimpieza:[],cobasObs:[],ampm:'AM',ampmRefri:'AM',ampmConduct:'AM',qrInstance:null,qrTab:'areas',dashMes:new Date().getMonth()+1,dashAnio:new Date().getFullYear(),dashTab:'diario',dashData:null,dashMaestros:null,dashCache:null,maestrosPromise:null,modulosActivos:null,serverTimeOffset:0};
+const state={areas:[],centrifugas:[],salas:[],acciones:[],refrigeradores:[],refriLimpieza:[],personal:[],cobasObs:[],ampm:'AM',ampmRefri:'AM',ampmConduct:'AM',qrInstance:null,qrTab:'areas',dashMes:new Date().getMonth()+1,dashAnio:new Date().getFullYear(),dashTab:'diario',dashData:null,dashMaestros:null,dashCache:null,maestrosPromise:null,modulosActivos:null,serverTimeOffset:0};
 
 function getServerNow() {
   return new Date(Date.now() + (state.serverTimeOffset || 0));
@@ -286,6 +286,7 @@ async function loadMaestros(){
     state.refrigeradores=data.refrigeradores||[];
     state.refriLimpieza=data.refriLimpieza||[];
     state.etiquetadoras=data.etiquetadoras||[];
+    state.personal=data.personal||[];
     if(data.modulosActivos){state.modulosActivos=data.modulosActivos}
     applyModulosVisibilidad();
     state.dashMaestros = data;
@@ -321,6 +322,7 @@ async function loadMaestros(){
       populateDatalist('list-et-bitacora-desc', data.sugerencias.etBitacoraDesc || []);
       populateDatalist('list-cobas-obs', data.sugerencias.cobasObs || []);
     }
+    setTimeout(bindResponsableLiveFeedback, 100);
   }catch(e){
     console.warn('Error cargando maestros de la API, cargando datos locales de prueba...', e);
     showToast('⚠️ Usando datos de prueba locales (Modo Offline/Pruebas)','info');
@@ -396,6 +398,142 @@ function toggleChip(el){el.classList.toggle('selected');const parentId=el.parent
 function centNum(name){const m=name.match(/(\d+)/);return m?parseInt(m[1]):0}
 function getSelectedChips(id){return Array.from(document.querySelectorAll(`#${id} .chip-item.selected`)).map(i=>i.dataset.value)}
 function toggleGrupoPreanalisis(){const btn=document.getElementById('btn-grupo-preanalisis');const active=btn.classList.toggle('active');const chips=document.querySelectorAll('#cent-chips .chip-item');chips.forEach(c=>{const v=c.dataset.value;const num=centNum(v);const isP=PREANALISIS.includes(num);if(isP){if(active){c.classList.add('selected')}else{c.classList.remove('selected')}}});if(typeof checkDuplicateCentrifugas==='function')checkDuplicateCentrifugas();}
+
+// ── Personal & Responsables Helpers ───────────────────────────
+function getNombreResponsable(rawVal) {
+  if (!rawVal) return '';
+  const trimmed = String(rawVal).trim();
+  const upper = trimmed.toUpperCase();
+  if (!state.personal || !state.personal.length) return trimmed;
+  const match = state.personal.find(p => p.iniciales === upper && p.activo !== 'NO');
+  return match && match.nombre ? match.nombre : trimmed;
+}
+
+function updateResponsableFeedback(inputEl) {
+  if (!inputEl) return;
+  const val = inputEl.value.trim().toUpperCase();
+  let feedbackEl = inputEl.parentElement.querySelector('.resp-feedback');
+  if (!feedbackEl) {
+    feedbackEl = document.createElement('div');
+    feedbackEl.className = 'resp-feedback';
+    inputEl.parentElement.appendChild(feedbackEl);
+  }
+  if (!val) {
+    feedbackEl.textContent = '';
+    feedbackEl.className = 'resp-feedback';
+    return;
+  }
+  const match = (state.personal || []).find(p => p.iniciales === val && p.activo !== 'NO');
+  if (match && match.nombre) {
+    feedbackEl.className = 'resp-feedback found';
+    feedbackEl.textContent = '✓ ' + match.nombre + (match.estamento ? ' (' + match.estamento + ')' : '');
+  } else if (val.length >= 2) {
+    feedbackEl.className = 'resp-feedback unknown';
+    feedbackEl.textContent = '👤 Inicial nueva (se registrará al guardar)';
+  } else {
+    feedbackEl.textContent = '';
+    feedbackEl.className = 'resp-feedback';
+  }
+}
+
+function bindResponsableLiveFeedback() {
+  const inputs = document.querySelectorAll('input[id$="-resp"], input[id$="-responsable"], #elim-responsable, #rev-admin-revisor, #edit-termo-resp, #edit-cent-resp, #edit-meson-resp, #edit-refri-resp, #edit-limp-refri-resp, #edit-conduct-resp, #edit-cobas-resp');
+  inputs.forEach(inp => {
+    if (!inp._respBound) {
+      inp._respBound = true;
+      inp.addEventListener('input', () => updateResponsableFeedback(inp));
+      inp.addEventListener('focus', () => updateResponsableFeedback(inp));
+    }
+  });
+}
+
+let nuevoPersonalPromiseResolver = null;
+
+async function ensureResponsableRegistered(rawInitials) {
+  if (!rawInitials) return true;
+  const val = String(rawInitials).trim().toUpperCase();
+  if (!val) return true;
+
+  // Si ya contiene espacios o más de 4 letras, asumir que ya es nombre completo
+  if (val.includes(' ') || val.length > 4) return true;
+
+  const match = (state.personal || []).find(p => p.iniciales === val && p.activo !== 'NO');
+  if (match && match.nombre) {
+    return true; // Ya registrado en maestro
+  }
+
+  // Desplegar modal para ingresar nombre
+  return new Promise((resolve) => {
+    nuevoPersonalPromiseResolver = resolve;
+    const modal = document.getElementById('modal-nuevo-personal');
+    const initInput = document.getElementById('nuevo-personal-iniciales');
+    const nameInput = document.getElementById('nuevo-personal-nombre');
+    if (initInput) initInput.value = val;
+    if (nameInput) {
+      nameInput.value = '';
+      setTimeout(() => nameInput.focus(), 150);
+    }
+    if (modal) modal.style.display = 'flex';
+  });
+}
+
+function cerrarModalNuevoPersonal() {
+  const modal = document.getElementById('modal-nuevo-personal');
+  if (modal) modal.style.display = 'none';
+  if (nuevoPersonalPromiseResolver) {
+    nuevoPersonalPromiseResolver(false);
+    nuevoPersonalPromiseResolver = null;
+  }
+}
+
+async function handleGuardarNuevoPersonal(e) {
+  if (e) e.preventDefault();
+  const iniciales = document.getElementById('nuevo-personal-iniciales').value.trim().toUpperCase();
+  const nombre = document.getElementById('nuevo-personal-nombre').value.trim().toUpperCase();
+  const estamento = document.getElementById('nuevo-personal-estamento').value;
+
+  if (!nombre) {
+    showToast('Ingrese su nombre completo', 'warning');
+    return;
+  }
+
+  const btn = document.getElementById('btn-guardar-nuevo-personal');
+  if (btn) btn.disabled = true;
+
+  try {
+    const res = await apiPost({
+      action: 'savePersonal',
+      iniciales: iniciales,
+      nombre: nombre,
+      estamento: estamento,
+      activo: 'SI'
+    });
+
+    if (res && res.success) {
+      showToast(`✓ Funcionario ${nombre} registrado exitosamente`, 'success');
+      if (res.personal) {
+        state.personal = res.personal;
+      } else {
+        state.personal.push({ iniciales, nombre, estamento, activo: 'SI' });
+      }
+      document.querySelectorAll('input[id$="-resp"], input[id$="-responsable"], #elim-responsable').forEach(inp => {
+        if (inp.value.trim().toUpperCase() === iniciales) updateResponsableFeedback(inp);
+      });
+      const modal = document.getElementById('modal-nuevo-personal');
+      if (modal) modal.style.display = 'none';
+      if (nuevoPersonalPromiseResolver) {
+        nuevoPersonalPromiseResolver(true);
+        nuevoPersonalPromiseResolver = null;
+      }
+    } else {
+      showToast(res.error || 'Error al registrar funcionario', 'error');
+    }
+  } catch (err) {
+    showToast('Error de conexión: ' + err.toString(), 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
 
 // URL params
 function checkUrlParams(){

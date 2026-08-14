@@ -1626,3 +1626,31 @@ body {
   color: #ffffff;
 }
 
+.resp-feedback {
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-top: 5px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 18px;
+  transition: all 0.2s ease;
+}
+
+.resp-feedback.found {
+  color: #10b981;
+}
+
+[data-theme="dark"] .resp-feedback.found {
+  color: #34d399;
+}
+
+.resp-feedback.unknown {
+  color: #d97706;
+}
+
+[data-theme="dark"] .resp-feedback.unknown {
+  color: #fbbf24;
+}
+
+

@@ -1241,6 +1241,48 @@
 
 </div>
 
+<!-- Modal Nuevo Funcionario / Responsable -->
+<div id="modal-nuevo-personal" class="modal-backdrop" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(15,23,42,0.7); backdrop-filter:blur(6px); z-index:9999; align-items:center; justify-content:center;">
+  <div class="modal-card" style="max-width:440px; width:92%; background:var(--bg-card, #ffffff); border-radius:16px; padding:24px; box-shadow:0 20px 40px rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); text-align:left;">
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:14px;">
+      <span style="font-size:26px;">👤</span>
+      <div>
+        <h3 style="margin:0; font-size:17px; font-weight:700;">Registrar Nuevo Funcionario</h3>
+        <p style="margin:0; font-size:12px; color:var(--text-dim, #64748b);">Las iniciales ingresadas no están en el maestro</p>
+      </div>
+    </div>
+    <p style="font-size:13px; margin-bottom:14px; color:var(--text-secondary, #475569); line-height:1.4;">
+      Para asociar automáticamente tus registros a tu nombre completo en Google Sheets, por favor ingresa tus datos:
+    </p>
+    <form id="form-nuevo-personal" onsubmit="handleGuardarNuevoPersonal(event)">
+      <div class="form-group" style="margin-bottom:12px;">
+        <label class="form-label" for="nuevo-personal-iniciales">Iniciales</label>
+        <input type="text" id="nuevo-personal-iniciales" class="form-control" readonly style="font-weight:700; letter-spacing:2px; background:rgba(0,0,0,0.04);" />
+      </div>
+      <div class="form-group" style="margin-bottom:12px;">
+        <label class="form-label" for="nuevo-personal-nombre">Nombre Completo *</label>
+        <input type="text" id="nuevo-personal-nombre" class="form-control" placeholder="Ej: JUAN PEREZ SOTO" required style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()" />
+      </div>
+      <div class="form-group" style="margin-bottom:18px;">
+        <label class="form-label" for="nuevo-personal-estamento">Estamento *</label>
+        <select id="nuevo-personal-estamento" class="form-control" required>
+          <option value="TENS">TENS</option>
+          <option value="Tecnólogo Médico">Tecnólogo Médico</option>
+          <option value="Bioquímico">Bioquímico</option>
+          <option value="Químico Farmacéutico">Químico Farmacéutico</option>
+          <option value="Auxiliar de Aseo">Auxiliar de Aseo</option>
+          <option value="Administrativo">Administrativo</option>
+          <option value="Otro">Otro</option>
+        </select>
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:10px;">
+        <button type="button" class="btn btn-secondary" onclick="cerrarModalNuevoPersonal()">Cancelar</button>
+        <button type="submit" id="btn-guardar-nuevo-personal" class="btn btn-primary">Registrar y Continuar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- ══ TOAST ════════════════════════════════════════════════ -->
 <div id="toast"></div>
 

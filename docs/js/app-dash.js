@@ -12,6 +12,8 @@ document.getElementById('form-termo').addEventListener('submit',async e=>{
     const confirmed = await showDuplicateConfirmModal(dup);
     if (!confirmed) return;
   }
+  const respVal = document.getElementById('termo-resp').value.trim().toUpperCase();
+  if (!(await ensureResponsableRegistered(respVal))) return;
   const obsVal = document.getElementById('termo-obs').value;
   const issues=isOutOfRange();
   if(issues){const ac=document.getElementById('termo-accion').value;if(!ac){showOutOfRangePopup(issues);return}}
@@ -43,6 +45,8 @@ document.getElementById('form-centrifugas').addEventListener('submit',async e=>{
     const confirmed = await showDuplicateConfirmModal(dup);
     if (!confirmed) return;
   }
+  const respVal = document.getElementById('cent-resp').value.trim().toUpperCase();
+  if (!(await ensureResponsableRegistered(respVal))) return;
   setLoading('btn-cent-submit','spinner-cent','btn-cent-text',true);
   try{
     const r=await apiPost({action:'saveCentrifuga',fecha:document.getElementById('cent-fecha').value,centrifugas:sel,responsable:document.getElementById('cent-resp').value,tipo_mantencion:document.getElementById('cent-tipo').value,observaciones:obsVal});
@@ -71,6 +75,8 @@ document.getElementById('form-mesones').addEventListener('submit',async e=>{
     const confirmed = await showDuplicateConfirmModal(dup);
     if (!confirmed) return;
   }
+  const respVal = document.getElementById('meson-resp').value.trim().toUpperCase();
+  if (!(await ensureResponsableRegistered(respVal))) return;
   setLoading('btn-meson-submit','spinner-meson','btn-meson-text',true);
   try{
     const r=await apiPost({action:'saveMesones',fecha:document.getElementById('meson-fecha').value,salas:sel,responsable:document.getElementById('meson-resp').value,observaciones:obsVal});
@@ -95,6 +101,8 @@ document.getElementById('form-refri-temp').addEventListener('submit',async e=>{
     showToast('⚠️ No es posible registrar el turno PM antes de las 12:00 hrs del día de hoy.', 'error');
     return;
   }
+  const respVal = document.getElementById('refri-resp').value.trim().toUpperCase();
+  if (!(await ensureResponsableRegistered(respVal))) return;
   const obsVal = document.getElementById('refri-obs').value;
   const issues=isOutOfRangeRefri();
   if(issues){const ac=document.getElementById('refri-accion').value;if(!ac){showOutOfRangePopup(issues);return}}
@@ -115,6 +123,8 @@ document.getElementById('form-limp-refri').addEventListener('submit',async e=>{
   const obsVal=document.getElementById('limp-refri-obs').value;
   const sel=getSelectedChips('limp-refri-chips');
   if(!sel.length){showToast('Seleccione al menos un equipo','error');return}
+  const respVal = document.getElementById('limp-refri-resp').value.trim().toUpperCase();
+  if (!(await ensureResponsableRegistered(respVal))) return;
   setLoading('btn-limp-refri-submit','spinner-limp-refri','btn-limp-refri-text',true);
   try{
     const r=await apiPost({action:'saveLimpiezaRefri',fecha:document.getElementById('limp-refri-fecha').value,equipos:sel,responsable:document.getElementById('limp-refri-resp').value,tipo_mantencion:document.getElementById('limp-refri-tipo').value,observaciones:obsVal});
@@ -133,6 +143,8 @@ document.getElementById('form-conductividad').addEventListener('submit',async e=
     showToast('⚠️ No es posible registrar el turno PM antes de las 12:00 hrs del día de hoy.', 'error');
     return;
   }
+  const respVal = document.getElementById('conduct-resp').value.trim().toUpperCase();
+  if (!(await ensureResponsableRegistered(respVal))) return;
   const obsVal = document.getElementById('conduct-obs').value;
   setLoading('btn-conduct-submit','spinner-conduct','btn-conduct-text',true);
   try{
@@ -264,10 +276,11 @@ if (formCobas) {
     const obsVal = document.getElementById('cobas-obs').value;
     const respVal = document.getElementById('cobas-resp').value.trim().toUpperCase();
     
-    if (respVal.length !== 3) {
-      showToast('Responsable debe tener exactamente 3 letras.', 'error');
+    if (!respVal) {
+      showToast('Responsable es obligatorio.', 'error');
       return;
     }
+    if (!(await ensureResponsableRegistered(respVal))) return;
     
     const sel = getSelectedCobasTasks();
     if (!sel.length) {
@@ -606,13 +619,13 @@ function renderTables(reg){
   const c=document.getElementById('dash-tables');
   if(!c||!reg) return;
   let html='';
-  if(isModuloActivo('termo'))html+=renderTableCard('🌡️ Temp. Ambiental',reg.termo||[],['Día','Turno','Área','Temp°','Hum%','Resp','Acción','Obs'],r=>[r.dia,r.turno,r.area,r.temperatura,r.humedad,r.responsable,r.accion_correctiva||'',r.observaciones]);
-  if(isModuloActivo('centrifugas'))html+=renderTableCard('⚙️ Centrífugas',reg.centrifugas||[],['Día','Centrífuga','Resp','Tipo','Obs'],r=>[r.dia,r.centrifuga,r.responsable,r.tipo_mantencion,r.observaciones]);
-  if(isModuloActivo('mesones'))html+=renderTableCard('🧽 Mesones',reg.mesones||[],['Día','Sala','Resp','Obs'],r=>[r.dia,r.sala,r.responsable,r.observaciones]);
-  if(isModuloActivo('refri-temp'))html+=renderTableCard('🧊 Temp. Refrigeradores',reg.refriTemp||[],['Día','Turno','Equipo','Temp°','Resp','Obs'],r=>[r.dia,r.turno,r.equipo,r.temperatura,r.responsable,r.observaciones]);
-  if(isModuloActivo('limp-refri'))html+=renderTableCard('🧹 Limpieza Refrigeradores',reg.limpiezaRefri||[],['Día','Tipo','Equipo','Resp','Obs'],r=>[r.dia,r.tipo_mantencion,r.equipo,r.responsable,r.observaciones]);
-  if(isModuloActivo('conductividad'))html+=renderTableCard('💧 Conductividad',reg.conductividad||[],['Día','Turno','µS/cm','Resp','Obs'],r=>[r.dia,r.turno,r.conductividad,r.responsable,r.observaciones]);
-  if(isModuloActivo('cobas'))html+=renderTableCard('🔬 Mantención Cobas',reg.cobas||[],['Día','Equipo','Resp','Frecuencia','Actividad','Obs'],r=>[r.dia,r.equipo,r.responsable,r.frecuencia,r.actividad,r.observaciones||'']);
+  if(isModuloActivo('termo'))html+=renderTableCard('🌡️ Temp. Ambiental',reg.termo||[],['Día','Turno','Área','Temp°','Hum%','Resp','Acción','Obs'],r=>[r.dia,r.turno,r.area,r.temperatura,r.humedad,getNombreResponsable(r.responsable),r.accion_correctiva||'',r.observaciones]);
+  if(isModuloActivo('centrifugas'))html+=renderTableCard('⚙️ Centrífugas',reg.centrifugas||[],['Día','Centrífuga','Resp','Tipo','Obs'],r=>[r.dia,r.centrifuga,getNombreResponsable(r.responsable),r.tipo_mantencion,r.observaciones]);
+  if(isModuloActivo('mesones'))html+=renderTableCard('🧽 Mesones',reg.mesones||[],['Día','Sala','Resp','Obs'],r=>[r.dia,r.sala,getNombreResponsable(r.responsable),r.observaciones]);
+  if(isModuloActivo('refri-temp'))html+=renderTableCard('🧊 Temp. Refrigeradores',reg.refriTemp||[],['Día','Turno','Equipo','Temp°','Resp','Obs'],r=>[r.dia,r.turno,r.equipo,r.temperatura,getNombreResponsable(r.responsable),r.observaciones]);
+  if(isModuloActivo('limp-refri'))html+=renderTableCard('🧹 Limpieza Refrigeradores',reg.limpiezaRefri||[],['Día','Tipo','Equipo','Resp','Obs'],r=>[r.dia,r.tipo_mantencion,r.equipo,getNombreResponsable(r.responsable),r.observaciones]);
+  if(isModuloActivo('conductividad'))html+=renderTableCard('💧 Conductividad',reg.conductividad||[],['Día','Turno','µS/cm','Resp','Obs'],r=>[r.dia,r.turno,r.conductividad,getNombreResponsable(r.responsable),r.observaciones]);
+  if(isModuloActivo('cobas'))html+=renderTableCard('🔬 Mantención Cobas',reg.cobas||[],['Día','Equipo','Resp','Frecuencia','Actividad','Obs'],r=>[r.dia,r.equipo,getNombreResponsable(r.responsable),r.frecuencia,r.actividad,r.observaciones||'']);
   c.innerHTML=html;
 }
 function renderTableCard(title,rows,headers,mapper){if(!rows.length)return`<div class="card card-sm" style="margin-bottom:16px;"><strong>${title}</strong><div style="color:var(--text-dim);font-size:13px;margin-top:8px;">Sin registros en este período.</div></div>`;const thead=`<tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr>`;const tbody=rows.map(r=>`<tr>${mapper(r).map(v=>`<td>${v??''}</td>`).join('')}</tr>`).join('');return`<div class="card" style="margin-bottom:16px;padding:16px 12px;"><strong style="font-family:'Outfit';font-size:15px;">${title}</strong><span style="color:var(--text-dim);font-size:12px;margin-left:8px;">${rows.length} registros</span><div class="records-table-wrap" style="margin-top:12px;"><table class="records-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table></div></div>`}
@@ -664,6 +677,7 @@ async function submitRevisadoAdmin(){
   err.classList.remove('visible');
   if(!registros.length){err.textContent='Seleccione al menos un registro.';err.classList.add('visible');return;}
   if(!revisor||revisor.length<2){err.textContent='Ingrese las iniciales del revisor (mín. 2 caracteres).';err.classList.add('visible');return;}
+  if (!(await ensureResponsableRegistered(revisor))) return;
   if(!pwd){err.textContent='Ingrese la contraseña.';err.classList.add('visible');return;}
   document.getElementById('spinner-rev-admin').classList.add('visible');
   document.getElementById('btn-rev-admin-text').style.display='none';
@@ -1741,10 +1755,11 @@ async function saveEtiquetadoraBitacora(e) {
   const respInput = document.getElementById('et-bitacora-responsable');
   const resp = respInput.value.trim().toUpperCase();
   
-  if (resp.length !== 3) {
-    showToast('Responsable debe tener exactamente 3 letras.', 'error');
+  if (!resp) {
+    showToast('Debe ingresar las iniciales del responsable.', 'error');
     return;
   }
+  if (!(await ensureResponsableRegistered(resp))) return;
   
   const spinner = document.getElementById('spinner-save-et-bitacora');
   const btnText = document.getElementById('btn-save-et-bitacora-text');
@@ -1868,6 +1883,8 @@ async function saveDxH900RegistroForm(e) {
   const respInput = document.getElementById('dxh-usuario');
   const espInput = document.getElementById('dxh-especialista');
   const descInput = document.getElementById('dxh-descripcion');
+  const respVal = respInput.value.trim().toUpperCase();
+  if (!(await ensureResponsableRegistered(respVal))) return;
   
   const spinner = document.getElementById('spinner-dxh');
   const btnText = document.getElementById('btn-dxh-text');
@@ -1982,10 +1999,11 @@ async function saveElimMuestrasForm(e) {
   const fechaInput = document.getElementById('elim-fecha');
   
   const respVal = respInput.value.trim().toUpperCase();
-  if (!/^[A-Z]{3}$/.test(respVal)) {
-    showToast('El responsable debe constar de 3 siglas alfabéticas.', 'error');
+  if (!respVal) {
+    showToast('El responsable es obligatorio.', 'error');
     return;
   }
+  if (!(await ensureResponsableRegistered(respVal))) return;
 
   if (!textInput.value.trim()) {
     showToast('Debe seleccionar una fecha corte de muestras.', 'error');
@@ -2571,7 +2589,8 @@ async function submitEditTermo(e) {
   const areaVal = document.getElementById('edit-termo-area').value;
   const tempVal = document.getElementById('edit-termo-temp').value;
   const humVal = document.getElementById('edit-termo-hum').value;
-  const respVal = document.getElementById('edit-termo-resp').value;
+  const respVal = document.getElementById('edit-termo-resp').value.trim().toUpperCase();
+  if (!(await ensureResponsableRegistered(respVal))) return;
   const accVal = document.getElementById('edit-termo-accion').value;
   const obsVal = document.getElementById('edit-termo-obs').value;
 
@@ -2850,7 +2869,8 @@ async function submitEditCentrifuga(e) {
   const fechaVal = document.getElementById('edit-cent-fecha').value;
   const tipoVal = document.getElementById('edit-cent-tipo').value;
   const centVal = document.getElementById('edit-cent-nombre').value;
-  const respVal = document.getElementById('edit-cent-resp').value;
+  const respVal = document.getElementById('edit-cent-resp').value.trim().toUpperCase();
+  if (!(await ensureResponsableRegistered(respVal))) return;
   const obsVal = document.getElementById('edit-cent-obs').value;
 
   setLoading('btn-edit-cent-submit', 'spinner-edit-cent', 'btn-edit-cent-text', true);
@@ -2980,7 +3000,8 @@ async function submitEditMeson(e) {
   const fechaReg = document.getElementById('edit-meson-fecha-reg').value;
   const fechaVal = document.getElementById('edit-meson-fecha').value;
   const salaVal = document.getElementById('edit-meson-sala').value;
-  const respVal = document.getElementById('edit-meson-resp').value;
+  const respVal = document.getElementById('edit-meson-resp').value.trim().toUpperCase();
+  if (!(await ensureResponsableRegistered(respVal))) return;
   const obsVal = document.getElementById('edit-meson-obs').value;
 
   setLoading('btn-edit-meson-submit', 'spinner-edit-meson', 'btn-edit-meson-text', true);
@@ -3129,7 +3150,8 @@ async function submitEditRefriTemp(e) {
   const equipoVal = document.getElementById('edit-refri-equipo').value;
   const tempVal = document.getElementById('edit-refri-temp-val').value;
   const accVal = document.getElementById('edit-refri-accion').value;
-  const respVal = document.getElementById('edit-refri-resp').value;
+  const respVal = document.getElementById('edit-refri-resp').value.trim().toUpperCase();
+  if (!(await ensureResponsableRegistered(respVal))) return;
   const obsVal = document.getElementById('edit-refri-obs').value;
 
   setLoading('btn-edit-refri-submit', 'spinner-edit-refri', 'btn-edit-refri-text', true);
@@ -3265,7 +3287,8 @@ async function submitEditLimpRefri(e) {
   const fechaVal = document.getElementById('edit-limp-refri-fecha').value;
   const tipoVal = document.getElementById('edit-limp-refri-tipo').value;
   const equipoVal = document.getElementById('edit-limp-refri-equipo').value;
-  const respVal = document.getElementById('edit-limp-refri-resp').value;
+  const respVal = document.getElementById('edit-limp-refri-resp').value.trim().toUpperCase();
+  if (!(await ensureResponsableRegistered(respVal))) return;
   const obsVal = document.getElementById('edit-limp-refri-obs').value;
 
   setLoading('btn-edit-limp-refri-submit', 'spinner-edit-limp-refri', 'btn-edit-limp-refri-text', true);
@@ -3406,7 +3429,8 @@ async function submitEditConductividad(e) {
     return;
   }
   const valVal = document.getElementById('edit-conduct-valor').value;
-  const respVal = document.getElementById('edit-conduct-resp').value;
+  const respVal = document.getElementById('edit-conduct-resp').value.trim().toUpperCase();
+  if (!(await ensureResponsableRegistered(respVal))) return;
   const obsVal = document.getElementById('edit-conduct-obs').value;
 
   setLoading('btn-edit-conduct-submit', 'spinner-edit-conduct', 'btn-edit-conduct-text', true);
@@ -3539,7 +3563,8 @@ async function submitEditCobas(e) {
   const equipoVal = document.getElementById('edit-cobas-equipo').value;
   const freqVal = document.getElementById('edit-cobas-frecuencia').value;
   const actVal = document.getElementById('edit-cobas-actividad').value;
-  const respVal = document.getElementById('edit-cobas-resp').value;
+  const respVal = document.getElementById('edit-cobas-resp').value.trim().toUpperCase();
+  if (!(await ensureResponsableRegistered(respVal))) return;
   const obsVal = document.getElementById('edit-cobas-obs').value;
 
   setLoading('btn-edit-cobas-submit', 'spinner-edit-cobas', 'btn-edit-cobas-text', true);
