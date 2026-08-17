@@ -527,6 +527,7 @@ body {
 .chip-ok      { background: rgba(16,185,129,0.15); color: var(--success); border: 1px solid rgba(16,185,129,0.3); }
 .chip-missing { background: rgba(239,68,68,0.15);  color: var(--danger);  border: 1px solid rgba(239,68,68,0.3); }
 .chip-partial { background: rgba(245,158,11,0.15); color: var(--warning); border: 1px solid rgba(245,158,11,0.3); }
+.chip-na      { background: rgba(100,116,139,0.12); color: #64748b; border: 1px solid rgba(100,116,139,0.28); opacity: 0.65; }
 
 /* ── Records Table ─────────────────────────────────────────── */
 .records-toggle {
@@ -904,6 +905,18 @@ body {
   background: rgba(239,68,68,0.10);
   border-color: rgba(239,68,68,0.3);
   color: var(--danger);
+}
+.day-chip.chip-na {
+  background: rgba(100, 116, 139, 0.12);
+  border-color: rgba(100, 116, 139, 0.28);
+  color: #64748b;
+  opacity: 0.65;
+}
+[data-theme="dark"] .day-chip.chip-na {
+  background: rgba(148, 163, 184, 0.10);
+  border-color: rgba(148, 163, 184, 0.20);
+  color: #94a3b8;
+  opacity: 0.6;
 }
 /* ── Alert text fix ────────────────────────────────────────── */
 .alert-banner p { margin: 0; }
