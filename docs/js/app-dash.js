@@ -430,17 +430,23 @@ function renderDailyView(reg){
   }
 
   if(isModuloActivo('centrifugas')){
-    const centHoy=(reg.centrifugas||[]).filter(r=>parseInt(r.dia)===hoy&&r.tipo_mantencion==='Diaria');
-    html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">⚙️ Centrífugas (Diaria)</div><div class="status-grid">';
+    const centHoy=(reg.centrifugas||[]).filter(r=>parseInt(r.dia)===hoy&&(r.tipo_mantencion==='Diaria'||r.tipo_mantencion==='Semanal'));
+    html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">⚙️ Centrífugas (Diaria / Semanal)</div><div class="status-grid">';
     const list = m.centrifugasDetailed || (m.centrifugas||[]).map(c=>({nombre:c, horarioTurno:'si'}));
     list.forEach(item=>{
       const c = item.nombre;
       const isNoHabit = !isHabit && item.horarioTurno === 'no';
-      const done = centHoy.some(r=>r.centrifuga===c);
+      const regFound = centHoy.find(r=>r.centrifuga===c);
+      const done = !!regFound;
+      const isSemanal = regFound && regFound.tipo_mantencion === 'Semanal';
       if (isNoHabit && !done) {
         html+=`<div class="status-item opt" style="opacity:0.55;" title="No exigido en días no hábiles"><span class="status-dot gray" style="background:#64748b;"></span>${c.replace('Centrífuga ','C')} (N/A)</div>`;
       } else {
-        html+=`<div class="status-item ${done?'done':'miss'}"><span class="status-dot ${done?'green':'red'}"></span>${c.replace('Centrífuga ','C')}</div>`;
+        const shortName = c.replace('Centrífuga ','C') + (isSemanal ? ' (Sem)' : '');
+        const tooltip = isSemanal 
+          ? `${c}: Mantención Semanal realizada (${getInicialesResponsable(regFound.responsable)})` 
+          : (done ? `${c}: Mantención Diaria realizada (${getInicialesResponsable(regFound.responsable)})` : `${c}: Pendiente`);
+        html+=`<div class="status-item ${done?'done':'miss'}" title="${tooltip}"><span class="status-dot ${done?'green':'red'}"></span>${shortName}</div>`;
       }
     });
     html+='</div></div>';
@@ -551,19 +557,29 @@ function renderMonthlyView(reg){
     list.forEach(item => {
       const c = item.nombre;
       const esSoloHabil = (item.horarioTurno || '').toString().trim().toLowerCase() === 'no';
-      const diasDone = new Set((reg.centrifugas||[]).filter(r=>r.centrifuga===c&&r.tipo_mantencion==='Diaria').map(r=>parseInt(r.dia)));
+      const mantPorDia = {};
+      (reg.centrifugas||[]).filter(r=>r.centrifuga===c).forEach(r => {
+        const d = parseInt(r.dia);
+        if (!mantPorDia[d] || r.tipo_mantencion === 'Semanal') {
+          mantPorDia[d] = r;
+        }
+      });
       let miss=0;
       let chips='';
       for(let d=1; d<=dh; d++){
-        const ok = diasDone.has(d);
+        const rObj = mantPorDia[d];
         const isNonWorking = esSoloHabil && isNonWorkingDay(d, state.dashMes, state.dashAnio, diasNoHabilesSet);
-        if (ok) {
-          chips += `<span class="day-chip chip-ok">${d}</span>`;
+        if (rObj && rObj.tipo_mantencion === 'Semanal') {
+          const resp = getInicialesResponsable(rObj.responsable);
+          chips += `<span class="day-chip chip-ok chip-semanal" title="Día ${d}: Mantención Semanal (${resp})">${d}<span class="chip-badge-s">S</span></span>`;
+        } else if (rObj && rObj.tipo_mantencion === 'Diaria') {
+          const resp = getInicialesResponsable(rObj.responsable);
+          chips += `<span class="day-chip chip-ok" title="Día ${d}: Mantención Diaria (${resp})">${d}</span>`;
         } else if (isNonWorking) {
           chips += `<span class="day-chip chip-na" title="Día no hábil / No exigido">${d}</span>`;
         } else {
           miss++;
-          chips += `<span class="day-chip chip-missing">${d}</span>`;
+          chips += `<span class="day-chip chip-missing" title="Día ${d}: Sin registro">${d}</span>`;
         }
       }
       html+=`<div style="font-size:12px;font-weight:600;margin:8px 0 4px;">${c} ${esSoloHabil ? '<span style="font-weight:normal; font-size:11px; color:var(--text-dim);">(Solo días hábiles)</span>' : ''} ${miss?'('+miss+' faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`;
@@ -2259,7 +2275,7 @@ async function checkDuplicateCentrifugas() {
   const tipoVal = document.getElementById('cent-tipo') ? document.getElementById('cent-tipo').value : 'Diaria';
   const selChips = getSelectedChips('cent-chips');
 
-  if (tipoVal !== 'Diaria' || !selChips.length || !fechaVal) {
+  if (!selChips.length || !fechaVal) {
     alertEl.classList.remove('visible');
     alertEl.style.display = 'none';
     alertEl.innerHTML = '';
@@ -2284,20 +2300,24 @@ async function checkDuplicateCentrifugas() {
       parseInt(r.dia) === dia &&
       parseInt(r.mes) === mes &&
       parseInt(r.anio) === anio &&
-      String(r.tipo_mantencion || '').trim().toLowerCase() === 'diaria' &&
-      String(r.centrifuga || '').trim().toLowerCase() === String(chipName || '').trim().toLowerCase()
+      String(r.centrifuga || '').trim().toLowerCase() === String(chipName || '').trim().toLowerCase() &&
+      (r.tipo_mantencion === 'Diaria' || r.tipo_mantencion === 'Semanal')
     );
     if (found) {
-      duplicates.push({ name: chipName, resp: found.responsable || 'Desconocido' });
+      duplicates.push({ 
+        name: chipName, 
+        resp: found.responsable || 'Desconocido',
+        tipo: found.tipo_mantencion || 'Diaria'
+      });
     }
   });
 
   if (duplicates.length > 0) {
     const fechaFmt = `${String(dia).padStart(2,'0')}/${String(mes).padStart(2,'0')}/${anio}`;
-    const dupListStr = duplicates.map(d => `<strong>${d.name}</strong> (por <strong>"${d.resp}"</strong>)`).join(', ');
+    const dupListStr = duplicates.map(d => `<strong>${d.name}</strong> [${d.tipo}] (por <strong>"${d.resp}"</strong>)`).join(', ');
     const cant = duplicates.length;
 
-    const htmlMsg = `⚠️ <strong>Aviso de Duplicidad:</strong> Se detectó mantención diaria del <strong>${fechaFmt}</strong> previa: ${dupListStr}.<br>¿Está seguro que desea continuar?`;
+    const htmlMsg = `⚠️ <strong>Aviso de Duplicidad:</strong> Se detectó registro previo del <strong>${fechaFmt}</strong>: ${dupListStr}.<br>¿Está seguro que desea continuar?`;
     alertEl.innerHTML = htmlMsg;
     alertEl.classList.add('visible');
     alertEl.style.display = 'block';
@@ -2307,7 +2327,7 @@ async function checkDuplicateCentrifugas() {
       cleanMessage: cant > 1 
         ? `Se detectaron registros de mantención previa para la fecha <strong>${fechaFmt}</strong>:` 
         : `Se detectó un registro de mantención previa para la fecha <strong>${fechaFmt}</strong>:`,
-      message: `Ya existe registro de mantención diaria para el día ${fechaFmt}.`
+      message: `Ya existe registro de mantención para el día ${fechaFmt}.`
     };
   } else {
     alertEl.classList.remove('visible');

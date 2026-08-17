@@ -874,6 +874,32 @@ body {
   border-color: rgba(16,185,129,0.4);
   color: var(--success);
 }
+.day-chip.chip-semanal {
+  position: relative;
+  background: rgba(16,185,129,0.20);
+  border-color: rgba(16,185,129,0.6);
+  color: var(--success);
+  font-weight: 700;
+}
+.day-chip.chip-semanal .chip-badge-s {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #10b981;
+  color: #ffffff;
+  font-size: 8px;
+  font-weight: 900;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.35);
+  border: 1.5px solid var(--bg-card, #1e293b);
+  pointer-events: none;
+}
 .day-chip.chip-missing {
   background: rgba(239,68,68,0.10);
   border-color: rgba(239,68,68,0.3);

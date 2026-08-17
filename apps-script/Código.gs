@@ -2404,11 +2404,11 @@ function triggerDatosNoRellenados(e) {
     centrifugasDetailed.forEach(item => {
       if (!esHab && item.horarioTurno === 'no') return;
       const c = item.nombre;
-      const existe = reg.centrifugas.some(r => parseInt(r.dia) === dia && r.centrifuga === c && r.tipo_mantencion === 'Diaria');
+      const existe = reg.centrifugas.some(r => parseInt(r.dia) === dia && r.centrifuga === c && (r.tipo_mantencion === 'Diaria' || r.tipo_mantencion === 'Semanal'));
       if (!existe) centFaltantes.push(c);
     });
     if (centFaltantes.length > 0) {
-      missingByRegister['centrifugas'] = { name: '⚙️ Centrífugas (Diaria)', items: centFaltantes, notif: activeForHour['centrifugas'] };
+      missingByRegister['centrifugas'] = { name: '⚙️ Centrífugas (Diaria / Semanal)', items: centFaltantes, notif: activeForHour['centrifugas'] };
     }
   }
 
@@ -2588,7 +2588,15 @@ function parseDateFromRow(row) {
 
 // ── Email — Alerta Mantenciones Semanales Vencidas ────────────
 
-function triggerMantencionSemanal(overrideRecipient) {
+function triggerMantencionSemanal(e) {
+  const isStringOverride = typeof e === 'string' && e.trim().length > 0;
+  const overrideRecipient = isStringOverride ? e.trim() : null;
+  const eventObj = isStringOverride ? null : (e || null);
+
+  try {
+    logTriggerExecution('triggerMantencionSemanal_STARTED', eventObj, 'Ejecución iniciada');
+  } catch(errLog) {}
+
   const hoy = new Date();
   const missingByRegister = {};
   
@@ -2599,6 +2607,7 @@ function triggerMantencionSemanal(overrideRecipient) {
       const listCentrifugas = getCentrifugas(); // e.g. ['Centrífuga 1', 'Centrífuga 2', ...]
       const sheetCent = getSheet(SHEETS.CENT_REG);
       const rowsCent = sheetCent ? sheetCent.getDataRange().getValues() : [];
+      const hoyMidnight = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
       
       listCentrifugas.forEach(cName => {
         let ultimaFecha = null;
@@ -2621,8 +2630,9 @@ function triggerMantencionSemanal(overrideRecipient) {
           isOverdue = true;
           statusText = 'Último registro: Nunca (sin registros desde 01/08/2026)';
         } else {
-          const diffMs = hoy.getTime() - ultimaFecha.getTime();
-          const diffDias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+          const uMidnight = new Date(ultimaFecha.getFullYear(), ultimaFecha.getMonth(), ultimaFecha.getDate());
+          const diffMs = hoyMidnight.getTime() - uMidnight.getTime();
+          const diffDias = Math.round(diffMs / (1000 * 60 * 60 * 24));
           if (diffDias > 7) {
             isOverdue = true;
             statusText = 'Último registro: ' + formatFechaValue(ultimaFecha) + ' (hace ' + diffDias + ' días)';
@@ -2652,6 +2662,7 @@ function triggerMantencionSemanal(overrideRecipient) {
       const listRefri = getRefriLimpieza(); // e.g. ['R1', 'R2', ...]
       const sheetLimp = getSheet(SHEETS.LIMP_REFRI);
       const rowsLimp = sheetLimp ? sheetLimp.getDataRange().getValues() : [];
+      const hoyMidnight = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
       
       listRefri.forEach(rName => {
         let ultimaFecha = null;
@@ -2674,8 +2685,9 @@ function triggerMantencionSemanal(overrideRecipient) {
           isOverdue = true;
           statusText = 'Último registro: Nunca (sin registros desde 01/08/2026)';
         } else {
-          const diffMs = hoy.getTime() - ultimaFecha.getTime();
-          const diffDias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+          const uMidnight = new Date(ultimaFecha.getFullYear(), ultimaFecha.getMonth(), ultimaFecha.getDate());
+          const diffMs = hoyMidnight.getTime() - uMidnight.getTime();
+          const diffDias = Math.round(diffMs / (1000 * 60 * 60 * 24));
           if (diffDias > 7) {
             isOverdue = true;
             statusText = 'Último registro: ' + formatFechaValue(ultimaFecha) + ' (hace ' + diffDias + ' días)';
@@ -2700,7 +2712,9 @@ function triggerMantencionSemanal(overrideRecipient) {
 
   if (Object.keys(missingByRegister).length === 0) {
     Logger.log('No hay mantenciones semanales vencidas.');
-    return ['No hay mantenciones semanales vencidas.'];
+    const logRes = ['No hay mantenciones semanales vencidas.'];
+    logTriggerExecution('triggerMantencionSemanal', eventObj, logRes);
+    return logRes;
   }
 
   // Enviar correos según los destinatarios de cada clave
@@ -2767,6 +2781,7 @@ function triggerMantencionSemanal(overrideRecipient) {
     Logger.log('Error en triggerAlertaMantencionesCobas: ' + e.toString());
   }
 
+  logTriggerExecution('triggerMantencionSemanal', eventObj, sentLogs);
   return sentLogs;
 }
 
@@ -2938,7 +2953,7 @@ function setupTriggers() {
   };
 
   const hourRecordatorio = 8;
-  const hourMantencion = parseHour('centrifugas', 9);
+  const hourMantencion = 9;
   const hourAlertaTermo = 8;
 
   // Trigger diario para recordatorio de mes anterior (solo actúa el día 1)
