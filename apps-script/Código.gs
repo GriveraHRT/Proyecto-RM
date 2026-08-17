@@ -2953,7 +2953,7 @@ function setupTriggers() {
   };
 
   const hourRecordatorio = 8;
-  const hourMantencion = 9;
+  const hourMantencion = 20;
   const hourAlertaTermo = 8;
 
   // Trigger diario para recordatorio de mes anterior (solo actúa el día 1)
@@ -2964,11 +2964,11 @@ function setupTriggers() {
     .inTimezone('America/Santiago')
     .create();
 
-  // Trigger diario para mantenciones semanales vencidas
+  // Trigger semanal para mantenciones semanales vencidas (Domingo a las 20:00 hrs)
   ScriptApp.newTrigger('triggerMantencionSemanal')
     .timeBased()
+    .onWeekDay(ScriptApp.WeekDay.SUNDAY)
     .atHour(hourMantencion)
-    .everyDays(1)
     .inTimezone('America/Santiago')
     .create();
 
@@ -3007,7 +3007,7 @@ function setupTriggers() {
   });
 
   Logger.log('Triggers configurados correctamente para las horas: ' + configuredHours.join(', '));
-  return 'Triggers configurados: triggerRecordatorioMesAnterior (' + String(hourRecordatorio).padStart(2,'0') + ':00), triggerMantencionSemanal (' + String(hourMantencion).padStart(2,'0') + ':00), triggerDatosNoRellenados (horas: ' + configuredHours.map(h => String(h).padStart(2,'0') + ':00').join(', ') + '), triggerAlertaConsolidadaTermo (' + String(hourAlertaTermo).padStart(2,'0') + ':30)';
+  return 'Triggers configurados: triggerRecordatorioMesAnterior (' + String(hourRecordatorio).padStart(2,'0') + ':00), triggerMantencionSemanal (Domingos ' + String(hourMantencion).padStart(2,'0') + ':00), triggerDatosNoRellenados (horas: ' + configuredHours.map(h => String(h).padStart(2,'0') + ':00').join(', ') + '), triggerAlertaConsolidadaTermo (' + String(hourAlertaTermo).padStart(2,'0') + ':30)';
 }
 
 // ── Inicialización del Spreadsheet ───────────────────────────
