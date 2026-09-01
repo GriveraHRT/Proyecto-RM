@@ -3677,3 +3677,481 @@ async function confirmDeleteCobas(idx) {
     showToast('❌ Error de conexión al eliminar', 'error');
   }
 }
+
+// ── Asistente de Regularización Histórica ────────────────────────
+
+function openAsistenteModal() {
+  const ms = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const mesEl = document.getElementById('asistente-mes');
+  const anioEl = document.getElementById('asistente-anio');
+  
+  if (mesEl && anioEl) {
+    const d = new Date();
+    // Default to previous month
+    d.setDate(1);
+    d.setMonth(d.getMonth() - 1);
+    const defMes = d.getMonth() + 1;
+    const defAnio = d.getFullYear();
+
+    mesEl.innerHTML = ms.map((m, i) => `<option value="${i+1}"${i+1 === defMes ? ' selected' : ''}>${m}</option>`).join('');
+    const curYear = new Date().getFullYear();
+    anioEl.innerHTML = [curYear - 2, curYear - 1, curYear, curYear + 1].map(a => `<option value="${a}"${a === defAnio ? ' selected' : ''}>${a}</option>`).join('');
+  }
+
+  // Pre-fill user if known
+  const respEl = document.getElementById('asistente-resp');
+  if (respEl && !respEl.value) {
+    const lastResp = localStorage.getItem('last_user_initials') || '';
+    if (lastResp) respEl.value = lastResp;
+  }
+
+  const pwdEl = document.getElementById('asistente-pwd');
+  if (pwdEl) pwdEl.value = '';
+
+  const err1 = document.getElementById('asistente-error-step1');
+  if (err1) { err1.style.display = 'none'; err1.textContent = ''; }
+  const err2 = document.getElementById('asistente-error-step2');
+  if (err2) { err2.style.display = 'none'; err2.textContent = ''; }
+
+  document.getElementById('asistente-step-1').style.display = 'block';
+  document.getElementById('asistente-step-2').style.display = 'none';
+  document.getElementById('asistente-step-3').style.display = 'none';
+
+  document.querySelectorAll('.modal-card').forEach(m => m.style.display = 'none');
+  const modalCard = document.getElementById('modal-asistente');
+  if (modalCard) modalCard.style.display = 'block';
+  const overlay = document.getElementById('modal-overlay');
+  if (overlay) overlay.classList.add('active');
+}
+
+function closeAsistenteModal() {
+  const modalCard = document.getElementById('modal-asistente');
+  if (modalCard) modalCard.style.display = 'none';
+  const overlay = document.getElementById('modal-overlay');
+  if (overlay) overlay.classList.remove('active');
+}
+
+function volverPaso1Asistente() {
+  document.getElementById('asistente-step-1').style.display = 'block';
+  document.getElementById('asistente-step-2').style.display = 'none';
+  document.getElementById('asistente-step-3').style.display = 'none';
+}
+
+state._asistenteData = null;
+
+async function ejecutarDiagnosticoAsistente() {
+  const mes = parseInt(document.getElementById('asistente-mes').value, 10);
+  const anio = parseInt(document.getElementById('asistente-anio').value, 10);
+  const resp = (document.getElementById('asistente-resp').value || '').trim().toUpperCase();
+  const pwd = (document.getElementById('asistente-pwd').value || '').trim();
+  const obs = (document.getElementById('asistente-obs').value || '').trim();
+
+  const errEl = document.getElementById('asistente-error-step1');
+  errEl.style.display = 'none';
+  errEl.textContent = '';
+
+  if (!resp || resp.length < 2) {
+    errEl.textContent = 'Ingrese las iniciales del usuario responsable (mín. 2 caracteres).';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (!pwd) {
+    errEl.textContent = 'Ingrese la contraseña de administrador.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  // Ensure user is valid in Personal maestro
+  if (typeof ensureResponsableRegistered === 'function') {
+    const ok = await ensureResponsableRegistered(resp);
+    if (!ok) return;
+  }
+
+  try { localStorage.setItem('last_user_initials', resp); } catch(e){}
+
+  const spin = document.getElementById('spinner-asistente-diag');
+  const btnTxt = document.getElementById('btn-asistente-diag-text');
+  if (spin) spin.style.display = 'inline-block';
+  if (btnTxt) btnTxt.textContent = 'Analizando registros...';
+
+  try {
+    const res = await apiPost({
+      action: 'diagnosticarFaltantesMes',
+      mes: mes,
+      anio: anio,
+      password: pwd
+    });
+
+    if (!res || !res.success) {
+      errEl.textContent = res ? res.error : 'Error de comunicación con el servidor.';
+      errEl.style.display = 'block';
+    } else {
+      state._asistenteData = {
+        diag: res,
+        mes: mes,
+        anio: anio,
+        responsable: resp,
+        password: pwd,
+        observacion: obs
+      };
+      renderDiagnosticoAsistente(res);
+      document.getElementById('asistente-step-1').style.display = 'none';
+      document.getElementById('asistente-step-2').style.display = 'block';
+      document.getElementById('asistente-step-3').style.display = 'none';
+    }
+  } catch (e) {
+    errEl.textContent = 'Error al ejecutar diagnóstico: ' + e.toString();
+    errEl.style.display = 'block';
+  } finally {
+    if (spin) spin.style.display = 'none';
+    if (btnTxt) btnTxt.textContent = '🔍 Diagnosticar Pendientes';
+  }
+}
+
+function renderDiagnosticoAsistente(diag) {
+  const banner = document.getElementById('asistente-diag-banner');
+  const container = document.getElementById('asistente-diag-content');
+  const execBtn = document.getElementById('btn-asistente-ejecutar');
+
+  const ms = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const mesNombre = ms[diag.mes - 1] || diag.mes;
+
+  if (diag.totales.total === 0) {
+    banner.className = 'alert-banner alert-info';
+    banner.innerHTML = `✨ <strong>¡Mes 100% al día!</strong> No se detectaron registros pendientes en <strong>${mesNombre} ${diag.anio}</strong> según las configuraciones activas.`;
+    container.innerHTML = '<div style="text-align:center; padding:24px 12px; color:var(--text-dim); font-size:14px;">Todos los formularios activos cuentan con su registro completo para este período.</div>';
+    if (execBtn) execBtn.style.display = 'none';
+    return;
+  }
+
+  if (execBtn) execBtn.style.display = 'inline-flex';
+  banner.className = 'alert-banner alert-info';
+  banner.innerHTML = `📊 Se detectaron <strong>${diag.totales.total} registros pendientes</strong> en <strong>${mesNombre} ${diag.anio}</strong>. Verifique el detalle a continuación antes de regularizar:`;
+
+  let html = '';
+
+  // 1. Termo
+  if (diag.faltantes.termo && diag.faltantes.termo.length > 0) {
+    const areasCount = {};
+    diag.faltantes.termo.forEach(it => {
+      areasCount[it.area] = (areasCount[it.area] || 0) + 1;
+    });
+    const areasSummary = Object.entries(areasCount).map(([a, count]) => `• <strong>${a}</strong>: ${count} turnos`).join('<br/>');
+
+    html += `
+      <div class="asistente-module-card card card-sm" style="margin-bottom:12px; border:1px solid rgba(255,255,255,0.08);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <label style="display:flex; align-items:center; gap:8px; font-weight:700; font-size:14px; cursor:pointer; margin:0;">
+            <input type="checkbox" id="asistente-check-termo" checked onchange="actualizarTotalAsistente()" style="width:16px; height:16px; cursor:pointer;" />
+            <span>🌡️ Temp. y Humedad Ambiental</span>
+          </label>
+          <span class="badge-pill" style="font-size:12px; background:rgba(0,102,255,0.15); color:var(--primary-color); padding:2px 8px; border-radius:10px;">${diag.faltantes.termo.length} registros</span>
+        </div>
+        <div style="font-size:12px; color:var(--text-dim); line-height:1.4; margin-bottom:8px;">
+          ${areasSummary}
+        </div>
+        <div class="form-row" style="margin-bottom:0; background:rgba(255,255,255,0.03); padding:8px; border-radius:6px;">
+          <div class="form-group" style="margin-bottom:0; flex:1;">
+            <label class="form-label" style="font-size:11px;">Temp. Nominal (°C)</label>
+            <input type="number" id="asistente-termo-temp" class="form-control form-control-sm" value="21.5" step="0.1" style="height:32px; font-size:12px;" />
+          </div>
+          <div class="form-group" style="margin-bottom:0; flex:1;">
+            <label class="form-label" style="font-size:11px;">Humedad Nominal (%)</label>
+            <input type="number" id="asistente-termo-hum" class="form-control form-control-sm" value="45" step="1" style="height:32px; font-size:12px;" />
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // 2. Centrífugas
+  if (diag.faltantes.centrifugas && diag.faltantes.centrifugas.length > 0) {
+    const centCount = {};
+    diag.faltantes.centrifugas.forEach(it => {
+      centCount[it.centrifuga] = (centCount[it.centrifuga] || 0) + 1;
+    });
+    const centSummary = Object.entries(centCount).map(([c, count]) => `• <strong>${c}</strong>: ${count} días`).join('<br/>');
+
+    html += `
+      <div class="asistente-module-card card card-sm" style="margin-bottom:12px; border:1px solid rgba(255,255,255,0.08);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <label style="display:flex; align-items:center; gap:8px; font-weight:700; font-size:14px; cursor:pointer; margin:0;">
+            <input type="checkbox" id="asistente-check-centrifugas" checked onchange="actualizarTotalAsistente()" style="width:16px; height:16px; cursor:pointer;" />
+            <span>⚙️ Mantención Centrífugas</span>
+          </label>
+          <span class="badge-pill" style="font-size:12px; background:rgba(0,102,255,0.15); color:var(--primary-color); padding:2px 8px; border-radius:10px;">${diag.faltantes.centrifugas.length} registros</span>
+        </div>
+        <div style="font-size:12px; color:var(--text-dim); line-height:1.4;">
+          ${centSummary}
+        </div>
+      </div>
+    `;
+  }
+
+  // 3. Mesones
+  if (diag.faltantes.mesones && diag.faltantes.mesones.length > 0) {
+    const mesonCount = {};
+    diag.faltantes.mesones.forEach(it => {
+      mesonCount[it.sala] = (mesonCount[it.sala] || 0) + 1;
+    });
+    const mesonSummary = Object.entries(mesonCount).map(([s, count]) => `• <strong>${s}</strong>: ${count} días`).join('<br/>');
+
+    html += `
+      <div class="asistente-module-card card card-sm" style="margin-bottom:12px; border:1px solid rgba(255,255,255,0.08);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <label style="display:flex; align-items:center; gap:8px; font-weight:700; font-size:14px; cursor:pointer; margin:0;">
+            <input type="checkbox" id="asistente-check-mesones" checked onchange="actualizarTotalAsistente()" style="width:16px; height:16px; cursor:pointer;" />
+            <span>🧽 Limpieza Mesones</span>
+          </label>
+          <span class="badge-pill" style="font-size:12px; background:rgba(0,102,255,0.15); color:var(--primary-color); padding:2px 8px; border-radius:10px;">${diag.faltantes.mesones.length} registros</span>
+        </div>
+        <div style="font-size:12px; color:var(--text-dim); line-height:1.4;">
+          ${mesonSummary}
+        </div>
+      </div>
+    `;
+  }
+
+  // 4. Temp Refrigeradores
+  if (diag.faltantes.refriTemp && diag.faltantes.refriTemp.length > 0) {
+    const refriCount = {};
+    diag.faltantes.refriTemp.forEach(it => {
+      refriCount[it.equipo] = (refriCount[it.equipo] || 0) + 1;
+    });
+    const refriSummary = Object.entries(refriCount).map(([r, count]) => `• <strong>${r}</strong>: ${count} turnos`).join('<br/>');
+
+    html += `
+      <div class="asistente-module-card card card-sm" style="margin-bottom:12px; border:1px solid rgba(255,255,255,0.08);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <label style="display:flex; align-items:center; gap:8px; font-weight:700; font-size:14px; cursor:pointer; margin:0;">
+            <input type="checkbox" id="asistente-check-refriTemp" checked onchange="actualizarTotalAsistente()" style="width:16px; height:16px; cursor:pointer;" />
+            <span>🧊 Temp. Refrigeradores</span>
+          </label>
+          <span class="badge-pill" style="font-size:12px; background:rgba(0,102,255,0.15); color:var(--primary-color); padding:2px 8px; border-radius:10px;">${diag.faltantes.refriTemp.length} registros</span>
+        </div>
+        <div style="font-size:12px; color:var(--text-dim); line-height:1.4;">
+          ${refriSummary}
+        </div>
+      </div>
+    `;
+  }
+
+  // 5. Conductividad
+  if (diag.faltantes.conductividad && diag.faltantes.conductividad.length > 0) {
+    html += `
+      <div class="asistente-module-card card card-sm" style="margin-bottom:12px; border:1px solid rgba(255,255,255,0.08);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <label style="display:flex; align-items:center; gap:8px; font-weight:700; font-size:14px; cursor:pointer; margin:0;">
+            <input type="checkbox" id="asistente-check-conductividad" checked onchange="actualizarTotalAsistente()" style="width:16px; height:16px; cursor:pointer;" />
+            <span>💧 Conductividad del Agua</span>
+          </label>
+          <span class="badge-pill" style="font-size:12px; background:rgba(0,102,255,0.15); color:var(--primary-color); padding:2px 8px; border-radius:10px;">${diag.faltantes.conductividad.length} registros</span>
+        </div>
+        <div class="form-group" style="margin-bottom:0; background:rgba(255,255,255,0.03); padding:8px; border-radius:6px;">
+          <label class="form-label" style="font-size:11px;">Conductividad Nominal (µS/cm)</label>
+          <input type="number" id="asistente-conduct-val" class="form-control form-control-sm" value="0.80" step="0.01" style="height:32px; font-size:12px;" />
+        </div>
+      </div>
+    `;
+  }
+
+  // 6. Cobas
+  if (diag.faltantes.cobas && diag.faltantes.cobas.length > 0) {
+    const cobasCount = {};
+    diag.faltantes.cobas.forEach(it => {
+      cobasCount[it.equipo] = (cobasCount[it.equipo] || 0) + 1;
+    });
+    const cobasSummary = Object.entries(cobasCount).map(([eq, count]) => `• <strong>${eq}</strong>: ${count} días sin mantención diaria`).join('<br/>');
+
+    html += `
+      <div class="asistente-module-card card card-sm" style="margin-bottom:12px; border:1px solid rgba(255,255,255,0.08);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <label style="display:flex; align-items:center; gap:8px; font-weight:700; font-size:14px; cursor:pointer; margin:0;">
+            <input type="checkbox" id="asistente-check-cobas" checked onchange="actualizarTotalAsistente()" style="width:16px; height:16px; cursor:pointer;" />
+            <span>🔬 Mantención Cobas</span>
+          </label>
+          <span class="badge-pill" style="font-size:12px; background:rgba(0,102,255,0.15); color:var(--primary-color); padding:2px 8px; border-radius:10px;">${diag.faltantes.cobas.length} días</span>
+        </div>
+        <div style="font-size:12px; color:var(--text-dim); line-height:1.4;">
+          ${cobasSummary}
+        </div>
+      </div>
+    `;
+  }
+
+  // 7. Eliminación de Muestras
+  if (diag.faltantes.elimMuestras && diag.faltantes.elimMuestras.length > 0) {
+    html += `
+      <div class="asistente-module-card card card-sm" style="margin-bottom:12px; border:1px solid rgba(255,255,255,0.08);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <label style="display:flex; align-items:center; gap:8px; font-weight:700; font-size:14px; cursor:pointer; margin:0;">
+            <input type="checkbox" id="asistente-check-elimMuestras" checked onchange="actualizarTotalAsistente()" style="width:16px; height:16px; cursor:pointer;" />
+            <span>🗑️ Eliminación de Muestras</span>
+          </label>
+          <span class="badge-pill" style="font-size:12px; background:rgba(0,102,255,0.15); color:var(--primary-color); padding:2px 8px; border-radius:10px;">${diag.faltantes.elimMuestras.length} registros</span>
+        </div>
+        <div style="font-size:12px; color:var(--text-dim); line-height:1.4;">
+          • Solo días hábiles requeridos con texto de fecha de corte automático.
+        </div>
+      </div>
+    `;
+  }
+
+  container.innerHTML = html;
+  actualizarTotalAsistente();
+}
+
+function actualizarTotalAsistente() {
+  if (!state._asistenteData || !state._asistenteData.diag) return;
+  const diag = state._asistenteData.diag;
+  let count = 0;
+
+  const chkTermo = document.getElementById('asistente-check-termo');
+  if (chkTermo && chkTermo.checked && diag.faltantes.termo) count += diag.faltantes.termo.length;
+
+  const chkCent = document.getElementById('asistente-check-centrifugas');
+  if (chkCent && chkCent.checked && diag.faltantes.centrifugas) count += diag.faltantes.centrifugas.length;
+
+  const chkMeson = document.getElementById('asistente-check-mesones');
+  if (chkMeson && chkMeson.checked && diag.faltantes.mesones) count += diag.faltantes.mesones.length;
+
+  const chkRefri = document.getElementById('asistente-check-refriTemp');
+  if (chkRefri && chkRefri.checked && diag.faltantes.refriTemp) count += diag.faltantes.refriTemp.length;
+
+  const chkCond = document.getElementById('asistente-check-conductividad');
+  if (chkCond && chkCond.checked && diag.faltantes.conductividad) count += diag.faltantes.conductividad.length;
+
+  const chkCobas = document.getElementById('asistente-check-cobas');
+  if (chkCobas && chkCobas.checked && diag.faltantes.cobas) count += diag.faltantes.cobas.length;
+
+  const chkElim = document.getElementById('asistente-check-elimMuestras');
+  if (chkElim && chkElim.checked && diag.faltantes.elimMuestras) count += diag.faltantes.elimMuestras.length;
+
+  const btnTxt = document.getElementById('btn-asistente-exec-text');
+  const btnExec = document.getElementById('btn-asistente-ejecutar');
+  if (btnTxt) btnTxt.textContent = `⚡ Regularizar ${count} Registro(s)`;
+  if (btnExec) btnExec.disabled = (count === 0);
+}
+
+async function ejecutarRegularizacionMasiva() {
+  if (!state._asistenteData || !state._asistenteData.diag) return;
+  const data = state._asistenteData;
+  const diag = data.diag;
+
+  const payload = {};
+
+  const chkTermo = document.getElementById('asistente-check-termo');
+  if (chkTermo && chkTermo.checked && diag.faltantes.termo && diag.faltantes.termo.length > 0) {
+    const tempInput = parseFloat(document.getElementById('asistente-termo-temp').value) || 21.5;
+    const humInput = parseFloat(document.getElementById('asistente-termo-hum').value) || 45;
+    payload.termo = diag.faltantes.termo.map(it => ({
+      ...it,
+      temp: tempInput,
+      hum: humInput
+    }));
+  }
+
+  const chkCent = document.getElementById('asistente-check-centrifugas');
+  if (chkCent && chkCent.checked && diag.faltantes.centrifugas && diag.faltantes.centrifugas.length > 0) {
+    payload.centrifugas = diag.faltantes.centrifugas;
+  }
+
+  const chkMeson = document.getElementById('asistente-check-mesones');
+  if (chkMeson && chkMeson.checked && diag.faltantes.mesones && diag.faltantes.mesones.length > 0) {
+    payload.mesones = diag.faltantes.mesones;
+  }
+
+  const chkRefri = document.getElementById('asistente-check-refriTemp');
+  if (chkRefri && chkRefri.checked && diag.faltantes.refriTemp && diag.faltantes.refriTemp.length > 0) {
+    payload.refriTemp = diag.faltantes.refriTemp;
+  }
+
+  const chkCond = document.getElementById('asistente-check-conductividad');
+  if (chkCond && chkCond.checked && diag.faltantes.conductividad && diag.faltantes.conductividad.length > 0) {
+    const condInput = parseFloat(document.getElementById('asistente-conduct-val').value) || 0.80;
+    payload.conductividad = diag.faltantes.conductividad.map(it => ({
+      ...it,
+      conductividad: condInput
+    }));
+  }
+
+  const chkCobas = document.getElementById('asistente-check-cobas');
+  if (chkCobas && chkCobas.checked && diag.faltantes.cobas && diag.faltantes.cobas.length > 0) {
+    payload.cobas = diag.faltantes.cobas;
+  }
+
+  const chkElim = document.getElementById('asistente-check-elimMuestras');
+  if (chkElim && chkElim.checked && diag.faltantes.elimMuestras && diag.faltantes.elimMuestras.length > 0) {
+    payload.elimMuestras = diag.faltantes.elimMuestras;
+  }
+
+  const errEl = document.getElementById('asistente-error-step2');
+  errEl.style.display = 'none';
+  errEl.textContent = '';
+
+  const spin = document.getElementById('spinner-asistente-exec');
+  const btnTxt = document.getElementById('btn-asistente-exec-text');
+  if (spin) spin.style.display = 'inline-block';
+  if (btnTxt) btnTxt.textContent = 'Guardando registros por lotes...';
+
+  try {
+    const res = await apiPost({
+      action: 'ejecutarRegularizacionBatch',
+      mes: data.mes,
+      anio: data.anio,
+      responsable: data.responsable,
+      password: data.password,
+      observacion: data.observacion,
+      payload: payload
+    });
+
+    if (!res || !res.success) {
+      errEl.textContent = res ? res.error : 'Error al guardar regularización.';
+      errEl.style.display = 'block';
+    } else {
+      showToast('✅ ' + res.message);
+      state.dashCache = null;
+      if (typeof clearRecordsMonthCache === 'function') clearRecordsMonthCache();
+      if (typeof prefetchDashboard === 'function') prefetchDashboard();
+
+      document.getElementById('asistente-step-1').style.display = 'none';
+      document.getElementById('asistente-step-2').style.display = 'none';
+      document.getElementById('asistente-step-3').style.display = 'block';
+
+      const descEl = document.getElementById('asistente-success-desc');
+      if (descEl) descEl.textContent = res.message;
+
+      const statsEl = document.getElementById('asistente-success-stats');
+      if (statsEl && res.stats) {
+        let statsHtml = '<strong style="display:block; margin-bottom:6px; font-size:13px; color:var(--text-color);">Detalle de registros creados:</strong>';
+        if (res.stats.termo) statsHtml += `<div style="font-size:12px; color:var(--text-dim); margin-bottom:3px;">• 🌡️ Temp. Ambiental: <strong>${res.stats.termo}</strong></div>`;
+        if (res.stats.centrifugas) statsHtml += `<div style="font-size:12px; color:var(--text-dim); margin-bottom:3px;">• ⚙️ Centrífugas: <strong>${res.stats.centrifugas}</strong></div>`;
+        if (res.stats.mesones) statsHtml += `<div style="font-size:12px; color:var(--text-dim); margin-bottom:3px;">• 🧽 Mesones: <strong>${res.stats.mesones}</strong></div>`;
+        if (res.stats.refriTemp) statsHtml += `<div style="font-size:12px; color:var(--text-dim); margin-bottom:3px;">• 🧊 Refrigeradores: <strong>${res.stats.refriTemp}</strong></div>`;
+        if (res.stats.conductividad) statsHtml += `<div style="font-size:12px; color:var(--text-dim); margin-bottom:3px;">• 💧 Conductividad: <strong>${res.stats.conductividad}</strong></div>`;
+        if (res.stats.cobas) statsHtml += `<div style="font-size:12px; color:var(--text-dim); margin-bottom:3px;">• 🔬 Cobas: <strong>${res.stats.cobas}</strong> tareas</div>`;
+        if (res.stats.elimMuestras) statsHtml += `<div style="font-size:12px; color:var(--text-dim); margin-bottom:3px;">• 🗑️ Eliminación Muestras: <strong>${res.stats.elimMuestras}</strong></div>`;
+        statsEl.innerHTML = statsHtml;
+      }
+    }
+  } catch (e) {
+    errEl.textContent = 'Error al ejecutar regularización: ' + e.toString();
+    errEl.style.display = 'block';
+  } finally {
+    if (spin) spin.style.display = 'none';
+    if (btnTxt) btnTxt.textContent = '⚡ Regularizar Todo Ahora';
+  }
+}
+
+function finalizarAsistente() {
+  closeAsistenteModal();
+  if (state._asistenteData) {
+    state.dashMes = state._asistenteData.mes;
+    state.dashAnio = state._asistenteData.anio;
+    const mesEl = document.getElementById('dash-mes');
+    const anioEl = document.getElementById('dash-anio');
+    if (mesEl) mesEl.value = state.dashMes;
+    if (anioEl) anioEl.value = state.dashAnio;
+  }
+  navigateTo('dashboard');
+}

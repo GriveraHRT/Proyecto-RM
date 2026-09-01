@@ -612,6 +612,18 @@ body {
   box-shadow: 0 8px 40px rgba(0,0,0,0.2);
   animation: slideUp 0.25s ease;
 }
+.modal-card.modal-card-lg {
+  max-width: 620px;
+  max-height: 88vh;
+  overflow-y: auto;
+}
+.asistente-module-card {
+  transition: all 0.2s ease;
+}
+.asistente-module-card:hover {
+  border-color: rgba(0, 102, 255, 0.3) !important;
+  background: rgba(0, 102, 255, 0.02);
+}
 @keyframes slideUp {
   from { transform: translateY(30px); opacity: 0; }
   to   { transform: translateY(0); opacity: 1; }

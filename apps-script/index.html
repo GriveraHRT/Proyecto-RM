@@ -1093,6 +1093,25 @@
       </div>
     </div>
 
+    <!-- ── Sección: Asistente de Regularización Histórica ── -->
+    <div class="card" style="margin-top:20px; border-left: 4px solid var(--primary-color);">
+      <div class="revision-admin-header">
+        <span class="revision-admin-icon">🤖</span>
+        <div>
+          <div class="revision-admin-title" style="display:flex; align-items:center; gap:8px;">
+            Asistente de Regularización Histórica
+            <span class="badge-pill badge-pill-new" style="background:var(--primary-color); color:#fff; font-size:11px; padding:2px 8px; border-radius:12px; font-weight:600;">Autorelleno</span>
+          </div>
+          <div class="revision-admin-subtitle">Detecte y complete automáticamente registros pendientes de meses anteriores según formularios activos y feriados.</div>
+        </div>
+      </div>
+      <div style="margin-top:16px;">
+        <button type="button" class="btn btn-primary" onclick="openAsistenteModal()" style="display:inline-flex; align-items:center; gap:6px;">
+          <span>✨ Iniciar Asistente</span>
+        </button>
+      </div>
+    </div>
+
     <!-- ── Sección: Marcar como Revisado ─────────────────── -->
     <div class="card" style="margin-top:20px;">
       <div class="revision-admin-header">
@@ -1845,6 +1864,88 @@
         </button>
       </div>
     </form>
+  </div>
+
+  <!-- Modal: Asistente de Regularización Histórica -->
+  <div class="modal-card modal-card-lg" id="modal-asistente" style="display:none; max-width:680px; width:95%; max-height:90vh; overflow-y:auto;" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeAsistenteModal()">✕</button>
+    <div class="modal-title" style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+      <span>🤖 Asistente de Regularización Histórica</span>
+    </div>
+
+    <!-- Paso 1: Configuración de Parámetros y Autenticación -->
+    <div id="asistente-step-1">
+      <p class="modal-body-text" style="color:var(--text-dim); font-size:13px; margin-bottom:14px; line-height:1.4;">
+        Seleccione el período histórico a evaluar y el usuario responsable único. Se requerirá la contraseña de administrador para autorizar la operación.
+      </p>
+
+      <div class="form-row" style="margin-bottom:12px;">
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label" for="asistente-mes">Mes a Regularizar</label>
+          <select id="asistente-mes" class="form-control"></select>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label" for="asistente-anio">Año</label>
+          <select id="asistente-anio" class="form-control"></select>
+        </div>
+      </div>
+
+      <div class="form-row" style="margin-bottom:12px;">
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label" for="asistente-resp">Usuario Responsable (Iniciales)</label>
+          <input type="text" id="asistente-resp" class="form-control" placeholder="Ej: GRC" maxlength="3"
+            style="text-transform:uppercase; letter-spacing:2px; font-weight:700;" list="list-personal-initials" />
+          <span class="form-help" style="font-size:11px; color:var(--text-dim);">Registrado en Maestro Personal</span>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label" for="asistente-pwd">Contraseña Administrador</label>
+          <input type="password" id="asistente-pwd" class="form-control" placeholder="••••••" />
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom:16px;">
+        <label class="form-label" for="asistente-obs">Observación General para los Registros</label>
+        <input type="text" id="asistente-obs" class="form-control" value="Regularización histórica por traspaso desde formato físico" />
+      </div>
+
+      <div id="asistente-error-step1" class="alert-banner alert-danger" style="display:none; margin-bottom:14px;"></div>
+
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
+        <button type="button" class="btn btn-secondary" onclick="closeAsistenteModal()">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btn-asistente-diagnosticar" onclick="ejecutarDiagnosticoAsistente()">
+          <div class="spinner" id="spinner-asistente-diag" style="display:none;"></div>
+          <span id="btn-asistente-diag-text">🔍 Diagnosticar Pendientes</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Paso 2: Diagnóstico y Previsualización de Faltantes -->
+    <div id="asistente-step-2" style="display:none;">
+      <div id="asistente-diag-banner" class="alert-banner alert-info" style="margin-bottom:14px;"></div>
+
+      <div id="asistente-diag-content" style="max-height:360px; overflow-y:auto; padding-right:4px;">
+        <!-- Inyectado con JS -->
+      </div>
+
+      <div id="asistente-error-step2" class="alert-banner alert-danger" style="display:none; margin-bottom:14px; margin-top:12px;"></div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-top:20px; border-top:1px solid rgba(255,255,255,0.1); padding-top:14px;">
+        <button type="button" class="btn btn-secondary" onclick="volverPaso1Asistente()">← Volver</button>
+        <button type="button" class="btn btn-success" id="btn-asistente-ejecutar" onclick="ejecutarRegularizacionMasiva()">
+          <div class="spinner" id="spinner-asistente-exec" style="display:none;"></div>
+          <span id="btn-asistente-exec-text">⚡ Regularizar Todo Ahora</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Paso 3: Confirmación y Éxito -->
+    <div id="asistente-step-3" style="display:none; text-align:center; padding:16px 8px;">
+      <div style="font-size:42px; margin-bottom:12px;">🎉</div>
+      <h3 style="font-size:18px; font-weight:700; color:var(--text-color); margin-bottom:8px;" id="asistente-success-title">¡Regularización Completada con Éxito!</h3>
+      <p id="asistente-success-desc" style="color:var(--text-dim); font-size:14px; margin-bottom:16px; line-height:1.5;"></p>
+      <div id="asistente-success-stats" style="margin-bottom:20px; text-align:left; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:12px 16px;"></div>
+      <button type="button" class="btn btn-primary" onclick="finalizarAsistente()">Ir al Dashboard</button>
+    </div>
   </div>
 
 </div>

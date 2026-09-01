@@ -412,6 +412,7 @@ function doGet(e) {
       case 'applyConfig': return jsonResponse(applyNotificationConfig(e.parameter.hour, e.parameter.to));
       case 'getProjectTriggersInfo': return jsonResponse(getProjectTriggersInfo());
       case 'scheduleAutoTest': return jsonResponse(scheduleAutoTriggerInMinutes(e.parameter.minutes || 2));
+      case 'diagnosticarFaltantesMes': return jsonResponse(diagnosticarFaltantesMes(e.parameter));
       case 'getTriggerLogs': return jsonResponse(getTriggerLogs());
       case 'SETUP_INIT_TA':     return jsonResponse(setup());
       case 'REINIT':            return jsonResponse(reinitialize());
@@ -471,6 +472,8 @@ function doPost(e) {
       case 'seedMaestroPersonal': return jsonResponse(seedMaestroPersonal(data.initials || data.list));
       case 'migrarInicialesAHistoricos': return jsonResponse(migrarInicialesAHistoricos());
       case 'setupMaestroPersonal': return jsonResponse(setupMaestroPersonal());
+      case 'diagnosticarFaltantesMes': return jsonResponse(diagnosticarFaltantesMes(data));
+      case 'ejecutarRegularizacionBatch': return jsonResponse(ejecutarRegularizacionBatch(data));
       default:                    return jsonResponse({ error: 'Acción no reconocida: ' + data.action });
     }
   } catch (err) {
@@ -3875,5 +3878,419 @@ function scheduleAutoTriggerInMinutes(minutes) {
     triggerId: trigger.getUniqueId()
   };
 }
+
+// ── Asistente de Regularización Histórica ────────────────────────
+
+function diagnosticarFaltantesMes(data) {
+  if (!data || data.password !== PASSWORD_REVISION) {
+    return { success: false, error: 'Contraseña incorrecta.' };
+  }
+  const mes = parseInt(data.mes, 10);
+  const anio = parseInt(data.anio, 10);
+  if (isNaN(mes) || isNaN(anio) || mes < 1 || mes > 12) {
+    return { success: false, error: 'Mes o año inválido.' };
+  }
+
+  const now = new Date();
+  const curMes = now.getMonth() + 1;
+  const curAnio = now.getFullYear();
+  const daysInMonth = new Date(anio, mes, 0).getDate();
+
+  let maxDia = daysInMonth;
+  if (anio === curAnio && mes === curMes) {
+    maxDia = now.getDate();
+  } else if (anio > curAnio || (anio === curAnio && mes > curMes)) {
+    return { success: false, error: 'No es posible regularizar meses futuros.' };
+  }
+
+  const modulosActivos = getModulosActivos();
+  const diasNoHabilesArray = getDiasNoHabilesMes(mes, anio);
+  const diasNoHabiles = new Set(diasNoHabilesArray);
+  const regs = getRegistros(mes, anio);
+
+  const faltantes = {
+    termo: [],
+    centrifugas: [],
+    mesones: [],
+    refriTemp: [],
+    conductividad: [],
+    cobas: [],
+    elimMuestras: []
+  };
+
+  // 1. Termo (Temperatura / Humedad Ambiental)
+  if (modulosActivos['termo'] !== false) {
+    const areas = getAreasDetailed();
+    areas.forEach(a => {
+      const areaName = a.nombre;
+      const esSoloHabil = (a.horarioTurno || '').toString().trim().toLowerCase() === 'no';
+      for (let d = 1; d <= maxDia; d++) {
+        if (esSoloHabil && diasNoHabiles.has(d)) continue;
+        ['Mañana', 'Tarde'].forEach(turno => {
+          if (anio === curAnio && mes === curMes && d === maxDia && turno === 'Tarde' && now.getHours() < 12) return;
+          const exists = (regs.termo || []).some(r => r.area === areaName && parseInt(r.dia, 10) === d && r.turno === turno);
+          if (!exists) {
+            faltantes.termo.push({
+              dia: d,
+              turno: turno,
+              area: areaName,
+              temp: 21.5,
+              hum: 45
+            });
+          }
+        });
+      }
+    });
+  }
+
+  // 2. Centrífugas
+  if (modulosActivos['centrifugas'] !== false) {
+    const cents = getCentrifugasDetailed();
+    cents.forEach(c => {
+      const centName = c.nombre;
+      const esSoloHabil = (c.horarioTurno || '').toString().trim().toLowerCase() === 'no';
+      for (let d = 1; d <= maxDia; d++) {
+        if (esSoloHabil && diasNoHabiles.has(d)) continue;
+        const exists = (regs.centrifugas || []).some(r => r.centrifuga === centName && parseInt(r.dia, 10) === d);
+        if (!exists) {
+          faltantes.centrifugas.push({
+            dia: d,
+            centrifuga: centName,
+            tipo_mantencion: 'Diaria'
+          });
+        }
+      }
+    });
+  }
+
+  // 3. Mesones
+  if (modulosActivos['mesones'] !== false) {
+    const salas = getSalasDetailed();
+    salas.forEach(s => {
+      const salaName = s.nombre;
+      const esSoloHabil = (s.horarioTurno || '').toString().trim().toLowerCase() === 'no';
+      for (let d = 1; d <= maxDia; d++) {
+        if (esSoloHabil && diasNoHabiles.has(d)) continue;
+        const exists = (regs.mesones || []).some(r => r.sala === salaName && parseInt(r.dia, 10) === d);
+        if (!exists) {
+          faltantes.mesones.push({
+            dia: d,
+            sala: salaName
+          });
+        }
+      }
+    });
+  }
+
+  // 4. Temp Refrigeradores (24/7)
+  if (modulosActivos['refri-temp'] !== false) {
+    const refris = getRefrigeradores();
+    refris.forEach(r => {
+      const eqName = r.equipo;
+      let tempSugg = 4.5;
+      if (!isNaN(r.tempMin) && !isNaN(r.tempMax)) {
+        tempSugg = parseFloat(((r.tempMin + r.tempMax) / 2).toFixed(1));
+      }
+      for (let d = 1; d <= maxDia; d++) {
+        ['Mañana', 'Tarde'].forEach(turno => {
+          if (anio === curAnio && mes === curMes && d === maxDia && turno === 'Tarde' && now.getHours() < 12) return;
+          const exists = (regs.refriTemp || []).some(rt => rt.equipo === eqName && parseInt(rt.dia, 10) === d && rt.turno === turno);
+          if (!exists) {
+            faltantes.refriTemp.push({
+              dia: d,
+              turno: turno,
+              equipo: eqName,
+              tipo: r.tipo || '',
+              temperatura: tempSugg
+            });
+          }
+        });
+      }
+    });
+  }
+
+  // 5. Conductividad
+  if (modulosActivos['conductividad'] !== false) {
+    for (let d = 1; d <= maxDia; d++) {
+      ['Mañana', 'Tarde'].forEach(turno => {
+        if (anio === curAnio && mes === curMes && d === maxDia && turno === 'Tarde' && now.getHours() < 12) return;
+        const exists = (regs.conductividad || []).some(r => parseInt(r.dia, 10) === d && r.turno === turno);
+        if (!exists) {
+          faltantes.conductividad.push({
+            dia: d,
+            turno: turno,
+            conductividad: 0.80
+          });
+        }
+      });
+    }
+  }
+
+  // 6. Cobas
+  if (modulosActivos['cobas'] !== false) {
+    const defaultCobasTasks = [
+      'Limpieza pipeta y puertos de vaciado (ISE)',
+      'Limpieza pipetas y agujas de lavado (c702)',
+      'Limpieza pipetas, agujas prelavado y sipper (e801)',
+      'Pipe diario y rack verde'
+    ];
+    ['Cobas 1', 'Cobas 2'].forEach(eq => {
+      for (let d = 1; d <= maxDia; d++) {
+        const done = (regs.cobas || []).filter(r => r.equipo === eq && parseInt(r.dia, 10) === d && r.frecuencia === 'Diaria');
+        if (done.length < 1) {
+          faltantes.cobas.push({
+            dia: d,
+            equipo: eq,
+            frecuencia: 'Diaria',
+            actividades: defaultCobasTasks
+          });
+        }
+      }
+    });
+  }
+
+  // 7. Eliminación de Muestras (solo días hábiles)
+  if (modulosActivos['elim-muestras'] !== false) {
+    for (let d = 1; d <= maxDia; d++) {
+      if (diasNoHabiles.has(d)) continue;
+      const exists = (regs.elimMuestras || []).some(r => parseInt(r.dia, 10) === d);
+      if (!exists) {
+        const dt = new Date(anio, mes - 1, d);
+        const dtCorte = new Date(dt.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const fCorteStr = `${String(dtCorte.getDate()).padStart(2, '0')}/${String(dtCorte.getMonth() + 1).padStart(2, '0')}/${dtCorte.getFullYear()}`;
+        faltantes.elimMuestras.push({
+          dia: d,
+          muestras_eliminadas: 'Muestras eliminadas con fecha de corte ' + fCorteStr
+        });
+      }
+    }
+  }
+
+  const totales = {
+    termo: faltantes.termo.length,
+    centrifugas: faltantes.centrifugas.length,
+    mesones: faltantes.mesones.length,
+    refriTemp: faltantes.refriTemp.length,
+    conductividad: faltantes.conductividad.length,
+    cobas: faltantes.cobas.length,
+    elimMuestras: faltantes.elimMuestras.length
+  };
+  totales.total = totales.termo + totales.centrifugas + totales.mesones + totales.refriTemp + totales.conductividad + totales.cobas + totales.elimMuestras;
+
+  return {
+    success: true,
+    mes: mes,
+    anio: anio,
+    maxDia: maxDia,
+    diasNoHabiles: diasNoHabilesArray,
+    modulosActivos: modulosActivos,
+    faltantes: faltantes,
+    totales: totales
+  };
+}
+
+function ejecutarRegularizacionBatch(data) {
+  if (!data || data.password !== PASSWORD_REVISION) {
+    return { success: false, error: 'Contraseña incorrecta.' };
+  }
+  const mes = parseInt(data.mes, 10);
+  const anio = parseInt(data.anio, 10);
+  if (isNaN(mes) || isNaN(anio) || mes < 1 || mes > 12) {
+    return { success: false, error: 'Mes o año inválido.' };
+  }
+  const respCode = (data.responsable || '').trim().toUpperCase();
+  if (!respCode || respCode.length < 2) {
+    return { success: false, error: 'Debe especificar el usuario responsable (iniciales).' };
+  }
+  const responsable = resolveNombreResponsable(respCode);
+  const obs = (data.observacion || 'Regularización histórica').trim();
+  const ts = getFechaRegistroFormatted();
+  const payload = data.payload || {};
+
+  const stats = {
+    termo: 0,
+    centrifugas: 0,
+    mesones: 0,
+    refriTemp: 0,
+    conductividad: 0,
+    cobas: 0,
+    elimMuestras: 0,
+    total: 0
+  };
+
+  // 1. Termo
+  if (Array.isArray(payload.termo) && payload.termo.length > 0) {
+    const sheet = getSheet(SHEETS.TERMO);
+    const rows = payload.termo.map(it => {
+      const f = { dia: it.dia, mes: mes, anio: anio };
+      const fStr = formatFechaDDMMYYYY(f);
+      return [
+        fStr,
+        it.dia, mes, anio,
+        responsable,
+        parseFloat(it.temp !== undefined ? it.temp : 21.5),
+        parseFloat(it.hum !== undefined ? it.hum : 45),
+        it.turno || 'Mañana',
+        it.area,
+        it.accion || '',
+        obs,
+        ts,
+        '', '', ''
+      ];
+    });
+    insertRowsAtTopBatch(sheet, rows);
+    clearSheetCache('termo', mes, anio);
+    stats.termo = rows.length;
+  }
+
+  // 2. Centrífugas
+  if (Array.isArray(payload.centrifugas) && payload.centrifugas.length > 0) {
+    const sheet = getSheet(SHEETS.CENT_REG);
+    const rows = payload.centrifugas.map(it => {
+      const f = { dia: it.dia, mes: mes, anio: anio };
+      const fStr = formatFechaDDMMYYYY(f);
+      return [
+        fStr,
+        it.dia, mes, anio,
+        it.centrifuga,
+        responsable,
+        it.tipo_mantencion || 'Diaria',
+        obs,
+        ts,
+        '', '', ''
+      ];
+    });
+    insertRowsAtTopBatch(sheet, rows);
+    clearSheetCache('centrifugas', mes, anio);
+    stats.centrifugas = rows.length;
+  }
+
+  // 3. Mesones
+  if (Array.isArray(payload.mesones) && payload.mesones.length > 0) {
+    const sheet = getSheet(SHEETS.MESONES);
+    const rows = payload.mesones.map(it => {
+      const f = { dia: it.dia, mes: mes, anio: anio };
+      const fStr = formatFechaDDMMYYYY(f);
+      return [
+        fStr,
+        it.dia, mes, anio,
+        it.sala,
+        responsable,
+        obs,
+        ts,
+        '', '', ''
+      ];
+    });
+    insertRowsAtTopBatch(sheet, rows);
+    clearSheetCache('mesones', mes, anio);
+    stats.mesones = rows.length;
+  }
+
+  // 4. Temp Refrigeradores
+  if (Array.isArray(payload.refriTemp) && payload.refriTemp.length > 0) {
+    const sheet = getSheet(SHEETS.REFRI_REG);
+    const rows = payload.refriTemp.map(it => {
+      const f = { dia: it.dia, mes: mes, anio: anio };
+      const fStr = formatFechaDDMMYYYY(f);
+      return [
+        fStr,
+        it.dia, mes, anio,
+        responsable,
+        parseFloat(it.temperatura !== undefined ? it.temperatura : 4.5),
+        it.turno || 'Mañana',
+        it.equipo,
+        it.tipo || '',
+        it.accion || '',
+        obs,
+        ts,
+        '', '', ''
+      ];
+    });
+    insertRowsAtTopBatch(sheet, rows);
+    clearSheetCache('refriTemp', mes, anio);
+    stats.refriTemp = rows.length;
+  }
+
+  // 5. Conductividad
+  if (Array.isArray(payload.conductividad) && payload.conductividad.length > 0) {
+    const sheet = getSheet(SHEETS.CONDUCT_REG);
+    const rows = payload.conductividad.map(it => {
+      const f = { dia: it.dia, mes: mes, anio: anio };
+      const fStr = formatFechaDDMMYYYY(f);
+      return [
+        fStr,
+        it.dia, mes, anio,
+        responsable,
+        parseFloat(it.conductividad !== undefined ? it.conductividad : 0.8),
+        it.turno || 'Mañana',
+        obs,
+        ts,
+        '', '', ''
+      ];
+    });
+    insertRowsAtTopBatch(sheet, rows);
+    clearSheetCache('conductividad', mes, anio);
+    stats.conductividad = rows.length;
+  }
+
+  // 6. Cobas
+  if (Array.isArray(payload.cobas) && payload.cobas.length > 0) {
+    const sheet = getSheet(SHEETS.COBAS_REG);
+    const rows = [];
+    payload.cobas.forEach(it => {
+      const f = { dia: it.dia, mes: mes, anio: anio };
+      const fStr = formatFechaDDMMYYYY(f);
+      const acts = Array.isArray(it.actividades) && it.actividades.length > 0 ? it.actividades : ['Mantenimiento diario Cobas'];
+      acts.forEach(act => {
+        rows.push([
+          fStr,
+          it.dia, mes, anio,
+          it.equipo,
+          responsable,
+          it.frecuencia || 'Diaria',
+          act,
+          obs,
+          ts,
+          '', '', ''
+        ]);
+      });
+    });
+    if (rows.length > 0) {
+      insertRowsAtTopBatch(sheet, rows);
+      clearSheetCache('cobas', mes, anio);
+    }
+    stats.cobas = rows.length;
+  }
+
+  // 7. Eliminación de Muestras
+  if (Array.isArray(payload.elimMuestras) && payload.elimMuestras.length > 0) {
+    const sheet = getSheet(SHEETS.ELIM_MUESTRAS);
+    const rows = payload.elimMuestras.map(it => {
+      const f = { dia: it.dia, mes: mes, anio: anio };
+      const fStr = formatFechaDDMMYYYY(f);
+      return [
+        fStr,
+        it.dia, mes, anio,
+        responsable,
+        it.muestras_eliminadas,
+        ts,
+        '', '', ''
+      ];
+    });
+    insertRowsAtTopBatch(sheet, rows);
+    try { sheet.hideColumns(7); } catch(e) {}
+    clearSheetCache('elimMuestras', mes, anio);
+    stats.elimMuestras = rows.length;
+  }
+
+  stats.total = stats.termo + stats.centrifugas + stats.mesones + stats.refriTemp + stats.conductividad + stats.cobas + stats.elimMuestras;
+
+  return {
+    success: true,
+    message: `Regularización completada con éxito. Se crearon ${stats.total} registro(s) en ${mes}/${anio}.`,
+    stats: stats
+  };
+}
+
 
 
