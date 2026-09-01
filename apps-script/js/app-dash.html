@@ -2344,7 +2344,7 @@ async function checkDuplicateCentrifugas() {
       cleanMessage: cant > 1 
         ? `Se detectaron registros de mantención previa para la fecha <strong>${fechaFmt}</strong>:` 
         : `Se detectó un registro de mantención previa para la fecha <strong>${fechaFmt}</strong>:`,
-      message: `Ya existe registro de mantención diaria para el día ${fechaFmt}.`
+      message: `Ya existe registro de mantención para el día ${fechaFmt}.`
     };
   } else {
     alertEl.classList.remove('visible');
@@ -3518,201 +3518,6 @@ async function submitEditConductividad(e) {
 }
 
 async function confirmDeleteConductividad(idx) {
-  if (selectEq && Array.isArray(state.refriLimpieza)) {
-    selectEq.innerHTML = state.refriLimpieza.map(e => `<option value="${e}" ${e === rec.equipo ? 'selected' : ''}>${e}</option>`).join('');
-  }
-
-  document.querySelectorAll('.modal-card').forEach(m => m.style.display = 'none');
-  const modal = document.getElementById('modal-edit-limp-refri');
-  if (modal) modal.style.display = 'block';
-  const overlay = document.getElementById('modal-overlay');
-  if (overlay) overlay.classList.add('active');
-}
-
-async function submitEditLimpRefri(e) {
-  e.preventDefault();
-  const fechaInput = document.getElementById('edit-limp-refri-fecha');
-  if (!validateDateInputNotFuture(fechaInput)) return;
-  const rowIndex = parseInt(document.getElementById('edit-limp-refri-rowindex').value);
-  const fechaReg = document.getElementById('edit-limp-refri-fecha-reg').value;
-  const fechaVal = document.getElementById('edit-limp-refri-fecha').value;
-  const tipoVal = document.getElementById('edit-limp-refri-tipo').value;
-  const equipoVal = document.getElementById('edit-limp-refri-equipo').value;
-  const respVal = document.getElementById('edit-limp-refri-resp').value.trim().toUpperCase();
-  if (!(await ensureResponsableRegistered(respVal))) return;
-  const obsVal = document.getElementById('edit-limp-refri-obs').value;
-
-  setLoading('btn-edit-limp-refri-submit', 'spinner-edit-limp-refri', 'btn-edit-limp-refri-text', true);
-  try {
-    const res = await apiPost({
-      action: 'updateLimpRefri',
-      rowIndex: rowIndex,
-      fecha_registro: fechaReg,
-      fecha: fechaVal,
-      tipo_mantencion: tipoVal,
-      equipo: equipoVal,
-      responsable: respVal,
-      observaciones: obsVal
-    });
-
-    if (res && res.success) {
-      showToast('✅ ' + res.message);
-      closeModal({ target: document.getElementById('modal-overlay') });
-      if (typeof clearRecordsMonthCache === 'function') clearRecordsMonthCache();
-      if (typeof prefetchDashboard === 'function') prefetchDashboard();
-      loadRecentLimpRefri();
-    } else {
-      showToast('❌ ' + (res.error || 'Error al actualizar registro'), 'error');
-    }
-  } catch (err) {
-    showToast('❌ Error de conexión al actualizar', 'error');
-  }
-  setLoading('btn-edit-limp-refri-submit', 'spinner-edit-limp-refri', 'btn-edit-limp-refri-text', false);
-}
-
-async function confirmDeleteLimpRefri(idx) {
-  const rec = recentLimpRefriCache[idx];
-  if (!rec) return;
-  if (!confirm(`¿Está seguro de eliminar la limpieza de "${rec.equipo}" del día ${rec.fecha}?`)) return;
-
-  try {
-    const res = await apiPost({
-      action: 'deleteLimpRefri',
-      rowIndex: rec.rowIndex,
-      fecha_registro: rec.fecha_registro,
-      mes: rec.mes,
-      anio: rec.anio
-    });
-
-    if (res && res.success) {
-      showToast('✅ ' + res.message);
-      if (typeof clearRecordsMonthCache === 'function') clearRecordsMonthCache();
-      if (typeof prefetchDashboard === 'function') prefetchDashboard();
-      loadRecentLimpRefri();
-    } else {
-      showToast('❌ ' + (res.error || 'Error al eliminar registro'), 'error');
-    }
-  } catch (err) {
-    showToast('❌ Error de conexión al eliminar', 'error');
-  }
-}
-
-// ── Recent Conductividad Records ──────────────────────────
-let recentConductividadCache = [];
-
-async function loadRecentConductividad() {
-  const tbody = document.getElementById('tbody-recent-conductividad');
-  if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 16px; color: #94a3b8;">🔄 Cargando registros recientes...</td></tr>';
-  try {
-    const res = await apiGet({ action: 'getRecentConductividad', limit: 20 });
-    if (res && res.success && Array.isArray(res.records)) {
-      recentConductividadCache = res.records;
-      renderRecentConductividadTable(recentConductividadCache);
-    } else {
-      tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${res.error || 'Error al cargar registros.'}</td></tr>`;
-    }
-  } catch (err) {
-    console.error('Error cargando últimos conductividad:', err);
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 16px; color: #ef4444;">❌ Error de conexión al cargar registros.</td></tr>';
-  }
-}
-
-function renderRecentConductividadTable(records) {
-  const tbody = document.getElementById('tbody-recent-conductividad');
-  if (!tbody) return;
-  if (!records || records.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 16px; color: #94a3b8;">No hay registros recientes.</td></tr>';
-    return;
-  }
-  tbody.innerHTML = records.map((r, idx) => {
-    const val = parseFloat(r.conductividad);
-    const oor = !isNaN(val) && val > 0.8;
-    const badge = oor
-      ? `<span style="color:#dc2626; font-weight:700; background:#fee2e2; padding:2px 5px; border-radius:4px; white-space:nowrap; display:inline-block;">⚠️ ${r.conductividad} µS/cm</span>`
-      : `<span style="font-weight:600; color:#0284c7; white-space:nowrap; display:inline-block;">${r.conductividad} µS/cm</span>`;
-    const turnoBadge = r.turno === 'Mañana' ? '☀️ AM' : '🌙 PM';
-    return `
-      <tr style="border-bottom: 1px solid #f1f5f9;">
-        <td style="padding: 8px 4px; white-space: nowrap;"><strong>${formatDDMMYYYY(r.fecha)}</strong> <span style="font-size:0.75rem; color:#64748b;">(${turnoBadge})</span></td>
-        <td style="padding: 8px 4px; text-align: center; white-space: nowrap;">${badge}</td>
-        <td style="padding: 8px 4px; text-align: center; font-weight:700; letter-spacing:1px; white-space: nowrap;" title="${getNombreResponsable(r.responsable)}">${getInicialesResponsable(r.responsable)}</td>
-        <td style="padding: 8px 4px; font-size: 0.82rem;">${r.observaciones || '-'}</td>
-        <td style="padding: 8px 4px; text-align: center; white-space: nowrap;">
-          <button type="button" class="btn btn-secondary" style="padding: 4px 6px; font-size: 0.75rem;" onclick="openEditConductividadModal(${idx})" title="Editar">✏️ Edit</button>
-          <button type="button" class="btn btn-danger" style="padding: 4px 6px; font-size: 0.75rem; margin-left: 2px;" onclick="confirmDeleteConductividad(${idx})" title="Eliminar">🗑️ Elim</button>
-        </td>
-      </tr>
-    `;
-  }).join('');
-}
-
-function openEditConductividadModal(idx) {
-  const rec = recentConductividadCache[idx];
-  if (!rec) return;
-  document.getElementById('edit-conduct-rowindex').value = rec.rowIndex;
-  document.getElementById('edit-conduct-fecha-reg').value = rec.fecha_registro || '';
-  document.getElementById('edit-conduct-old-mes').value = rec.mes || '';
-  document.getElementById('edit-conduct-old-anio').value = rec.anio || '';
-  document.getElementById('edit-conduct-fecha').value = parseFechaToInput(rec.fecha);
-  document.getElementById('edit-conduct-turno').value = rec.turno === 'Tarde' ? 'Tarde' : 'Mañana';
-  document.getElementById('edit-conduct-valor').value = rec.conductividad;
-  document.getElementById('edit-conduct-resp').value = rec.responsable || '';
-  document.getElementById('edit-conduct-obs').value = rec.observaciones || '';
-
-  document.querySelectorAll('.modal-card').forEach(m => m.style.display = 'none');
-  const modal = document.getElementById('modal-edit-conductividad');
-  if (modal) modal.style.display = 'block';
-  const overlay = document.getElementById('modal-overlay');
-  if (overlay) overlay.classList.add('active');
-}
-
-async function submitEditConductividad(e) {
-  e.preventDefault();
-  const fechaInput = document.getElementById('edit-conduct-fecha');
-  if (!validateDateInputNotFuture(fechaInput)) return;
-  const rowIndex = parseInt(document.getElementById('edit-conduct-rowindex').value);
-  const fechaReg = document.getElementById('edit-conduct-fecha-reg').value;
-  const fechaVal = document.getElementById('edit-conduct-fecha').value;
-  const turnoVal = document.getElementById('edit-conduct-turno').value;
-  if (fechaVal === today() && (turnoVal === 'Tarde' || turnoVal === 'PM') && getServerNow().getHours() < 12) {
-    showToast('⚠️ No es posible registrar el turno PM antes de las 12:00 hrs del día de hoy.', 'error');
-    return;
-  }
-  const valVal = document.getElementById('edit-conduct-valor').value;
-  const respVal = document.getElementById('edit-conduct-resp').value.trim().toUpperCase();
-  if (!(await ensureResponsableRegistered(respVal))) return;
-  const obsVal = document.getElementById('edit-conduct-obs').value;
-
-  setLoading('btn-edit-conduct-submit', 'spinner-edit-conduct', 'btn-edit-conduct-text', true);
-  try {
-    const res = await apiPost({
-      action: 'updateConductividad',
-      rowIndex: rowIndex,
-      fecha_registro: fechaReg,
-      fecha: fechaVal,
-      turno: turnoVal,
-      conductividad: valVal,
-      responsable: respVal,
-      observaciones: obsVal
-    });
-
-    if (res && res.success) {
-      showToast('✅ ' + res.message);
-      closeModal({ target: document.getElementById('modal-overlay') });
-      if (typeof clearRecordsMonthCache === 'function') clearRecordsMonthCache();
-      if (typeof prefetchDashboard === 'function') prefetchDashboard();
-      loadRecentConductividad();
-    } else {
-      showToast('❌ ' + (res.error || 'Error al actualizar registro'), 'error');
-    }
-  } catch (err) {
-    showToast('❌ Error de conexión al actualizar', 'error');
-  }
-  setLoading('btn-edit-conduct-submit', 'spinner-edit-conduct', 'btn-edit-conduct-text', false);
-}
-
-async function confirmDeleteConductividad(idx) {
   const rec = recentConductividadCache[idx];
   if (!rec) return;
   if (!confirm(`¿Está seguro de eliminar el registro de conductividad del día ${rec.fecha}?`)) return;
@@ -3872,6 +3677,8 @@ async function confirmDeleteCobas(idx) {
   } catch (err) {
     showToast('❌ Error de conexión al eliminar', 'error');
   }
+}
+
 // ── Asistente de Regularización Histórica ────────────────────────
 
 function openAsistenteModal() {
