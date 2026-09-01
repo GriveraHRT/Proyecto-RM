@@ -1074,7 +1074,8 @@ function saveTermo(data) {
     data.observaciones || '',
     ts,
     '',  // Revisado_Por
-    ''   // Fecha_Revisión
+    '',  // Fecha_Revisión
+    ''   // Obs._Revisión
   ]);
 
   clearSheetCache('termo', f.mes, f.anio);
@@ -1096,7 +1097,7 @@ function getRecentTermo(limit) {
 
   const endRow = Math.min(lastRow, 1 + limit);
   const numRows = endRow - 1;
-  const data = sheet.getRange(2, 1, numRows, 14).getValues();
+  const data = sheet.getRange(2, 1, numRows, 15).getValues();
 
   const records = data.map((r, idx) => {
     let fechaStr = getFechaFromRow(r);
@@ -1117,7 +1118,8 @@ function getRecentTermo(limit) {
       observaciones: r[10] ? String(r[10]) : '',
       fecha_registro: tsStr,
       revisado_por: r[12] ? String(r[12]) : '',
-      fecha_revision: r[13] ? String(r[13]) : ''
+      fecha_revision: r[13] ? String(r[13]) : '',
+      obs_revision: r[14] ? String(r[14]) : ''
     };
   });
 
@@ -1136,7 +1138,7 @@ function getRecentCentrifugas(limit) {
   if (lastRow < 2) return { success: true, records: [] };
   const endRow = Math.min(lastRow, 1 + limit);
   const numRows = endRow - 1;
-  const data = sheet.getRange(2, 1, numRows, 11).getValues();
+  const data = sheet.getRange(2, 1, numRows, 12).getValues();
   const records = data.map((r, idx) => {
     let fechaStr = getFechaFromRow(r);
     let tsStr = r[8] instanceof Date ? getFechaRegistroFormatted(r[8]) : String(r[8] || '');
@@ -1148,7 +1150,10 @@ function getRecentCentrifugas(limit) {
       responsable: r[5] ? String(r[5]) : '',
       tipo_mantencion: r[6] ? String(r[6]) : '',
       observaciones: r[7] ? String(r[7]) : '',
-      fecha_registro: tsStr
+      fecha_registro: tsStr,
+      revisado_por: r[9] ? String(r[9]) : '',
+      fecha_revision: r[10] ? String(r[10]) : '',
+      obs_revision: r[11] ? String(r[11]) : ''
     };
   });
   setCachedJson(cacheKey, records, CACHE_TTL_RECENT);
@@ -1166,7 +1171,7 @@ function getRecentMesones(limit) {
   if (lastRow < 2) return { success: true, records: [] };
   const endRow = Math.min(lastRow, 1 + limit);
   const numRows = endRow - 1;
-  const data = sheet.getRange(2, 1, numRows, 10).getValues();
+  const data = sheet.getRange(2, 1, numRows, 11).getValues();
   const records = data.map((r, idx) => {
     let fechaStr = getFechaFromRow(r);
     let tsStr = r[7] instanceof Date ? getFechaRegistroFormatted(r[7]) : String(r[7] || '');
@@ -1177,7 +1182,10 @@ function getRecentMesones(limit) {
       sala: r[4] ? String(r[4]) : '',
       responsable: r[5] ? String(r[5]) : '',
       observaciones: r[6] ? String(r[6]) : '',
-      fecha_registro: tsStr
+      fecha_registro: tsStr,
+      revisado_por: r[8] ? String(r[8]) : '',
+      fecha_revision: r[9] ? String(r[9]) : '',
+      obs_revision: r[10] ? String(r[10]) : ''
     };
   });
   setCachedJson(cacheKey, records, CACHE_TTL_RECENT);
@@ -1195,7 +1203,7 @@ function getRecentRefriTemp(limit) {
   if (lastRow < 2) return { success: true, records: [] };
   const endRow = Math.min(lastRow, 1 + limit);
   const numRows = endRow - 1;
-  const data = sheet.getRange(2, 1, numRows, 14).getValues();
+  const data = sheet.getRange(2, 1, numRows, 15).getValues();
   const records = data.map((r, idx) => {
     let fechaStr = getFechaFromRow(r);
     let tsStr = r[11] instanceof Date ? getFechaRegistroFormatted(r[11]) : String(r[11] || '');
@@ -1210,7 +1218,10 @@ function getRecentRefriTemp(limit) {
       tipo: r[8] ? String(r[8]) : '',
       accion_correctiva: r[9] ? String(r[9]) : '',
       observaciones: r[10] ? String(r[10]) : '',
-      fecha_registro: tsStr
+      fecha_registro: tsStr,
+      revisado_por: r[12] ? String(r[12]) : '',
+      fecha_revision: r[13] ? String(r[13]) : '',
+      obs_revision: r[14] ? String(r[14]) : ''
     };
   });
   setCachedJson(cacheKey, records, CACHE_TTL_RECENT);
@@ -1228,7 +1239,7 @@ function getRecentLimpRefri(limit) {
   if (lastRow < 2) return { success: true, records: [] };
   const endRow = Math.min(lastRow, 1 + limit);
   const numRows = endRow - 1;
-  const data = sheet.getRange(2, 1, numRows, 11).getValues();
+  const data = sheet.getRange(2, 1, numRows, 12).getValues();
   const records = data.map((r, idx) => {
     let fechaStr = getFechaFromRow(r);
     let tsStr = r[8] instanceof Date ? getFechaRegistroFormatted(r[8]) : String(r[8] || '');
@@ -1240,7 +1251,10 @@ function getRecentLimpRefri(limit) {
       equipo: r[5] ? String(r[5]) : '',
       responsable: r[6] ? String(r[6]) : '',
       observaciones: r[7] ? String(r[7]) : '',
-      fecha_registro: tsStr
+      fecha_registro: tsStr,
+      revisado_por: r[9] ? String(r[9]) : '',
+      fecha_revision: r[10] ? String(r[10]) : '',
+      obs_revision: r[11] ? String(r[11]) : ''
     };
   });
   setCachedJson(cacheKey, records, CACHE_TTL_RECENT);
@@ -1258,7 +1272,7 @@ function getRecentConductividad(limit) {
   if (lastRow < 2) return { success: true, records: [] };
   const endRow = Math.min(lastRow, 1 + limit);
   const numRows = endRow - 1;
-  const data = sheet.getRange(2, 1, numRows, 11).getValues();
+  const data = sheet.getRange(2, 1, numRows, 12).getValues();
   const records = data.map((r, idx) => {
     let fechaStr = getFechaFromRow(r);
     let tsStr = r[8] instanceof Date ? getFechaRegistroFormatted(r[8]) : String(r[8] || '');
@@ -1270,7 +1284,10 @@ function getRecentConductividad(limit) {
       conductividad: r[5],
       turno: r[6] ? String(r[6]) : '',
       observaciones: r[7] ? String(r[7]) : '',
-      fecha_registro: tsStr
+      fecha_registro: tsStr,
+      revisado_por: r[9] ? String(r[9]) : '',
+      fecha_revision: r[10] ? String(r[10]) : '',
+      obs_revision: r[11] ? String(r[11]) : ''
     };
   });
   setCachedJson(cacheKey, records, CACHE_TTL_RECENT);
@@ -1288,7 +1305,7 @@ function getRecentCobas(limit) {
   if (lastRow < 2) return { success: true, records: [] };
   const endRow = Math.min(lastRow, 1 + limit);
   const numRows = endRow - 1;
-  const data = sheet.getRange(2, 1, numRows, 12).getValues();
+  const data = sheet.getRange(2, 1, numRows, 13).getValues();
   const records = data.map((r, idx) => {
     let fechaStr = getFechaFromRow(r);
     let tsStr = r[9] instanceof Date ? getFechaRegistroFormatted(r[9]) : String(r[9] || '');
@@ -1301,7 +1318,10 @@ function getRecentCobas(limit) {
       frecuencia: r[6] ? String(r[6]) : '',
       actividad: r[7] ? String(r[7]) : '',
       observaciones: r[8] ? String(r[8]) : '',
-      fecha_registro: tsStr
+      fecha_registro: tsStr,
+      revisado_por: r[10] ? String(r[10]) : '',
+      fecha_revision: r[11] ? String(r[11]) : '',
+      obs_revision: r[12] ? String(r[12]) : ''
     };
   });
   setCachedJson(cacheKey, records, CACHE_TTL_RECENT);
@@ -1673,7 +1693,8 @@ function saveCentrifuga(data) {
     data.observaciones || '',
     ts,
     '',  // Revisado_Por
-    ''   // Fecha_Revisión
+    '',  // Fecha_Revisión
+    ''   // Obs._Revisión
   ]);
   insertRowsAtTopBatch(sheet, rows);
 
@@ -1704,7 +1725,8 @@ function saveMesones(data) {
     data.observaciones || '',
     ts,
     '',  // Revisado_Por
-    ''   // Fecha_Revisión
+    '',  // Fecha_Revisión
+    ''   // Obs._Revisión
   ]);
   insertRowsAtTopBatch(sheet, rows);
 
@@ -1748,7 +1770,8 @@ function saveRefriTemp(data) {
     data.observaciones || '',
     ts,
     '',  // Revisado_Por
-    ''   // Fecha_Revisión
+    '',  // Fecha_Revisión
+    ''   // Obs._Revisión
   ]);
 
   clearSheetCache('refriTemp', f.mes, f.anio);
@@ -1793,7 +1816,8 @@ function saveLimpiezaRefri(data) {
     data.observaciones || '',
     ts,
     '',  // Revisado_Por
-    ''   // Fecha_Revisión
+    '',  // Fecha_Revisión
+    ''   // Obs._Revisión
   ]);
   insertRowsAtTopBatch(sheet, rows);
 
@@ -1825,7 +1849,8 @@ function saveConductividad(data) {
     data.observaciones || '',
     ts,
     '',  // Revisado_Por
-    ''   // Fecha_Revisión
+    '',  // Fecha_Revisión
+    ''   // Obs._Revisión
   ]);
 
   clearSheetCache('conductividad', f.mes, f.anio);
@@ -1868,7 +1893,8 @@ function saveCobas(data) {
       data.observaciones || '',
       ts,
       '',  // Revisado_Por
-      ''   // Fecha_Revisión
+      '',  // Fecha_Revisión
+      ''   // Obs._Revisión
     ]);
   });
   
@@ -1887,43 +1913,43 @@ function getRegistros(mes, anio) {
       fecha: getFechaFromRow(r), dia: r[1], mes: r[2], anio: r[3],
       responsable: r[4], temperatura: r[5], humedad: r[6], turno: r[7],
       area: r[8], accion_correctiva: r[9] || '', observaciones: r[10],
-      revisado_por: r[12] || '', fecha_revision: r[13] || ''
+      revisado_por: r[12] || '', fecha_revision: r[13] || '', obs_revision: r[14] || ''
     }) },
     { key: 'centrifugas',   sheetName: SHEETS.CENT_REG,    colMes: 2, colAnio: 3, mapper: r => ({
       fecha: getFechaFromRow(r), dia: r[1], mes: r[2], anio: r[3], centrifuga: r[4],
       responsable: r[5], tipo_mantencion: r[6], observaciones: r[7],
-      revisado_por: r[9] || '', fecha_revision: r[10] || ''
+      revisado_por: r[9] || '', fecha_revision: r[10] || '', obs_revision: r[11] || ''
     }) },
     { key: 'mesones',       sheetName: SHEETS.MESONES,     colMes: 2, colAnio: 3, mapper: r => ({
       fecha: getFechaFromRow(r), dia: r[1], mes: r[2], anio: r[3], sala: r[4],
       responsable: r[5], observaciones: r[6],
-      revisado_por: r[8] || '', fecha_revision: r[9] || ''
+      revisado_por: r[8] || '', fecha_revision: r[9] || '', obs_revision: r[10] || ''
     }) },
     { key: 'refriTemp',     sheetName: SHEETS.REFRI_REG,    colMes: 2, colAnio: 3, mapper: r => ({
       fecha: getFechaFromRow(r), dia: r[1], mes: r[2], anio: r[3],
       responsable: r[4], temperatura: r[5], turno: r[6],
       equipo: r[7], tipo: r[8], accion_correctiva: r[9] || '', observaciones: r[10],
-      revisado_por: r[12] || '', fecha_revision: r[13] || ''
+      revisado_por: r[12] || '', fecha_revision: r[13] || '', obs_revision: r[14] || ''
     }) },
     { key: 'limpiezaRefri',  sheetName: SHEETS.LIMP_REFRI,   colMes: 2, colAnio: 3, mapper: r => ({
       fecha: getFechaFromRow(r), dia: r[1], mes: r[2], anio: r[3],
       tipo_mantencion: r[4], equipo: r[5], responsable: r[6], observaciones: r[7],
-      revisado_por: r[9] || '', fecha_revision: r[10] || ''
+      revisado_por: r[9] || '', fecha_revision: r[10] || '', obs_revision: r[11] || ''
     }) },
     { key: 'conductividad', sheetName: SHEETS.CONDUCT_REG,  colMes: 2, colAnio: 3, mapper: r => ({
       fecha: getFechaFromRow(r), dia: r[1], mes: r[2], anio: r[3],
       responsable: r[4], conductividad: r[5], turno: r[6], observaciones: r[7],
-      revisado_por: r[9] || '', fecha_revision: r[10] || ''
+      revisado_por: r[9] || '', fecha_revision: r[10] || '', obs_revision: r[11] || ''
     }) },
     { key: 'cobas',         sheetName: SHEETS.COBAS_REG,   colMes: 2, colAnio: 3, mapper: r => ({
       fecha: getFechaFromRow(r), dia: r[1], mes: r[2], anio: r[3],
       equipo: r[4], responsable: r[5], frecuencia: r[6], actividad: r[7],
-      observaciones: r[8], revisado_por: r[10] || '', fecha_revision: r[11] || ''
+      observaciones: r[8], revisado_por: r[10] || '', fecha_revision: r[11] || '', obs_revision: r[12] || ''
     }) },
     { key: 'elimMuestras',  sheetName: SHEETS.ELIM_MUESTRAS, colMes: 2, colAnio: 3, mapper: r => ({
       fecha: getFechaFromRow(r), dia: r[1], mes: r[2], anio: r[3],
       responsable: r[4], muestras_eliminadas: r[5],
-      revisado_por: r[7] || '', fecha_revision: r[8] || ''
+      revisado_por: r[7] || '', fecha_revision: r[8] || '', obs_revision: r[9] || ''
     }) }
   ];
 
@@ -1967,7 +1993,8 @@ function getRevision(mes, anio) {
         mes: rows[i][0], anio: rows[i][1],
         registros: String(rows[i][2] || '').split(',').map(s => s.trim()).filter(Boolean),
         revisor: rows[i][3] || '',
-        timestamp: rows[i][4] || ''
+        timestamp: rows[i][4] || '',
+        observacion: rows[i][5] ? String(rows[i][5]) : ''
       });
     }
   }
@@ -1991,6 +2018,7 @@ function marcarRevisado(data) {
     return { success: false, error: 'Seleccione al menos un registro para revisar.' };
   }
   const revisor = resolveNombreResponsable(data.revisor || 'REV');
+  const observacion = data.observacion || data.observaciones || '';
   const mes  = parseInt(data.mes);
   const anio = parseInt(data.anio);
   const sheet = getSheet(SHEETS.REVISIONES);
@@ -1998,18 +2026,18 @@ function marcarRevisado(data) {
   const fechaRev = formatFechaValue(new Date());
 
   // Agregar nueva fila de revisión (permite múltiples revisiones parciales)
-  sheet.appendRow([mes, anio, registros.join(','), revisor, ts]);
+  sheet.appendRow([mes, anio, registros.join(','), revisor, ts, observacion]);
 
   // Mapa de qué hojas corresponden a cada registro seleccionable
   const STAMP_MAP = {
-    termo:        { sheet: SHEETS.TERMO,        colMes: 2, colAnio: 3, colRev: 12, colFecha: 13 },
-    centrifugas:  { sheet: SHEETS.CENT_REG,     colMes: 2, colAnio: 3, colRev: 9,  colFecha: 10 },
-    mesones:      { sheet: SHEETS.MESONES,       colMes: 2, colAnio: 3, colRev: 8,  colFecha: 9  },
-    refriTemp:    { sheet: SHEETS.REFRI_REG,     colMes: 2, colAnio: 3, colRev: 12, colFecha: 13 },
-    limpRefri:    { sheet: SHEETS.LIMP_REFRI,    colMes: 2, colAnio: 3, colRev: 9,  colFecha: 10 },
-    conductividad:{ sheet: SHEETS.CONDUCT_REG,   colMes: 2, colAnio: 3, colRev: 9,  colFecha: 10 },
-    cobas:        { sheet: SHEETS.COBAS_REG,     colMes: 2, colAnio: 3, colRev: 10, colFecha: 11 },
-    elimMuestras: { sheet: SHEETS.ELIM_MUESTRAS, colMes: 2, colAnio: 3, colRev: 7,  colFecha: 8  }
+    termo:        { sheet: SHEETS.TERMO,        colMes: 2, colAnio: 3, colRev: 12, colFecha: 13, colObs: 14 },
+    centrifugas:  { sheet: SHEETS.CENT_REG,     colMes: 2, colAnio: 3, colRev: 9,  colFecha: 10, colObs: 11 },
+    mesones:      { sheet: SHEETS.MESONES,       colMes: 2, colAnio: 3, colRev: 8,  colFecha: 9,  colObs: 10 },
+    refriTemp:    { sheet: SHEETS.REFRI_REG,     colMes: 2, colAnio: 3, colRev: 12, colFecha: 13, colObs: 14 },
+    limpRefri:    { sheet: SHEETS.LIMP_REFRI,    colMes: 2, colAnio: 3, colRev: 9,  colFecha: 10, colObs: 11 },
+    conductividad:{ sheet: SHEETS.CONDUCT_REG,   colMes: 2, colAnio: 3, colRev: 9,  colFecha: 10, colObs: 11 },
+    cobas:        { sheet: SHEETS.COBAS_REG,     colMes: 2, colAnio: 3, colRev: 10, colFecha: 11, colObs: 12 },
+    elimMuestras: { sheet: SHEETS.ELIM_MUESTRAS, colMes: 2, colAnio: 3, colRev: 7,  colFecha: 8,  colObs: 9  }
   };
 
   const cacheKeyMap = {
@@ -2027,7 +2055,7 @@ function marcarRevisado(data) {
   registros.forEach(function(reg) {
     const cfg = STAMP_MAP[reg];
     if (cfg) {
-      stampRevision(getSheet(cfg.sheet), cfg.colMes, cfg.colAnio, mes, anio, revisor, fechaRev, cfg.colRev, cfg.colFecha);
+      stampRevision(getSheet(cfg.sheet), cfg.colMes, cfg.colAnio, mes, anio, revisor, fechaRev, cfg.colRev, cfg.colFecha, cfg.colObs, observacion);
       if (cacheKeyMap[reg]) {
         clearSheetCache(cacheKeyMap[reg], mes, anio);
       }
@@ -2045,15 +2073,24 @@ function marcarRevisado(data) {
   return { success: true, message: 'Revisión confirmada por ' + revisor + ': ' + nombresRev };
 }
 
-/** Escribe las iniciales del revisor y fecha en todos los registros de un mes en un solo batch */
-function stampRevision(sheet, colMes, colAnio, mes, anio, iniciales, fechaRev, colRevPor, colRevFecha) {
+/** Escribe las iniciales del revisor, fecha y observación en todos los registros de un mes en un solo batch */
+function stampRevision(sheet, colMes, colAnio, mes, anio, iniciales, fechaRev, colRevPor, colRevFecha, colObs, observacion) {
   const data = sheet.getDataRange().getValues();
   if (data.length <= 1) return;
+
+  const minCols = (colObs !== undefined ? colObs + 1 : colRevFecha + 1);
+  if (sheet.getMaxColumns() < minCols) {
+    sheet.insertColumnsAfter(sheet.getMaxColumns(), minCols - sheet.getMaxColumns());
+  }
+
   let modified = false;
   for (let i = 1; i < data.length; i++) {
     if (parseInt(data[i][colMes]) === mes && parseInt(data[i][colAnio]) === anio) {
       data[i][colRevPor] = iniciales;
       data[i][colRevFecha] = fechaRev;
+      if (colObs !== undefined) {
+        data[i][colObs] = observacion || '';
+      }
       modified = true;
     }
   }
@@ -3015,27 +3052,27 @@ function setupTriggers() {
 function getSheetDefs() {
   return [
     // Registros primero
-    { name: SHEETS.TERMO,       headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Responsable','Temperatura (°C)','Humedad (%)','Turno','Area','Acción Correctiva','Observaciones','Fecha de registro','Revisado Por','Fecha Revisión'],
+    { name: SHEETS.TERMO,       headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Responsable','Temperatura (°C)','Humedad (%)','Turno','Area','Acción Correctiva','Observaciones','Fecha de registro','Revisado Por','Fecha Revisión','Obs. Revisión'],
       hideCols: [2,3,4,12] },
-    { name: SHEETS.CENT_REG,    headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Centrifuga','Responsable','Tipo Mantención','Observaciones','Fecha de registro','Revisado Por','Fecha Revisión'],
+    { name: SHEETS.CENT_REG,    headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Centrifuga','Responsable','Tipo Mantención','Observaciones','Fecha de registro','Revisado Por','Fecha Revisión','Obs. Revisión'],
       hideCols: [2,3,4,9] },
-    { name: SHEETS.MESONES,     headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Sala','Responsable','Observaciones','Fecha de registro','Revisado Por','Fecha Revisión'],
+    { name: SHEETS.MESONES,     headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Sala','Responsable','Observaciones','Fecha de registro','Revisado Por','Fecha Revisión','Obs. Revisión'],
       hideCols: [2,3,4,8] },
-    { name: SHEETS.REFRI_REG,   headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Responsable','Temperatura (°C)','Turno','Equipo','Tipo','Acción Correctiva','Observaciones','Fecha de registro','Revisado Por','Fecha Revisión'],
+    { name: SHEETS.REFRI_REG,   headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Responsable','Temperatura (°C)','Turno','Equipo','Tipo','Acción Correctiva','Observaciones','Fecha de registro','Revisado Por','Fecha Revisión','Obs. Revisión'],
       hideCols: [2,3,4,12] },
-    { name: SHEETS.LIMP_REFRI,  headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Tipo Mantención','Equipo','Responsable','Observaciones','Fecha de registro','Revisado Por','Fecha Revisión'],
+    { name: SHEETS.LIMP_REFRI,  headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Tipo Mantención','Equipo','Responsable','Observaciones','Fecha de registro','Revisado Por','Fecha Revisión','Obs. Revisión'],
       hideCols: [2,3,4,9] },
-    { name: SHEETS.CONDUCT_REG, headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Responsable','Conductividad (µS/cm)','Turno','Observaciones','Fecha de registro','Revisado Por','Fecha Revisión'],
+    { name: SHEETS.CONDUCT_REG, headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Responsable','Conductividad (µS/cm)','Turno','Observaciones','Fecha de registro','Revisado Por','Fecha Revisión','Obs. Revisión'],
       hideCols: [2,3,4,9] },
-    { name: SHEETS.COBAS_REG,   headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Equipo','Responsable','Frecuencia','Actividad','Observaciones','Fecha de registro','Revisado Por','Fecha Revisión'],
+    { name: SHEETS.COBAS_REG,   headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Equipo','Responsable','Frecuencia','Actividad','Observaciones','Fecha de registro','Revisado Por','Fecha Revisión','Obs. Revisión'],
       hideCols: [2,3,4,10] },
-    { name: SHEETS.REVISIONES,  headers: ['Mes','Año','Registros','Revisor','Fecha de registro'],
+    { name: SHEETS.REVISIONES,  headers: ['Mes','Año','Registros','Revisor','Fecha de registro','Observación'],
       hideCols: [5] },
     { name: SHEETS.ETIQUETADORAS_REG, headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Etiquetadora','Nombre Práctico','Accion','Descripcion','Responsable','Fecha de registro'],
       hideCols: [2,3,4,10] },
     { name: SHEETS.DXH900_REG,  headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Usuario Responsable','Descripción Intervención','Nombre Especialista','Fecha de registro'],
       hideCols: [2,3,4,8] },
-    { name: SHEETS.ELIM_MUESTRAS, headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Responsable','Muestras Eliminadas','Fecha de registro','Revisado Por','Fecha Revisión'],
+    { name: SHEETS.ELIM_MUESTRAS, headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Responsable','Muestras Eliminadas','Fecha de registro','Revisado Por','Fecha Revisión','Obs. Revisión'],
       hideCols: [2,3,4,7] },
     // Maestros al final
     { name: SHEETS.AREAS,       headers: ['Area', 'Horario turno'] },
@@ -3223,8 +3260,8 @@ function resetRegistros() {
   // Update Revisiones headers to new format
   const revSheet = getSheet(SHEETS.REVISIONES);
   if (revSheet) {
-    revSheet.getRange(1, 1, 1, 5).setValues([['Mes','Año','Registros','Revisor','Fecha de registro']]);
-    revSheet.getRange(1, 1, 1, 5).setBackground('#0F172A').setFontColor('#FFFFFF').setFontWeight('bold');
+    revSheet.getRange(1, 1, 1, 6).setValues([['Mes','Año','Registros','Revisor','Fecha de registro','Observación']]);
+    revSheet.getRange(1, 1, 1, 6).setBackground('#0F172A').setFontColor('#FFFFFF').setFontWeight('bold');
   }
   return { success: true, message: 'Registros limpiados', details: results };
 }
@@ -3689,7 +3726,8 @@ function saveElimMuestras(data) {
     data.muestras_eliminadas,
     ts,
     '',  // Revisado Por
-    ''   // Fecha Revisión
+    '',  // Fecha Revisión
+    ''   // Obs. Revisión
   ]);
 
   try {

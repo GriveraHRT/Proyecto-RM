@@ -641,13 +641,14 @@ function renderTables(reg){
   const c=document.getElementById('dash-tables');
   if(!c||!reg) return;
   let html='';
-  if(isModuloActivo('termo'))html+=renderTableCard('🌡️ Temp. Ambiental',reg.termo||[],['Día','Turno','Área','Temp°','Hum%','Resp','Acción','Obs'],r=>[r.dia,r.turno,r.area,r.temperatura,r.humedad,getInicialesResponsable(r.responsable),r.accion_correctiva||'',r.observaciones]);
-  if(isModuloActivo('centrifugas'))html+=renderTableCard('⚙️ Centrífugas',reg.centrifugas||[],['Día','Centrífuga','Resp','Tipo','Obs'],r=>[r.dia,r.centrifuga,getInicialesResponsable(r.responsable),r.tipo_mantencion,r.observaciones]);
-  if(isModuloActivo('mesones'))html+=renderTableCard('🧽 Mesones',reg.mesones||[],['Día','Sala','Resp','Obs'],r=>[r.dia,r.sala,getInicialesResponsable(r.responsable),r.observaciones]);
-  if(isModuloActivo('refri-temp'))html+=renderTableCard('🧊 Temp. Refrigeradores',reg.refriTemp||[],['Día','Turno','Equipo','Temp°','Resp','Obs'],r=>[r.dia,r.turno,r.equipo,r.temperatura,getInicialesResponsable(r.responsable),r.observaciones]);
-  if(isModuloActivo('limp-refri'))html+=renderTableCard('🧹 Limpieza Refrigeradores',reg.limpiezaRefri||[],['Día','Tipo','Equipo','Resp','Obs'],r=>[r.dia,r.tipo_mantencion,r.equipo,getInicialesResponsable(r.responsable),r.observaciones]);
-  if(isModuloActivo('conductividad'))html+=renderTableCard('💧 Conductividad',reg.conductividad||[],['Día','Turno','µS/cm','Resp','Obs'],r=>[r.dia,r.turno,r.conductividad,getInicialesResponsable(r.responsable),r.observaciones]);
-  if(isModuloActivo('cobas'))html+=renderTableCard('🔬 Mantención Cobas',reg.cobas||[],['Día','Equipo','Resp','Frecuencia','Actividad','Obs'],r=>[r.dia,r.equipo,getInicialesResponsable(r.responsable),r.frecuencia,r.actividad,r.observaciones||'']);
+  if(isModuloActivo('termo'))html+=renderTableCard('🌡️ Temp. Ambiental',reg.termo||[],['Día','Turno','Área','Temp°','Hum%','Resp','Acción','Obs','Obs. Rev.'],r=>[r.dia,r.turno,r.area,r.temperatura,r.humedad,getInicialesResponsable(r.responsable),r.accion_correctiva||'',r.observaciones,r.obs_revision||'']);
+  if(isModuloActivo('centrifugas'))html+=renderTableCard('⚙️ Centrífugas',reg.centrifugas||[],['Día','Centrífuga','Resp','Tipo','Obs','Obs. Rev.'],r=>[r.dia,r.centrifuga,getInicialesResponsable(r.responsable),r.tipo_mantencion,r.observaciones,r.obs_revision||'']);
+  if(isModuloActivo('mesones'))html+=renderTableCard('🧽 Mesones',reg.mesones||[],['Día','Sala','Resp','Obs','Obs. Rev.'],r=>[r.dia,r.sala,getInicialesResponsable(r.responsable),r.observaciones,r.obs_revision||'']);
+  if(isModuloActivo('refri-temp'))html+=renderTableCard('🧊 Temp. Refrigeradores',reg.refriTemp||[],['Día','Turno','Equipo','Temp°','Resp','Obs','Obs. Rev.'],r=>[r.dia,r.turno,r.equipo,r.temperatura,getInicialesResponsable(r.responsable),r.observaciones,r.obs_revision||'']);
+  if(isModuloActivo('limp-refri'))html+=renderTableCard('🧹 Limpieza Refrigeradores',reg.limpiezaRefri||[],['Día','Tipo','Equipo','Resp','Obs','Obs. Rev.'],r=>[r.dia,r.tipo_mantencion,r.equipo,getInicialesResponsable(r.responsable),r.observaciones,r.obs_revision||'']);
+  if(isModuloActivo('conductividad'))html+=renderTableCard('💧 Conductividad',reg.conductividad||[],['Día','Turno','µS/cm','Resp','Obs','Obs. Rev.'],r=>[r.dia,r.turno,r.conductividad,getInicialesResponsable(r.responsable),r.observaciones,r.obs_revision||'']);
+  if(isModuloActivo('cobas'))html+=renderTableCard('🔬 Mantención Cobas',reg.cobas||[],['Día','Equipo','Resp','Frecuencia','Actividad','Obs','Obs. Rev.'],r=>[r.dia,r.equipo,getInicialesResponsable(r.responsable),r.frecuencia,r.actividad,r.observaciones||'',r.obs_revision||'']);
+  if(isModuloActivo('elim-muestras') && reg.elimMuestras)html+=renderTableCard('🗑️ Eliminación Muestras',reg.elimMuestras||[],['Día','Muestras Eliminadas','Resp','Obs. Rev.'],r=>[r.dia,r.muestras_eliminadas,getInicialesResponsable(r.responsable),r.obs_revision||'']);
   c.innerHTML=html;
 }
 function renderTableCard(title,rows,headers,mapper){if(!rows.length)return`<div class="card card-sm" style="margin-bottom:16px;"><strong>${title}</strong><div style="color:var(--text-dim);font-size:13px;margin-top:8px;">Sin registros en este período.</div></div>`;const thead=`<tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr>`;const tbody=rows.map(r=>`<tr>${mapper(r).map(v=>`<td>${v??''}</td>`).join('')}</tr>`).join('');return`<div class="card" style="margin-bottom:16px;padding:16px 12px;"><strong style="font-family:'Outfit';font-size:15px;">${title}</strong><span style="color:var(--text-dim);font-size:12px;margin-left:8px;">${rows.length} registros</span><div class="records-table-wrap" style="margin-top:12px;"><table class="records-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table></div></div>`}
@@ -694,13 +695,27 @@ async function loadRevStatus(){
       const done=revisados.indexOf(t.key)!==-1;
       html+=`<div class="status-item ${done?'done':'miss'}"><span class="status-dot ${done?'green':'red'}"></span>${t.name}</div>`;
     });
-    html+='</div>';panel.innerHTML=html;panel.style.display='block';
+    html+='</div>';
+    if(rev.revisiones && rev.revisiones.length > 0){
+      const obsList = rev.revisiones.filter(r => r.observacion && r.observacion.trim().length > 0);
+      if(obsList.length > 0){
+        html+='<div style="margin-top:10px; padding-top:8px; border-top:1px dashed rgba(255,255,255,0.12); font-size:12px;">';
+        html+='<strong style="color:var(--text-dim); display:block; margin-bottom:4px;">Observaciones registradas de Jefatura:</strong>';
+        obsList.forEach(item => {
+          html+=`<div style="margin-top:4px; line-height:1.4; color:var(--text-main); font-size:11.5px;">• <strong>${getInicialesResponsable(item.revisor)}</strong>: ${escapeHtml(item.observacion)}</div>`;
+        });
+        html+='</div>';
+      }
+    }
+    panel.innerHTML=html;panel.style.display='block';
   }catch(e){panel.style.display='none';}
 }
 async function submitRevisadoAdmin(){
   const registros=getSelectedChips('rev-chips');
   const revisor=document.getElementById('rev-admin-revisor').value;
   const pwd=document.getElementById('rev-admin-pwd').value;
+  const obsEl=document.getElementById('rev-admin-obs');
+  const observacion=obsEl ? obsEl.value.trim() : '';
   const mes=document.getElementById('rev-admin-mes').value;
   const anio=document.getElementById('rev-admin-anio').value;
   const err=document.getElementById('rev-admin-error');
@@ -712,10 +727,11 @@ async function submitRevisadoAdmin(){
   document.getElementById('spinner-rev-admin').classList.add('visible');
   document.getElementById('btn-rev-admin-text').style.display='none';
   try{
-    const r=await apiPost({action:'marcarRevisado',password:pwd,mes:mes,anio:anio,registros:registros,revisor:revisor});
+    const r=await apiPost({action:'marcarRevisado',password:pwd,mes:mes,anio:anio,registros:registros,revisor:revisor,observacion:observacion});
     if(r.success){
       showToast('✅ '+r.message);
       document.getElementById('rev-admin-pwd').value='';
+      if(obsEl) obsEl.value='';
       document.querySelectorAll('#rev-chips .chip-item').forEach(c=>c.classList.remove('selected'));
       document.getElementById('btn-rev-select-all').classList.remove('active');
       state.dashCache=null; // invalidate cache
@@ -2009,7 +2025,7 @@ async function loadElimMuestrasHistorialForm() {
             <span style="color:var(--primary-color);">🗑️ ${r.muestras_eliminadas}</span>
             <span style="color:var(--text-dim); font-size:11px;" title="${getNombreResponsable(r.responsable)}">📅 ${r.fecha} — 👤 ${getInicialesResponsable(r.responsable)}</span>
           </div>
-          ${r.revisado_por ? `<div style="font-size:11px; color:#10B981; margin-top:2px;">✓ Revisado por ${getInicialesResponsable(r.revisado_por)} (${r.fecha_revision})</div>` : ''}
+          ${r.revisado_por ? `<div style="font-size:11px; color:#10B981; margin-top:2px;">✓ Revisado por ${getInicialesResponsable(r.revisado_por)} (${r.fecha_revision})${r.obs_revision ? ` — Obs: <em>${escapeHtml(r.obs_revision)}</em>` : ''}</div>` : ''}
         </div>
       `).join('');
       list.style.display = 'block';
