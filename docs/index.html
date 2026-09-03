@@ -157,7 +157,7 @@
         <div class="form-group">
           <label class="form-label" for="termo-resp">Responsable (iniciales)</label>
           <input type="text" id="termo-resp" class="form-control"
-            placeholder="ABC" maxlength="3"
+            placeholder="ABC" maxlength="4"
             style="text-transform:uppercase; letter-spacing:3px; font-weight:700; font-size:18px;"
             required />
         </div>
@@ -251,7 +251,7 @@
         <div class="form-group">
           <label class="form-label" for="cent-resp">Responsable (iniciales)</label>
           <input type="text" id="cent-resp" class="form-control"
-            placeholder="ABC" maxlength="3"
+            placeholder="ABC" maxlength="4"
             style="text-transform:uppercase; letter-spacing:3px; font-weight:700; font-size:18px;"
             required />
         </div>
@@ -300,7 +300,7 @@
         <div class="form-group">
           <label class="form-label" for="meson-resp">Responsable (iniciales)</label>
           <input type="text" id="meson-resp" class="form-control"
-            placeholder="ABC" maxlength="3"
+            placeholder="ABC" maxlength="4"
             style="text-transform:uppercase; letter-spacing:3px; font-weight:700; font-size:18px;"
             required />
         </div>
@@ -373,7 +373,7 @@
         <div class="form-group">
           <label class="form-label" for="refri-resp">Responsable (iniciales)</label>
           <input type="text" id="refri-resp" class="form-control"
-            placeholder="ABC" maxlength="3"
+            placeholder="ABC" maxlength="4"
             style="text-transform:uppercase; letter-spacing:3px; font-weight:700; font-size:18px;"
             required />
         </div>
@@ -430,7 +430,7 @@
         <div class="form-group">
           <label class="form-label" for="limp-refri-resp">Responsable (iniciales)</label>
           <input type="text" id="limp-refri-resp" class="form-control"
-            placeholder="ABC" maxlength="3"
+            placeholder="ABC" maxlength="4"
             style="text-transform:uppercase; letter-spacing:3px; font-weight:700; font-size:18px;"
             required />
         </div>
@@ -501,7 +501,7 @@
         <div class="form-group">
           <label class="form-label" for="conduct-resp">Responsable (iniciales)</label>
           <input type="text" id="conduct-resp" class="form-control"
-            placeholder="ABC" maxlength="3"
+            placeholder="ABC" maxlength="4"
             style="text-transform:uppercase; letter-spacing:3px; font-weight:700; font-size:18px;"
             required />
         </div>
@@ -689,7 +689,7 @@
           <div class="form-group">
             <label class="form-label" for="et-bitacora-responsable">Responsable (iniciales)</label>
             <input type="text" id="et-bitacora-responsable" class="form-control"
-              placeholder="ABC" maxlength="3"
+              placeholder="ABC" maxlength="4"
               style="text-transform:uppercase; letter-spacing:3px; font-weight:700; font-size:18px;"
               required />
           </div>
@@ -831,7 +831,7 @@
         <div class="form-group">
           <label class="form-label" for="cobas-resp">Responsable (iniciales)</label>
           <input type="text" id="cobas-resp" class="form-control"
-            placeholder="ABC" maxlength="3"
+            placeholder="ABC" maxlength="4"
             style="text-transform:uppercase; letter-spacing:3px; font-weight:700; font-size:18px;"
             required />
         </div>
@@ -955,7 +955,7 @@
       <div class="form-group">
         <label class="form-label" for="rev-admin-revisor">Revisor (iniciales)</label>
         <input type="text" id="rev-admin-revisor" class="form-control"
-          placeholder="ABC" maxlength="3"
+          placeholder="ABC" maxlength="4"
           style="text-transform:uppercase; letter-spacing:3px; font-weight:700; font-size:18px;" />
       </div>
 
@@ -1059,9 +1059,9 @@
             <input type="date" id="elim-fecha" class="form-control" required />
           </div>
           <div class="form-group">
-            <label class="form-label" for="elim-responsable">Responsable (3 siglas)</label>
-            <input type="text" id="elim-responsable" class="form-control" placeholder="Ej: ABC" maxlength="3" pattern="[A-Za-z]{3}" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z]/g,'')" required />
-            <span class="form-help" style="font-size:11px; color:var(--text-dim);">Limitado a 3 iniciales alfabéticas</span>
+            <label class="form-label" for="elim-responsable">Responsable (iniciales)</label>
+            <input type="text" id="elim-responsable" class="form-control" placeholder="Ej: ABC" maxlength="4" pattern="[A-Za-z]{3,4}" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z]/g,'')" required />
+            <span class="form-help" style="font-size:11px; color:var(--text-dim);">3 o 4 iniciales alfabéticas</span>
           </div>
         </div>
 
@@ -1248,7 +1248,7 @@
 
       <div class="form-group" style="margin-bottom: 12px;">
         <label class="form-label" for="edit-termo-resp">Responsable (iniciales)</label>
-        <input type="text" id="edit-termo-resp" class="form-control" maxlength="3" style="text-transform:uppercase; letter-spacing:2px; font-weight:700;" required />
+        <input type="text" id="edit-termo-resp" class="form-control" maxlength="4" style="text-transform:uppercase; letter-spacing:2px; font-weight:700;" required />
       </div>
 
       <div class="form-group" style="margin-bottom: 16px;">
@@ -1261,6 +1261,311 @@
         <button type="submit" class="btn btn-primary" id="btn-edit-termo-submit">
           <div class="spinner" id="spinner-edit-termo"></div>
           <span id="btn-edit-termo-text">💾 Guardar Cambios</span>
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Modal: Editar Registro de Centrífugas -->
+  <div class="modal-card" id="modal-edit-centrifugas" style="display:none; max-width: 500px;" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div class="modal-title" style="font-size: 1.15rem; font-weight: 700; margin-bottom: 16px;">✏️ Editar Registro de Centrífuga</div>
+    <form id="form-edit-centrifugas" onsubmit="submitEditCentrifuga(event)" autocomplete="off">
+      <input type="hidden" id="edit-cent-rowindex" />
+      <input type="hidden" id="edit-cent-fecha-reg" />
+      <input type="hidden" id="edit-cent-old-mes" />
+      <input type="hidden" id="edit-cent-old-anio" />
+
+      <div class="form-row" style="margin-bottom: 12px;">
+        <div class="form-group">
+          <label class="form-label" for="edit-cent-fecha">Fecha</label>
+          <input type="date" id="edit-cent-fecha" class="form-control" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="edit-cent-tipo">Tipo Mantención</label>
+          <select id="edit-cent-tipo" class="form-control" required>
+            <option value="Diaria">🔁 Diaria</option>
+            <option value="Semanal">📅 Semanal</option>
+            <option value="Anual">🔧 Anual / Según necesidad</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label class="form-label" for="edit-cent-nombre">Centrífuga</label>
+        <select id="edit-cent-nombre" class="form-control" required></select>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label class="form-label" for="edit-cent-resp">Responsable (iniciales)</label>
+        <input type="text" id="edit-cent-resp" class="form-control" maxlength="4" style="text-transform:uppercase; letter-spacing:2px; font-weight:700;" required />
+      </div>
+
+      <div class="form-group" style="margin-bottom: 16px;">
+        <label class="form-label" for="edit-cent-obs">Observaciones</label>
+        <input type="text" id="edit-cent-obs" class="form-control" placeholder="Opcional…" />
+      </div>
+
+      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal({target:document.getElementById('modal-overlay')})">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btn-edit-cent-submit">
+          <div class="spinner" id="spinner-edit-cent"></div>
+          <span id="btn-edit-cent-text">💾 Guardar Cambios</span>
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Modal: Editar Registro de Mesones -->
+  <div class="modal-card" id="modal-edit-mesones" style="display:none; max-width: 500px;" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div class="modal-title" style="font-size: 1.15rem; font-weight: 700; margin-bottom: 16px;">✏️ Editar Registro de Mesón</div>
+    <form id="form-edit-mesones" onsubmit="submitEditMeson(event)" autocomplete="off">
+      <input type="hidden" id="edit-meson-rowindex" />
+      <input type="hidden" id="edit-meson-fecha-reg" />
+      <input type="hidden" id="edit-meson-old-mes" />
+      <input type="hidden" id="edit-meson-old-anio" />
+
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label class="form-label" for="edit-meson-fecha">Fecha</label>
+        <input type="date" id="edit-meson-fecha" class="form-control" required />
+      </div>
+
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label class="form-label" for="edit-meson-sala">Sala</label>
+        <select id="edit-meson-sala" class="form-control" required></select>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label class="form-label" for="edit-meson-resp">Responsable (iniciales)</label>
+        <input type="text" id="edit-meson-resp" class="form-control" maxlength="4" style="text-transform:uppercase; letter-spacing:2px; font-weight:700;" required />
+      </div>
+
+      <div class="form-group" style="margin-bottom: 16px;">
+        <label class="form-label" for="edit-meson-obs">Observaciones</label>
+        <input type="text" id="edit-meson-obs" class="form-control" placeholder="Opcional…" />
+      </div>
+
+      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal({target:document.getElementById('modal-overlay')})">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btn-edit-meson-submit">
+          <div class="spinner" id="spinner-edit-meson"></div>
+          <span id="btn-edit-meson-text">💾 Guardar Cambios</span>
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Modal: Editar Registro Temp Refrigeradores -->
+  <div class="modal-card" id="modal-edit-refri-temp" style="display:none; max-width: 500px;" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div class="modal-title" style="font-size: 1.15rem; font-weight: 700; margin-bottom: 16px;">✏️ Editar Temp. Refrigerador</div>
+    <form id="form-edit-refri-temp" onsubmit="submitEditRefriTemp(event)" autocomplete="off">
+      <input type="hidden" id="edit-refri-rowindex" />
+      <input type="hidden" id="edit-refri-fecha-reg" />
+      <input type="hidden" id="edit-refri-old-mes" />
+      <input type="hidden" id="edit-refri-old-anio" />
+
+      <div class="form-row" style="margin-bottom: 12px;">
+        <div class="form-group">
+          <label class="form-label" for="edit-refri-fecha">Fecha</label>
+          <input type="date" id="edit-refri-fecha" class="form-control" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="edit-refri-turno">Turno</label>
+          <select id="edit-refri-turno" class="form-control" required>
+            <option value="Mañana">☀️ Mañana (AM)</option>
+            <option value="Tarde">🌙 Tarde (PM)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label class="form-label" for="edit-refri-equipo">Equipo</label>
+        <select id="edit-refri-equipo" class="form-control" required></select>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label class="form-label" for="edit-refri-temp-val">Temperatura (°C)</label>
+        <input type="number" id="edit-refri-temp-val" class="form-control" step="0.1" min="-100" max="50" required />
+      </div>
+
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label class="form-label" for="edit-refri-accion">Acción Correctiva</label>
+        <select id="edit-refri-accion" class="form-control">
+          <option value="">Ninguna / Opcional</option>
+        </select>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label class="form-label" for="edit-refri-resp">Responsable (iniciales)</label>
+        <input type="text" id="edit-refri-resp" class="form-control" maxlength="4" style="text-transform:uppercase; letter-spacing:2px; font-weight:700;" required />
+      </div>
+
+      <div class="form-group" style="margin-bottom: 16px;">
+        <label class="form-label" for="edit-refri-obs">Observaciones</label>
+        <input type="text" id="edit-refri-obs" class="form-control" placeholder="Opcional…" />
+      </div>
+
+      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal({target:document.getElementById('modal-overlay')})">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btn-edit-refri-submit">
+          <div class="spinner" id="spinner-edit-refri"></div>
+          <span id="btn-edit-refri-text">💾 Guardar Cambios</span>
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Modal: Editar Registro Limpieza Refrigeradores -->
+  <div class="modal-card" id="modal-edit-limp-refri" style="display:none; max-width: 500px;" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div class="modal-title" style="font-size: 1.15rem; font-weight: 700; margin-bottom: 16px;">✏️ Editar Limpieza Refrigerador</div>
+    <form id="form-edit-limp-refri" onsubmit="submitEditLimpRefri(event)" autocomplete="off">
+      <input type="hidden" id="edit-limp-refri-rowindex" />
+      <input type="hidden" id="edit-limp-refri-fecha-reg" />
+      <input type="hidden" id="edit-limp-refri-old-mes" />
+      <input type="hidden" id="edit-limp-refri-old-anio" />
+
+      <div class="form-row" style="margin-bottom: 12px;">
+        <div class="form-group">
+          <label class="form-label" for="edit-limp-refri-fecha">Fecha</label>
+          <input type="date" id="edit-limp-refri-fecha" class="form-control" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="edit-limp-refri-tipo">Tipo Mantención</label>
+          <select id="edit-limp-refri-tipo" class="form-control" required>
+            <option value="Semanal (externa)">📅 Semanal (externa)</option>
+            <option value="Semestral (interna)">🔧 Semestral (interna)</option>
+            <option value="Descongelación manual">❄️ Descongelación manual</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label class="form-label" for="edit-limp-refri-equipo">Equipo</label>
+        <select id="edit-limp-refri-equipo" class="form-control" required></select>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label class="form-label" for="edit-limp-refri-resp">Responsable (iniciales)</label>
+        <input type="text" id="edit-limp-refri-resp" class="form-control" maxlength="4" style="text-transform:uppercase; letter-spacing:2px; font-weight:700;" required />
+      </div>
+
+      <div class="form-group" style="margin-bottom: 16px;">
+        <label class="form-label" for="edit-limp-refri-obs">Observaciones</label>
+        <input type="text" id="edit-limp-refri-obs" class="form-control" placeholder="Opcional…" />
+      </div>
+
+      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal({target:document.getElementById('modal-overlay')})">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btn-edit-limp-refri-submit">
+          <div class="spinner" id="spinner-edit-limp-refri"></div>
+          <span id="btn-edit-limp-refri-text">💾 Guardar Cambios</span>
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Modal: Editar Registro Conductividad -->
+  <div class="modal-card" id="modal-edit-conductividad" style="display:none; max-width: 500px;" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div class="modal-title" style="font-size: 1.15rem; font-weight: 700; margin-bottom: 16px;">✏️ Editar Conductividad</div>
+    <form id="form-edit-conductividad" onsubmit="submitEditConductividad(event)" autocomplete="off">
+      <input type="hidden" id="edit-conduct-rowindex" />
+      <input type="hidden" id="edit-conduct-fecha-reg" />
+      <input type="hidden" id="edit-conduct-old-mes" />
+      <input type="hidden" id="edit-conduct-old-anio" />
+
+      <div class="form-row" style="margin-bottom: 12px;">
+        <div class="form-group">
+          <label class="form-label" for="edit-conduct-fecha">Fecha</label>
+          <input type="date" id="edit-conduct-fecha" class="form-control" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="edit-conduct-turno">Turno</label>
+          <select id="edit-conduct-turno" class="form-control" required>
+            <option value="Mañana">☀️ Mañana (AM)</option>
+            <option value="Tarde">🌙 Tarde (PM)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label class="form-label" for="edit-conduct-valor">Conductividad (µS/cm)</label>
+        <input type="number" id="edit-conduct-valor" class="form-control" step="0.01" min="0" max="10" required />
+      </div>
+
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label class="form-label" for="edit-conduct-resp">Responsable (iniciales)</label>
+        <input type="text" id="edit-conduct-resp" class="form-control" maxlength="4" style="text-transform:uppercase; letter-spacing:2px; font-weight:700;" required />
+      </div>
+
+      <div class="form-group" style="margin-bottom: 16px;">
+        <label class="form-label" for="edit-conduct-obs">Observaciones</label>
+        <input type="text" id="edit-conduct-obs" class="form-control" placeholder="Opcional…" />
+      </div>
+
+      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal({target:document.getElementById('modal-overlay')})">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btn-edit-conduct-submit">
+          <div class="spinner" id="spinner-edit-conduct"></div>
+          <span id="btn-edit-conduct-text">💾 Guardar Cambios</span>
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Modal: Editar Registro Cobas -->
+  <div class="modal-card" id="modal-edit-cobas" style="display:none; max-width: 500px;" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div class="modal-title" style="font-size: 1.15rem; font-weight: 700; margin-bottom: 16px;">✏️ Editar Mantención Cobas</div>
+    <form id="form-edit-cobas" onsubmit="submitEditCobas(event)" autocomplete="off">
+      <input type="hidden" id="edit-cobas-rowindex" />
+      <input type="hidden" id="edit-cobas-fecha-reg" />
+      <input type="hidden" id="edit-cobas-old-mes" />
+      <input type="hidden" id="edit-cobas-old-anio" />
+
+      <div class="form-row" style="margin-bottom: 12px;">
+        <div class="form-group">
+          <label class="form-label" for="edit-cobas-fecha">Fecha</label>
+          <input type="date" id="edit-cobas-fecha" class="form-control" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="edit-cobas-equipo">Equipo</label>
+          <select id="edit-cobas-equipo" class="form-control" required>
+            <option value="Cobas 1">Cobas 1</option>
+            <option value="Cobas 2">Cobas 2</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row" style="margin-bottom: 12px;">
+        <div class="form-group">
+          <label class="form-label" for="edit-cobas-frecuencia">Frecuencia</label>
+          <input type="text" id="edit-cobas-frecuencia" class="form-control" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="edit-cobas-resp">Responsable</label>
+          <input type="text" id="edit-cobas-resp" class="form-control" maxlength="4" style="text-transform:uppercase; letter-spacing:2px; font-weight:700;" required />
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label class="form-label" for="edit-cobas-actividad">Actividad</label>
+        <input type="text" id="edit-cobas-actividad" class="form-control" required />
+      </div>
+
+      <div class="form-group" style="margin-bottom: 16px;">
+        <label class="form-label" for="edit-cobas-obs">Observaciones</label>
+        <input type="text" id="edit-cobas-obs" class="form-control" placeholder="Opcional…" />
+      </div>
+
+      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal({target:document.getElementById('modal-overlay')})">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btn-edit-cobas-submit">
+          <div class="spinner" id="spinner-edit-cobas"></div>
+          <span id="btn-edit-cobas-text">💾 Guardar Cambios</span>
         </button>
       </div>
     </form>
@@ -1293,7 +1598,7 @@
       <div class="form-row" style="margin-bottom:12px;">
         <div class="form-group" style="margin-bottom:0;">
           <label class="form-label" for="asistente-resp">Usuario Responsable (Iniciales)</label>
-          <input type="text" id="asistente-resp" class="form-control" placeholder="Ej: GRC" maxlength="3"
+          <input type="text" id="asistente-resp" class="form-control" placeholder="Ej: GRC" maxlength="4"
             style="text-transform:uppercase; letter-spacing:2px; font-weight:700;" list="list-personal-initials" />
           <span class="form-help" style="font-size:11px; color:var(--text-dim);">Registrado en Maestro Personal</span>
         </div>

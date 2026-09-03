@@ -452,7 +452,7 @@ function getInicialesResponsable(val) {
     return state.personalByNameMap[upper].iniciales;
   }
   if (trimmed.length <= 4) return upper;
-  return trimmed.split(/\s+/).map(w => w[0]).join('').toUpperCase().substring(0, 3);
+  return trimmed.split(/\s+/).map(w => w[0]).join('').toUpperCase().substring(0, 4);
 }
 
 function updateResponsableFeedback(inputEl) {
