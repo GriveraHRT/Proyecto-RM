@@ -1,6 +1,6 @@
 # Proyecto RM — Guía de Despliegue
 
-Este documento describe el procedimiento obligatorio para publicar y desplegar actualizaciones del sistema de **Registros Mensuales (Laboratorio Clínico — Hospital de Talca)**.
+Este documento describe el procedimiento obligatorio para publicar y desplegar actualizaciones del sistema de **Registros Unidad de Laboratorio (Laboratorio Clínico — Hospital de Talca)**.
 
 ---
 

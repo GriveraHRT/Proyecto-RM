@@ -368,7 +368,7 @@ function doGet(e) {
     const tmp = HtmlService.createTemplateFromFile('index');
     tmp.parameter = e.parameter || {};
     return tmp.evaluate()
-      .setTitle('Registros Mensuales — HRT LAB')
+      .setTitle('Registros Unidad de Laboratorio — HRT LAB')
       .setFaviconUrl('https://griverahrt.github.io/Proyecto-RM/img/favicon.png')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
@@ -2115,7 +2115,7 @@ function sendAlertaFueraDeRango(info) {
 
   const subject = '⚠️ [Registros Lab] Alerta: Valor fuera de rango — ' + info.area;
   const body = 'Estimado/a,\n\n' +
-    'Se ha registrado un valor fuera de rango en el sistema de Registros Mensuales.\n\n' +
+    'Se ha registrado un valor fuera de rango en el sistema de Registros Unidad de Laboratorio.\n\n' +
     '📍 Área: ' + info.area + '\n' +
     '📅 Fecha: ' + info.fecha + '\n' +
     '🕐 Turno: ' + info.turno + '\n' +
@@ -2128,7 +2128,7 @@ function sendAlertaFueraDeRango(info) {
     'Enlace a los registros:\n' + SHEET_URL + '\n\n' +
     '---\n' +
     'Este mensaje fue enviado automáticamente.\n' +
-    'Registros Mensuales — Laboratorio Clínico — Hospital de Talca\n';
+    'Registros Unidad de Laboratorio — Laboratorio Clínico — Hospital de Talca\n';
 
   const to = getEmailRecipients('termo');
   if (to) {
@@ -2226,7 +2226,7 @@ function triggerAlertaConsolidadaTermo() {
     'Enlace a los registros:\n' + SHEET_URL + '\n\n' +
     '---\n' +
     'Este mensaje consolidado fue enviado automáticamente a las 08:30.\n' +
-    'Registros Mensuales — Laboratorio Clínico — Hospital de Talca\n';
+    'Registros Unidad de Laboratorio — Laboratorio Clínico — Hospital de Talca\n';
 
   try {
     MailApp.sendEmail({ to: recipients, subject: subject, body: body });
@@ -2255,7 +2255,7 @@ function sendAlertaRefriTemp(info) {
     'Enlace a los registros:\n' + SHEET_URL + '\n\n' +
     '---\n' +
     'Este mensaje fue enviado automáticamente.\n' +
-    'Registros Mensuales — Laboratorio Clínico — Hospital de Talca\n';
+    'Registros Unidad de Laboratorio — Laboratorio Clínico — Hospital de Talca\n';
 
   const to = getEmailRecipients('refriTemp');
   if (to) {
@@ -2281,7 +2281,7 @@ function sendAlertaConductividad(info) {
     'Enlace a los registros:\n' + SHEET_URL + '\n\n' +
     '---\n' +
     'Este mensaje fue enviado automáticamente.\n' +
-    'Registros Mensuales — Laboratorio Clínico — Hospital de Talca\n';
+    'Registros Unidad de Laboratorio — Laboratorio Clínico — Hospital de Talca\n';
 
   const to = getEmailRecipients('conductividad');
   if (to) {
@@ -2349,7 +2349,7 @@ function triggerRecordatorioMesAnterior() {
       'Enlace a los registros:\n' + SHEET_URL + '\n\n' +
       '---\n' +
       'Este mensaje fue enviado automáticamente.\n' +
-      'Registros Mensuales — Laboratorio Clínico — Hospital de Talca\n';
+      'Registros Unidad de Laboratorio — Laboratorio Clínico — Hospital de Talca\n';
 
     try {
       MailApp.sendEmail({ to: email, subject: subject, body: body });
@@ -2564,7 +2564,7 @@ function triggerDatosNoRellenados(e) {
       'Enlace a los registros:\n' + SHEET_URL + '\n\n' +
       '---\n' +
       'Este mensaje fue enviado automáticamente.\n' +
-      'Registros Mensuales — Laboratorio Clínico — Hospital de Talca\n';
+      'Registros Unidad de Laboratorio — Laboratorio Clínico — Hospital de Talca\n';
 
     try {
       MailApp.sendEmail({ to: group.recipientsOriginal, subject: subject, body: body });
@@ -2800,7 +2800,7 @@ function triggerMantencionSemanal(e) {
       'Enlace a los registros:\n' + SHEET_URL + '\n\n' +
       '---\n' +
       'Este mensaje fue enviado automáticamente.\n' +
-      'Registros Mensuales — Laboratorio Clínico — Hospital de Talca\n';
+      'Registros Unidad de Laboratorio — Laboratorio Clínico — Hospital de Talca\n';
 
     try {
       MailApp.sendEmail({ to: group.to, subject: subject, body: body });
@@ -2958,7 +2958,7 @@ function triggerAlertaMantencionesCobas() {
     'Enlace a los registros:\n' + SHEET_URL + '\n\n' +
     '---\n' +
     'Este mensaje fue enviado automáticamente.\n' +
-    'Registros Mensuales — Laboratorio Clínico — Hospital de Talca\n';
+    'Registros Unidad de Laboratorio — Laboratorio Clínico — Hospital de Talca\n';
     
   try {
     MailApp.sendEmail({ to: recipients, subject: subject, body: body });
@@ -3222,7 +3222,7 @@ function initializeSpreadsheet() {
 }
 
 function setup() {
-  const ss = SpreadsheetApp.create('Registros Mensuales Laboratorio HRT');
+  const ss = SpreadsheetApp.create('Registros Unidad de Laboratorio HRT');
   const id = ss.getId();
   PropertiesService.getScriptProperties().setProperty('SPREADSHEET_ID', id);
   initializeSpreadsheet();
@@ -3595,7 +3595,7 @@ function sendTestNotificacion(data) {
   const nombreRegistro = data.registro || data.clave || 'General';
   const subject = '🧪 [Registros Lab] Correo de Prueba — ' + nombreRegistro;
   const body = 'Estimado/a,\n\n' +
-    'Esta es una notificación de PRUEBA generada desde el panel de Administración del sistema de Registros Mensuales.\n\n' +
+    'Esta es una notificación de PRUEBA generada desde el panel de Administración del sistema de Registros Unidad de Laboratorio.\n\n' +
     '📍 Tipo de Registro: ' + nombreRegistro + '\n' +
     '🔑 Clave interna: ' + (data.clave || 'n/a') + '\n' +
     '📅 Fecha y Hora de Envío: ' + new Date().toLocaleString('es-CL') + '\n\n' +
@@ -3604,7 +3604,7 @@ function sendTestNotificacion(data) {
     'Enlace a los registros:\n' + SHEET_URL + '\n\n' +
     '---\n' +
     'Mensaje generado de forma automática para verificación del sistema.\n' +
-    'Registros Mensuales — Laboratorio Clínico — Hospital de Talca\n';
+    'Registros Unidad de Laboratorio — Laboratorio Clínico — Hospital de Talca\n';
     
   try {
     MailApp.sendEmail({ to: to, subject: subject, body: body });
@@ -3701,7 +3701,7 @@ function sendAlertaDxH900(info) {
     'Enlace a los registros:\n' + SHEET_URL + '\n\n' +
     '---\n' +
     'Este mensaje fue enviado automáticamente.\n' +
-    'Registros Mensuales — Laboratorio Clínico — Hospital de Talca\n';
+    'Registros Unidad de Laboratorio — Laboratorio Clínico — Hospital de Talca\n';
 
   const to = getEmailRecipients('dxh900');
   if (to) {

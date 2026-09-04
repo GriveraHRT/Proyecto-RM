@@ -1238,7 +1238,7 @@ function printQR(){
     showToast('⚠️ Permita ventanas emergentes para poder imprimir','error');
     return;
   }
-  w.document.write(`<!DOCTYPE html><html><head><title>QR - ${val}</title><style>body{font-family:sans-serif;text-align:center;padding:40px;}h2{margin-bottom:16px;}p{color:#555;font-size:13px;margin-top:12px;}.qr-container svg{width:200px;height:200px;display:block;margin:0 auto;}</style></head><body><h2>Registros Mensuales</h2><h3>${val}</h3><div class="qr-container" style="display:flex;justify-content:center;align-items:center;margin:20px auto;width:200px;height:200px;">${qrContent}</div><p>Escanear para registrar</p><script>window.onload=()=>{window.print();}<\/script></body></html>`);
+  w.document.write(`<!DOCTYPE html><html><head><title>QR - ${val}</title><style>body{font-family:sans-serif;text-align:center;padding:40px;}h2{margin-bottom:16px;}p{color:#555;font-size:13px;margin-top:12px;}.qr-container svg{width:200px;height:200px;display:block;margin:0 auto;}</style></head><body><h2>Registros Unidad de Laboratorio</h2><h3>${val}</h3><div class="qr-container" style="display:flex;justify-content:center;align-items:center;margin:20px auto;width:200px;height:200px;">${qrContent}</div><p>Escanear para registrar</p><script>window.onload=()=>{window.print();}<\/script></body></html>`);
   w.document.close();
 }
 
