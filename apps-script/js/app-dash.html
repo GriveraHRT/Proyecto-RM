@@ -3699,13 +3699,6 @@ function openAsistenteModal() {
     anioEl.innerHTML = [curYear - 2, curYear - 1, curYear, curYear + 1].map(a => `<option value="${a}"${a === defAnio ? ' selected' : ''}>${a}</option>`).join('');
   }
 
-  // Pre-fill user if known
-  const respEl = document.getElementById('asistente-resp');
-  if (respEl && !respEl.value) {
-    const lastResp = localStorage.getItem('last_user_initials') || '';
-    if (lastResp) respEl.value = lastResp;
-  }
-
   const pwdEl = document.getElementById('asistente-pwd');
   if (pwdEl) pwdEl.value = '';
 
@@ -3743,7 +3736,6 @@ state._asistenteData = null;
 async function ejecutarDiagnosticoAsistente() {
   const mes = parseInt(document.getElementById('asistente-mes').value, 10);
   const anio = parseInt(document.getElementById('asistente-anio').value, 10);
-  const resp = (document.getElementById('asistente-resp').value || '').trim().toUpperCase();
   const pwd = (document.getElementById('asistente-pwd').value || '').trim();
   const obs = (document.getElementById('asistente-obs').value || '').trim();
 
@@ -3751,24 +3743,11 @@ async function ejecutarDiagnosticoAsistente() {
   errEl.style.display = 'none';
   errEl.textContent = '';
 
-  if (!resp || resp.length < 2) {
-    errEl.textContent = 'Ingrese las iniciales del usuario responsable (mín. 2 caracteres).';
-    errEl.style.display = 'block';
-    return;
-  }
   if (!pwd) {
     errEl.textContent = 'Ingrese la contraseña de administrador.';
     errEl.style.display = 'block';
     return;
   }
-
-  // Ensure user is valid in Personal maestro
-  if (typeof ensureResponsableRegistered === 'function') {
-    const ok = await ensureResponsableRegistered(resp);
-    if (!ok) return;
-  }
-
-  try { localStorage.setItem('last_user_initials', resp); } catch(e){}
 
   const spin = document.getElementById('spinner-asistente-diag');
   const btnTxt = document.getElementById('btn-asistente-diag-text');
@@ -3791,7 +3770,6 @@ async function ejecutarDiagnosticoAsistente() {
         diag: res,
         mes: mes,
         anio: anio,
-        responsable: resp,
         password: pwd,
         observacion: obs
       };
@@ -3809,56 +3787,95 @@ async function ejecutarDiagnosticoAsistente() {
   }
 }
 
+function aplicarSiglasGlobales(val) {
+  const upper = (val || '').trim().toUpperCase();
+  document.querySelectorAll('.asistente-sigla-subitem').forEach(inp => {
+    inp.value = upper;
+  });
+}
+
+function toggleGrupoAsistente(module) {
+  const chks = document.querySelectorAll(`.asistente-check-subitem[data-module="${module}"]`);
+  if (!chks.length) return;
+  const anyUnchecked = Array.from(chks).some(c => !c.checked);
+  chks.forEach(c => c.checked = anyUnchecked);
+  actualizarTotalAsistente();
+}
+
 function renderDiagnosticoAsistente(diag) {
   const banner = document.getElementById('asistente-diag-banner');
   const container = document.getElementById('asistente-diag-content');
   const execBtn = document.getElementById('btn-asistente-ejecutar');
+  const globalRespInput = document.getElementById('asistente-resp-global');
 
   const ms = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
   const mesNombre = ms[diag.mes - 1] || diag.mes;
+
+  // Pre-fill global initials
+  const defaultResp = localStorage.getItem('last_user_initials') || '';
+  if (globalRespInput) {
+    globalRespInput.value = defaultResp;
+  }
 
   if (diag.totales.total === 0) {
     banner.className = 'alert-banner alert-info';
     banner.innerHTML = `✨ <strong>¡Mes 100% al día!</strong> No se detectaron registros pendientes en <strong>${mesNombre} ${diag.anio}</strong> según las configuraciones activas.`;
     container.innerHTML = '<div style="text-align:center; padding:24px 12px; color:var(--text-dim); font-size:14px;">Todos los formularios activos cuentan con su registro completo para este período.</div>';
+    const globalBox = document.getElementById('asistente-resp-global-box');
+    if (globalBox) globalBox.style.display = 'none';
     if (execBtn) execBtn.style.display = 'none';
     return;
   }
 
+  const globalBox = document.getElementById('asistente-resp-global-box');
+  if (globalBox) globalBox.style.display = 'block';
   if (execBtn) execBtn.style.display = 'inline-flex';
+
   banner.className = 'alert-banner alert-info';
-  banner.innerHTML = `📊 Se detectaron <strong>${diag.totales.total} registros pendientes</strong> en <strong>${mesNombre} ${diag.anio}</strong>. Verifique el detalle a continuación antes de regularizar:`;
+  banner.innerHTML = `📊 Se detectaron <strong>${diag.totales.total} registros pendientes</strong> en <strong>${mesNombre} ${diag.anio}</strong>. Active o desactive cada ítem y asigne las siglas correspondientes:`;
 
   let html = '';
 
-  // 1. Termo
+  // 1. Termo (Temperatura y Humedad Ambiental)
   if (diag.faltantes.termo && diag.faltantes.termo.length > 0) {
-    const areasCount = {};
+    const areasMap = {};
     diag.faltantes.termo.forEach(it => {
-      areasCount[it.area] = (areasCount[it.area] || 0) + 1;
+      areasMap[it.area] = (areasMap[it.area] || 0) + 1;
     });
-    const areasSummary = Object.entries(areasCount).map(([a, count]) => `• <strong>${a}</strong>: ${count} turnos`).join('<br/>');
+
+    let itemsHtml = Object.entries(areasMap).map(([area, count]) => `
+      <div class="asistente-subitem" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; padding:6px 8px; border-bottom:1px solid rgba(255,255,255,0.05); gap:8px;">
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; cursor:pointer; margin:0; flex:1; min-width:180px;">
+          <input type="checkbox" class="asistente-check-subitem" data-module="termo" data-entity="${encodeURIComponent(area)}" checked onchange="actualizarTotalAsistente()" style="width:16px; height:16px; cursor:pointer;" />
+          <span>${area} <span style="font-size:11px; font-weight:normal; color:var(--text-dim);">(${count} turnos)</span></span>
+        </label>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <label style="font-size:11px; color:var(--text-dim); margin:0;">Sigla:</label>
+          <input type="text" class="asistente-sigla-subitem form-control" value="${defaultResp}" placeholder="Ej: GRC" maxlength="4" style="width:65px; height:28px; text-transform:uppercase; font-weight:700; text-align:center; font-size:11px; padding:2px 4px;" list="list-personal-initials" />
+        </div>
+      </div>
+    `).join('');
 
     html += `
       <div class="asistente-module-card card card-sm" style="margin-bottom:12px; border:1px solid rgba(255,255,255,0.08);">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <label style="display:flex; align-items:center; gap:8px; font-weight:700; font-size:14px; cursor:pointer; margin:0;">
-            <input type="checkbox" id="asistente-check-termo" checked onchange="actualizarTotalAsistente()" style="width:16px; height:16px; cursor:pointer;" />
-            <span>🌡️ Temp. y Humedad Ambiental</span>
-          </label>
-          <span class="badge-pill" style="font-size:12px; background:rgba(0,102,255,0.15); color:var(--primary-color); padding:2px 8px; border-radius:10px;">${diag.faltantes.termo.length} registros</span>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid rgba(255,255,255,0.08);">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-weight:700; font-size:14px;">🌡️ Temp. y Humedad Ambiental</span>
+            <span class="badge-pill" style="font-size:11px; background:rgba(0,102,255,0.15); color:var(--primary-color); padding:2px 8px; border-radius:10px;">${diag.faltantes.termo.length} registros</span>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="toggleGrupoAsistente('termo')" style="padding:2px 8px; font-size:11px; height:24px;">Seleccionar / Deseleccionar</button>
         </div>
-        <div style="font-size:12px; color:var(--text-dim); line-height:1.4; margin-bottom:8px;">
-          ${areasSummary}
+        <div style="margin-bottom:8px;">
+          ${itemsHtml}
         </div>
         <div class="form-row" style="margin-bottom:0; background:rgba(255,255,255,0.03); padding:8px; border-radius:6px;">
           <div class="form-group" style="margin-bottom:0; flex:1;">
             <label class="form-label" style="font-size:11px;">Temp. Nominal (°C)</label>
-            <input type="number" id="asistente-termo-temp" class="form-control form-control-sm" value="21.5" step="0.1" style="height:32px; font-size:12px;" />
+            <input type="number" id="asistente-termo-temp" class="form-control form-control-sm" value="21.5" step="0.1" style="height:30px; font-size:12px;" />
           </div>
           <div class="form-group" style="margin-bottom:0; flex:1;">
             <label class="form-label" style="font-size:11px;">Humedad Nominal (%)</label>
-            <input type="number" id="asistente-termo-hum" class="form-control form-control-sm" value="45" step="1" style="height:32px; font-size:12px;" />
+            <input type="number" id="asistente-termo-hum" class="form-control form-control-sm" value="45" step="1" style="height:30px; font-size:12px;" />
           </div>
         </div>
       </div>
@@ -3867,72 +3884,102 @@ function renderDiagnosticoAsistente(diag) {
 
   // 2. Centrífugas
   if (diag.faltantes.centrifugas && diag.faltantes.centrifugas.length > 0) {
-    const centCount = {};
+    const centMap = {};
     diag.faltantes.centrifugas.forEach(it => {
-      centCount[it.centrifuga] = (centCount[it.centrifuga] || 0) + 1;
+      centMap[it.centrifuga] = (centMap[it.centrifuga] || 0) + 1;
     });
-    const centSummary = Object.entries(centCount).map(([c, count]) => `• <strong>${c}</strong>: ${count} días`).join('<br/>');
+
+    let itemsHtml = Object.entries(centMap).map(([cent, count]) => `
+      <div class="asistente-subitem" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; padding:6px 8px; border-bottom:1px solid rgba(255,255,255,0.05); gap:8px;">
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; cursor:pointer; margin:0; flex:1; min-width:180px;">
+          <input type="checkbox" class="asistente-check-subitem" data-module="centrifugas" data-entity="${encodeURIComponent(cent)}" checked onchange="actualizarTotalAsistente()" style="width:16px; height:16px; cursor:pointer;" />
+          <span>⚙️ ${cent} <span style="font-size:11px; font-weight:normal; color:var(--text-dim);">(${count} días)</span></span>
+        </label>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <label style="font-size:11px; color:var(--text-dim); margin:0;">Sigla:</label>
+          <input type="text" class="asistente-sigla-subitem form-control" value="${defaultResp}" placeholder="Ej: GRC" maxlength="4" style="width:65px; height:28px; text-transform:uppercase; font-weight:700; text-align:center; font-size:11px; padding:2px 4px;" list="list-personal-initials" />
+        </div>
+      </div>
+    `).join('');
 
     html += `
       <div class="asistente-module-card card card-sm" style="margin-bottom:12px; border:1px solid rgba(255,255,255,0.08);">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <label style="display:flex; align-items:center; gap:8px; font-weight:700; font-size:14px; cursor:pointer; margin:0;">
-            <input type="checkbox" id="asistente-check-centrifugas" checked onchange="actualizarTotalAsistente()" style="width:16px; height:16px; cursor:pointer;" />
-            <span>⚙️ Mantención Centrífugas</span>
-          </label>
-          <span class="badge-pill" style="font-size:12px; background:rgba(0,102,255,0.15); color:var(--primary-color); padding:2px 8px; border-radius:10px;">${diag.faltantes.centrifugas.length} registros</span>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid rgba(255,255,255,0.08);">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-weight:700; font-size:14px;">⚙️ Mantención Centrífugas</span>
+            <span class="badge-pill" style="font-size:11px; background:rgba(0,102,255,0.15); color:var(--primary-color); padding:2px 8px; border-radius:10px;">${diag.faltantes.centrifugas.length} registros</span>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="toggleGrupoAsistente('centrifugas')" style="padding:2px 8px; font-size:11px; height:24px;">Seleccionar / Deseleccionar</button>
         </div>
-        <div style="font-size:12px; color:var(--text-dim); line-height:1.4;">
-          ${centSummary}
-        </div>
+        <div>${itemsHtml}</div>
       </div>
     `;
   }
 
   // 3. Mesones
   if (diag.faltantes.mesones && diag.faltantes.mesones.length > 0) {
-    const mesonCount = {};
+    const salaMap = {};
     diag.faltantes.mesones.forEach(it => {
-      mesonCount[it.sala] = (mesonCount[it.sala] || 0) + 1;
+      salaMap[it.sala] = (salaMap[it.sala] || 0) + 1;
     });
-    const mesonSummary = Object.entries(mesonCount).map(([s, count]) => `• <strong>${s}</strong>: ${count} días`).join('<br/>');
+
+    let itemsHtml = Object.entries(salaMap).map(([sala, count]) => `
+      <div class="asistente-subitem" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; padding:6px 8px; border-bottom:1px solid rgba(255,255,255,0.05); gap:8px;">
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; cursor:pointer; margin:0; flex:1; min-width:180px;">
+          <input type="checkbox" class="asistente-check-subitem" data-module="mesones" data-entity="${encodeURIComponent(sala)}" checked onchange="actualizarTotalAsistente()" style="width:16px; height:16px; cursor:pointer;" />
+          <span>🧽 ${sala} <span style="font-size:11px; font-weight:normal; color:var(--text-dim);">(${count} días)</span></span>
+        </label>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <label style="font-size:11px; color:var(--text-dim); margin:0;">Sigla:</label>
+          <input type="text" class="asistente-sigla-subitem form-control" value="${defaultResp}" placeholder="Ej: GRC" maxlength="4" style="width:65px; height:28px; text-transform:uppercase; font-weight:700; text-align:center; font-size:11px; padding:2px 4px;" list="list-personal-initials" />
+        </div>
+      </div>
+    `).join('');
 
     html += `
       <div class="asistente-module-card card card-sm" style="margin-bottom:12px; border:1px solid rgba(255,255,255,0.08);">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <label style="display:flex; align-items:center; gap:8px; font-weight:700; font-size:14px; cursor:pointer; margin:0;">
-            <input type="checkbox" id="asistente-check-mesones" checked onchange="actualizarTotalAsistente()" style="width:16px; height:16px; cursor:pointer;" />
-            <span>🧽 Limpieza Mesones</span>
-          </label>
-          <span class="badge-pill" style="font-size:12px; background:rgba(0,102,255,0.15); color:var(--primary-color); padding:2px 8px; border-radius:10px;">${diag.faltantes.mesones.length} registros</span>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid rgba(255,255,255,0.08);">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-weight:700; font-size:14px;">🧽 Limpieza Mesones</span>
+            <span class="badge-pill" style="font-size:11px; background:rgba(0,102,255,0.15); color:var(--primary-color); padding:2px 8px; border-radius:10px;">${diag.faltantes.mesones.length} registros</span>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="toggleGrupoAsistente('mesones')" style="padding:2px 8px; font-size:11px; height:24px;">Seleccionar / Deseleccionar</button>
         </div>
-        <div style="font-size:12px; color:var(--text-dim); line-height:1.4;">
-          ${mesonSummary}
-        </div>
+        <div>${itemsHtml}</div>
       </div>
     `;
   }
 
   // 4. Temp Refrigeradores
   if (diag.faltantes.refriTemp && diag.faltantes.refriTemp.length > 0) {
-    const refriCount = {};
+    const refriMap = {};
     diag.faltantes.refriTemp.forEach(it => {
-      refriCount[it.equipo] = (refriCount[it.equipo] || 0) + 1;
+      refriMap[it.equipo] = (refriMap[it.equipo] || 0) + 1;
     });
-    const refriSummary = Object.entries(refriCount).map(([r, count]) => `• <strong>${r}</strong>: ${count} turnos`).join('<br/>');
+
+    let itemsHtml = Object.entries(refriMap).map(([equipo, count]) => `
+      <div class="asistente-subitem" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; padding:6px 8px; border-bottom:1px solid rgba(255,255,255,0.05); gap:8px;">
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; cursor:pointer; margin:0; flex:1; min-width:180px;">
+          <input type="checkbox" class="asistente-check-subitem" data-module="refriTemp" data-entity="${encodeURIComponent(equipo)}" checked onchange="actualizarTotalAsistente()" style="width:16px; height:16px; cursor:pointer;" />
+          <span>🧊 ${equipo} <span style="font-size:11px; font-weight:normal; color:var(--text-dim);">(${count} turnos)</span></span>
+        </label>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <label style="font-size:11px; color:var(--text-dim); margin:0;">Sigla:</label>
+          <input type="text" class="asistente-sigla-subitem form-control" value="${defaultResp}" placeholder="Ej: GRC" maxlength="4" style="width:65px; height:28px; text-transform:uppercase; font-weight:700; text-align:center; font-size:11px; padding:2px 4px;" list="list-personal-initials" />
+        </div>
+      </div>
+    `).join('');
 
     html += `
       <div class="asistente-module-card card card-sm" style="margin-bottom:12px; border:1px solid rgba(255,255,255,0.08);">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <label style="display:flex; align-items:center; gap:8px; font-weight:700; font-size:14px; cursor:pointer; margin:0;">
-            <input type="checkbox" id="asistente-check-refriTemp" checked onchange="actualizarTotalAsistente()" style="width:16px; height:16px; cursor:pointer;" />
-            <span>🧊 Temp. Refrigeradores</span>
-          </label>
-          <span class="badge-pill" style="font-size:12px; background:rgba(0,102,255,0.15); color:var(--primary-color); padding:2px 8px; border-radius:10px;">${diag.faltantes.refriTemp.length} registros</span>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid rgba(255,255,255,0.08);">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-weight:700; font-size:14px;">🧊 Temp. Refrigeradores</span>
+            <span class="badge-pill" style="font-size:11px; background:rgba(0,102,255,0.15); color:var(--primary-color); padding:2px 8px; border-radius:10px;">${diag.faltantes.refriTemp.length} registros</span>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="toggleGrupoAsistente('refriTemp')" style="padding:2px 8px; font-size:11px; height:24px;">Seleccionar / Deseleccionar</button>
         </div>
-        <div style="font-size:12px; color:var(--text-dim); line-height:1.4;">
-          ${refriSummary}
-        </div>
+        <div>${itemsHtml}</div>
       </div>
     `;
   }
@@ -3941,16 +3988,25 @@ function renderDiagnosticoAsistente(diag) {
   if (diag.faltantes.conductividad && diag.faltantes.conductividad.length > 0) {
     html += `
       <div class="asistente-module-card card card-sm" style="margin-bottom:12px; border:1px solid rgba(255,255,255,0.08);">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <label style="display:flex; align-items:center; gap:8px; font-weight:700; font-size:14px; cursor:pointer; margin:0;">
-            <input type="checkbox" id="asistente-check-conductividad" checked onchange="actualizarTotalAsistente()" style="width:16px; height:16px; cursor:pointer;" />
-            <span>💧 Conductividad del Agua</span>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid rgba(255,255,255,0.08);">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-weight:700; font-size:14px;">💧 Conductividad del Agua</span>
+            <span class="badge-pill" style="font-size:11px; background:rgba(0,102,255,0.15); color:var(--primary-color); padding:2px 8px; border-radius:10px;">${diag.faltantes.conductividad.length} registros</span>
+          </div>
+        </div>
+        <div class="asistente-subitem" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; padding:6px 8px; gap:8px; margin-bottom:8px;">
+          <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; cursor:pointer; margin:0; flex:1; min-width:180px;">
+            <input type="checkbox" class="asistente-check-subitem" data-module="conductividad" data-entity="conductividad" checked onchange="actualizarTotalAsistente()" style="width:16px; height:16px; cursor:pointer;" />
+            <span>Medición Mañana y Tarde <span style="font-size:11px; font-weight:normal; color:var(--text-dim);">(${diag.faltantes.conductividad.length} turnos)</span></span>
           </label>
-          <span class="badge-pill" style="font-size:12px; background:rgba(0,102,255,0.15); color:var(--primary-color); padding:2px 8px; border-radius:10px;">${diag.faltantes.conductividad.length} registros</span>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <label style="font-size:11px; color:var(--text-dim); margin:0;">Sigla:</label>
+            <input type="text" class="asistente-sigla-subitem form-control" value="${defaultResp}" placeholder="Ej: GRC" maxlength="4" style="width:65px; height:28px; text-transform:uppercase; font-weight:700; text-align:center; font-size:11px; padding:2px 4px;" list="list-personal-initials" />
+          </div>
         </div>
         <div class="form-group" style="margin-bottom:0; background:rgba(255,255,255,0.03); padding:8px; border-radius:6px;">
           <label class="form-label" style="font-size:11px;">Conductividad Nominal (µS/cm)</label>
-          <input type="number" id="asistente-conduct-val" class="form-control form-control-sm" value="0.80" step="0.01" style="height:32px; font-size:12px;" />
+          <input type="number" id="asistente-conduct-val" class="form-control form-control-sm" value="0.80" step="0.01" style="height:30px; font-size:12px;" />
         </div>
       </div>
     `;
@@ -3958,24 +4014,34 @@ function renderDiagnosticoAsistente(diag) {
 
   // 6. Cobas
   if (diag.faltantes.cobas && diag.faltantes.cobas.length > 0) {
-    const cobasCount = {};
+    const cobasMap = {};
     diag.faltantes.cobas.forEach(it => {
-      cobasCount[it.equipo] = (cobasCount[it.equipo] || 0) + 1;
+      cobasMap[it.equipo] = (cobasMap[it.equipo] || 0) + 1;
     });
-    const cobasSummary = Object.entries(cobasCount).map(([eq, count]) => `• <strong>${eq}</strong>: ${count} días sin mantención diaria`).join('<br/>');
+
+    let itemsHtml = Object.entries(cobasMap).map(([eq, count]) => `
+      <div class="asistente-subitem" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; padding:6px 8px; border-bottom:1px solid rgba(255,255,255,0.05); gap:8px;">
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; cursor:pointer; margin:0; flex:1; min-width:180px;">
+          <input type="checkbox" class="asistente-check-subitem" data-module="cobas" data-entity="${encodeURIComponent(eq)}" checked onchange="actualizarTotalAsistente()" style="width:16px; height:16px; cursor:pointer;" />
+          <span>🔬 ${eq} <span style="font-size:11px; font-weight:normal; color:var(--text-dim);">(${count} días)</span></span>
+        </label>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <label style="font-size:11px; color:var(--text-dim); margin:0;">Sigla:</label>
+          <input type="text" class="asistente-sigla-subitem form-control" value="${defaultResp}" placeholder="Ej: GRC" maxlength="4" style="width:65px; height:28px; text-transform:uppercase; font-weight:700; text-align:center; font-size:11px; padding:2px 4px;" list="list-personal-initials" />
+        </div>
+      </div>
+    `).join('');
 
     html += `
       <div class="asistente-module-card card card-sm" style="margin-bottom:12px; border:1px solid rgba(255,255,255,0.08);">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <label style="display:flex; align-items:center; gap:8px; font-weight:700; font-size:14px; cursor:pointer; margin:0;">
-            <input type="checkbox" id="asistente-check-cobas" checked onchange="actualizarTotalAsistente()" style="width:16px; height:16px; cursor:pointer;" />
-            <span>🔬 Mantención Cobas</span>
-          </label>
-          <span class="badge-pill" style="font-size:12px; background:rgba(0,102,255,0.15); color:var(--primary-color); padding:2px 8px; border-radius:10px;">${diag.faltantes.cobas.length} días</span>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid rgba(255,255,255,0.08);">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-weight:700; font-size:14px;">🔬 Mantención Cobas</span>
+            <span class="badge-pill" style="font-size:11px; background:rgba(0,102,255,0.15); color:var(--primary-color); padding:2px 8px; border-radius:10px;">${diag.faltantes.cobas.length} días</span>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="toggleGrupoAsistente('cobas')" style="padding:2px 8px; font-size:11px; height:24px;">Seleccionar / Deseleccionar</button>
         </div>
-        <div style="font-size:12px; color:var(--text-dim); line-height:1.4;">
-          ${cobasSummary}
-        </div>
+        <div>${itemsHtml}</div>
       </div>
     `;
   }
@@ -3984,15 +4050,21 @@ function renderDiagnosticoAsistente(diag) {
   if (diag.faltantes.elimMuestras && diag.faltantes.elimMuestras.length > 0) {
     html += `
       <div class="asistente-module-card card card-sm" style="margin-bottom:12px; border:1px solid rgba(255,255,255,0.08);">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <label style="display:flex; align-items:center; gap:8px; font-weight:700; font-size:14px; cursor:pointer; margin:0;">
-            <input type="checkbox" id="asistente-check-elimMuestras" checked onchange="actualizarTotalAsistente()" style="width:16px; height:16px; cursor:pointer;" />
-            <span>🗑️ Eliminación de Muestras</span>
-          </label>
-          <span class="badge-pill" style="font-size:12px; background:rgba(0,102,255,0.15); color:var(--primary-color); padding:2px 8px; border-radius:10px;">${diag.faltantes.elimMuestras.length} registros</span>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid rgba(255,255,255,0.08);">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-weight:700; font-size:14px;">🗑️ Eliminación de Muestras</span>
+            <span class="badge-pill" style="font-size:11px; background:rgba(0,102,255,0.15); color:var(--primary-color); padding:2px 8px; border-radius:10px;">${diag.faltantes.elimMuestras.length} registros</span>
+          </div>
         </div>
-        <div style="font-size:12px; color:var(--text-dim); line-height:1.4;">
-          • Solo días hábiles requeridos con texto de fecha de corte automático.
+        <div class="asistente-subitem" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; padding:6px 8px; gap:8px;">
+          <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; cursor:pointer; margin:0; flex:1; min-width:180px;">
+            <input type="checkbox" class="asistente-check-subitem" data-module="elimMuestras" data-entity="elimMuestras" checked onchange="actualizarTotalAsistente()" style="width:16px; height:16px; cursor:pointer;" />
+            <span>Eliminación diaria requerida en días hábiles</span>
+          </label>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <label style="font-size:11px; color:var(--text-dim); margin:0;">Sigla:</label>
+            <input type="text" class="asistente-sigla-subitem form-control" value="${defaultResp}" placeholder="Ej: GRC" maxlength="4" style="width:65px; height:28px; text-transform:uppercase; font-weight:700; text-align:center; font-size:11px; padding:2px 4px;" list="list-personal-initials" />
+          </div>
         </div>
       </div>
     `;
@@ -4007,26 +4079,37 @@ function actualizarTotalAsistente() {
   const diag = state._asistenteData.diag;
   let count = 0;
 
-  const chkTermo = document.getElementById('asistente-check-termo');
-  if (chkTermo && chkTermo.checked && diag.faltantes.termo) count += diag.faltantes.termo.length;
+  const checkedEntities = {};
+  document.querySelectorAll('.asistente-check-subitem').forEach(chk => {
+    if (chk.checked) {
+      const mod = chk.getAttribute('data-module');
+      const ent = decodeURIComponent(chk.getAttribute('data-entity'));
+      if (!checkedEntities[mod]) checkedEntities[mod] = new Set();
+      checkedEntities[mod].add(ent);
+    }
+  });
 
-  const chkCent = document.getElementById('asistente-check-centrifugas');
-  if (chkCent && chkCent.checked && diag.faltantes.centrifugas) count += diag.faltantes.centrifugas.length;
-
-  const chkMeson = document.getElementById('asistente-check-mesones');
-  if (chkMeson && chkMeson.checked && diag.faltantes.mesones) count += diag.faltantes.mesones.length;
-
-  const chkRefri = document.getElementById('asistente-check-refriTemp');
-  if (chkRefri && chkRefri.checked && diag.faltantes.refriTemp) count += diag.faltantes.refriTemp.length;
-
-  const chkCond = document.getElementById('asistente-check-conductividad');
-  if (chkCond && chkCond.checked && diag.faltantes.conductividad) count += diag.faltantes.conductividad.length;
-
-  const chkCobas = document.getElementById('asistente-check-cobas');
-  if (chkCobas && chkCobas.checked && diag.faltantes.cobas) count += diag.faltantes.cobas.length;
-
-  const chkElim = document.getElementById('asistente-check-elimMuestras');
-  if (chkElim && chkElim.checked && diag.faltantes.elimMuestras) count += diag.faltantes.elimMuestras.length;
+  if (diag.faltantes.termo && checkedEntities.termo) {
+    count += diag.faltantes.termo.filter(it => checkedEntities.termo.has(it.area)).length;
+  }
+  if (diag.faltantes.centrifugas && checkedEntities.centrifugas) {
+    count += diag.faltantes.centrifugas.filter(it => checkedEntities.centrifugas.has(it.centrifuga)).length;
+  }
+  if (diag.faltantes.mesones && checkedEntities.mesones) {
+    count += diag.faltantes.mesones.filter(it => checkedEntities.mesones.has(it.sala)).length;
+  }
+  if (diag.faltantes.refriTemp && checkedEntities.refriTemp) {
+    count += diag.faltantes.refriTemp.filter(it => checkedEntities.refriTemp.has(it.equipo)).length;
+  }
+  if (diag.faltantes.conductividad && checkedEntities.conductividad && checkedEntities.conductividad.has('conductividad')) {
+    count += diag.faltantes.conductividad.length;
+  }
+  if (diag.faltantes.cobas && checkedEntities.cobas) {
+    count += diag.faltantes.cobas.filter(it => checkedEntities.cobas.has(it.equipo)).length;
+  }
+  if (diag.faltantes.elimMuestras && checkedEntities.elimMuestras && checkedEntities.elimMuestras.has('elimMuestras')) {
+    count += diag.faltantes.elimMuestras.length;
+  }
 
   const btnTxt = document.getElementById('btn-asistente-exec-text');
   const btnExec = document.getElementById('btn-asistente-ejecutar');
@@ -4039,56 +4122,134 @@ async function ejecutarRegularizacionMasiva() {
   const data = state._asistenteData;
   const diag = data.diag;
 
-  const payload = {};
-
-  const chkTermo = document.getElementById('asistente-check-termo');
-  if (chkTermo && chkTermo.checked && diag.faltantes.termo && diag.faltantes.termo.length > 0) {
-    const tempInput = parseFloat(document.getElementById('asistente-termo-temp').value) || 21.5;
-    const humInput = parseFloat(document.getElementById('asistente-termo-hum').value) || 45;
-    payload.termo = diag.faltantes.termo.map(it => ({
-      ...it,
-      temp: tempInput,
-      hum: humInput
-    }));
-  }
-
-  const chkCent = document.getElementById('asistente-check-centrifugas');
-  if (chkCent && chkCent.checked && diag.faltantes.centrifugas && diag.faltantes.centrifugas.length > 0) {
-    payload.centrifugas = diag.faltantes.centrifugas;
-  }
-
-  const chkMeson = document.getElementById('asistente-check-mesones');
-  if (chkMeson && chkMeson.checked && diag.faltantes.mesones && diag.faltantes.mesones.length > 0) {
-    payload.mesones = diag.faltantes.mesones;
-  }
-
-  const chkRefri = document.getElementById('asistente-check-refriTemp');
-  if (chkRefri && chkRefri.checked && diag.faltantes.refriTemp && diag.faltantes.refriTemp.length > 0) {
-    payload.refriTemp = diag.faltantes.refriTemp;
-  }
-
-  const chkCond = document.getElementById('asistente-check-conductividad');
-  if (chkCond && chkCond.checked && diag.faltantes.conductividad && diag.faltantes.conductividad.length > 0) {
-    const condInput = parseFloat(document.getElementById('asistente-conduct-val').value) || 0.80;
-    payload.conductividad = diag.faltantes.conductividad.map(it => ({
-      ...it,
-      conductividad: condInput
-    }));
-  }
-
-  const chkCobas = document.getElementById('asistente-check-cobas');
-  if (chkCobas && chkCobas.checked && diag.faltantes.cobas && diag.faltantes.cobas.length > 0) {
-    payload.cobas = diag.faltantes.cobas;
-  }
-
-  const chkElim = document.getElementById('asistente-check-elimMuestras');
-  if (chkElim && chkElim.checked && diag.faltantes.elimMuestras && diag.faltantes.elimMuestras.length > 0) {
-    payload.elimMuestras = diag.faltantes.elimMuestras;
-  }
-
   const errEl = document.getElementById('asistente-error-step2');
   errEl.style.display = 'none';
   errEl.textContent = '';
+
+  const checkedEntities = {};
+  const entitySiglas = {};
+  let missingSiglaFound = false;
+
+  document.querySelectorAll('.asistente-check-subitem').forEach(chk => {
+    if (chk.checked) {
+      const mod = chk.getAttribute('data-module');
+      const ent = decodeURIComponent(chk.getAttribute('data-entity'));
+      if (!checkedEntities[mod]) checkedEntities[mod] = new Set();
+      checkedEntities[mod].add(ent);
+
+      const parentSubitem = chk.closest('.asistente-subitem');
+      const siglaInp = parentSubitem ? parentSubitem.querySelector('.asistente-sigla-subitem') : null;
+      const sigla = (siglaInp ? siglaInp.value : '').trim().toUpperCase();
+      if (!sigla || sigla.length < 2) {
+        missingSiglaFound = true;
+      }
+      if (!entitySiglas[mod]) entitySiglas[mod] = {};
+      entitySiglas[mod][ent] = sigla;
+    }
+  });
+
+  if (Object.keys(checkedEntities).length === 0) {
+    errEl.textContent = 'No ha seleccionado ningún ítem para regularizar.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  if (missingSiglaFound) {
+    errEl.textContent = 'Debe indicar las iniciales del responsable (mín. 2 caracteres) para cada ítem seleccionado.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  // Validate all unique initials in Personal Maestro
+  const allSiglas = new Set();
+  Object.values(entitySiglas).forEach(entMap => {
+    Object.values(entMap).forEach(s => allSiglas.add(s));
+  });
+
+  if (typeof ensureResponsableRegistered === 'function') {
+    for (const s of allSiglas) {
+      const ok = await ensureResponsableRegistered(s);
+      if (!ok) return;
+    }
+  }
+
+  // Save last used global initials
+  const globalRespInput = document.getElementById('asistente-resp-global');
+  const globalResp = globalRespInput && globalRespInput.value.trim().length >= 2
+    ? globalRespInput.value.trim().toUpperCase()
+    : Array.from(allSiglas)[0];
+
+  if (globalResp) {
+    try { localStorage.setItem('last_user_initials', globalResp); } catch(e){}
+  }
+
+  // Build payload
+  const payload = {};
+
+  if (diag.faltantes.termo && checkedEntities.termo) {
+    const tempInput = parseFloat(document.getElementById('asistente-termo-temp').value) || 21.5;
+    const humInput = parseFloat(document.getElementById('asistente-termo-hum').value) || 45;
+    payload.termo = diag.faltantes.termo
+      .filter(it => checkedEntities.termo.has(it.area))
+      .map(it => ({
+        ...it,
+        temp: tempInput,
+        hum: humInput,
+        responsable: entitySiglas.termo[it.area] || globalResp
+      }));
+  }
+
+  if (diag.faltantes.centrifugas && checkedEntities.centrifugas) {
+    payload.centrifugas = diag.faltantes.centrifugas
+      .filter(it => checkedEntities.centrifugas.has(it.centrifuga))
+      .map(it => ({
+        ...it,
+        responsable: entitySiglas.centrifugas[it.centrifuga] || globalResp
+      }));
+  }
+
+  if (diag.faltantes.mesones && checkedEntities.mesones) {
+    payload.mesones = diag.faltantes.mesones
+      .filter(it => checkedEntities.mesones.has(it.sala))
+      .map(it => ({
+        ...it,
+        responsable: entitySiglas.mesones[it.sala] || globalResp
+      }));
+  }
+
+  if (diag.faltantes.refriTemp && checkedEntities.refriTemp) {
+    payload.refriTemp = diag.faltantes.refriTemp
+      .filter(it => checkedEntities.refriTemp.has(it.equipo))
+      .map(it => ({
+        ...it,
+        responsable: entitySiglas.refriTemp[it.equipo] || globalResp
+      }));
+  }
+
+  if (diag.faltantes.conductividad && checkedEntities.conductividad && checkedEntities.conductividad.has('conductividad')) {
+    const condInput = parseFloat(document.getElementById('asistente-conduct-val').value) || 0.80;
+    payload.conductividad = diag.faltantes.conductividad.map(it => ({
+      ...it,
+      conductividad: condInput,
+      responsable: entitySiglas.conductividad['conductividad'] || globalResp
+    }));
+  }
+
+  if (diag.faltantes.cobas && checkedEntities.cobas) {
+    payload.cobas = diag.faltantes.cobas
+      .filter(it => checkedEntities.cobas.has(it.equipo))
+      .map(it => ({
+        ...it,
+        responsable: entitySiglas.cobas[it.equipo] || globalResp
+      }));
+  }
+
+  if (diag.faltantes.elimMuestras && checkedEntities.elimMuestras && checkedEntities.elimMuestras.has('elimMuestras')) {
+    payload.elimMuestras = diag.faltantes.elimMuestras.map(it => ({
+      ...it,
+      responsable: entitySiglas.elimMuestras['elimMuestras'] || globalResp
+    }));
+  }
 
   const spin = document.getElementById('spinner-asistente-exec');
   const btnTxt = document.getElementById('btn-asistente-exec-text');
@@ -4100,7 +4261,7 @@ async function ejecutarRegularizacionMasiva() {
       action: 'ejecutarRegularizacionBatch',
       mes: data.mes,
       anio: data.anio,
-      responsable: data.responsable,
+      responsable: globalResp,
       password: data.password,
       observacion: data.observacion,
       payload: payload

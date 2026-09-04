@@ -4099,10 +4099,15 @@ function ejecutarRegularizacionBatch(data) {
     return { success: false, error: 'Mes o año inválido.' };
   }
   const respCode = (data.responsable || '').trim().toUpperCase();
-  if (!respCode || respCode.length < 2) {
-    return { success: false, error: 'Debe especificar el usuario responsable (iniciales).' };
+  const defaultResp = respCode ? resolveNombreResponsable(respCode) : '';
+  
+  function getRowResp(it) {
+    if (it && it.responsable && it.responsable.toString().trim().length >= 2) {
+      return resolveNombreResponsable(it.responsable.toString().trim().toUpperCase());
+    }
+    return defaultResp;
   }
-  const responsable = resolveNombreResponsable(respCode);
+
   const obs = (data.observacion || 'Regularización histórica').trim();
   const ts = getFechaRegistroFormatted();
   const payload = data.payload || {};
@@ -4127,7 +4132,7 @@ function ejecutarRegularizacionBatch(data) {
       return [
         fStr,
         it.dia, mes, anio,
-        responsable,
+        getRowResp(it),
         parseFloat(it.temp !== undefined ? it.temp : 21.5),
         parseFloat(it.hum !== undefined ? it.hum : 45),
         it.turno || 'Mañana',
@@ -4153,7 +4158,7 @@ function ejecutarRegularizacionBatch(data) {
         fStr,
         it.dia, mes, anio,
         it.centrifuga,
-        responsable,
+        getRowResp(it),
         it.tipo_mantencion || 'Diaria',
         obs,
         ts,
@@ -4175,7 +4180,7 @@ function ejecutarRegularizacionBatch(data) {
         fStr,
         it.dia, mes, anio,
         it.sala,
-        responsable,
+        getRowResp(it),
         obs,
         ts,
         '', '', ''
@@ -4195,7 +4200,7 @@ function ejecutarRegularizacionBatch(data) {
       return [
         fStr,
         it.dia, mes, anio,
-        responsable,
+        getRowResp(it),
         parseFloat(it.temperatura !== undefined ? it.temperatura : 4.5),
         it.turno || 'Mañana',
         it.equipo,
@@ -4220,7 +4225,7 @@ function ejecutarRegularizacionBatch(data) {
       return [
         fStr,
         it.dia, mes, anio,
-        responsable,
+        getRowResp(it),
         parseFloat(it.conductividad !== undefined ? it.conductividad : 0.8),
         it.turno || 'Mañana',
         obs,
@@ -4241,12 +4246,13 @@ function ejecutarRegularizacionBatch(data) {
       const f = { dia: it.dia, mes: mes, anio: anio };
       const fStr = formatFechaDDMMYYYY(f);
       const acts = Array.isArray(it.actividades) && it.actividades.length > 0 ? it.actividades : ['Mantenimiento diario Cobas'];
+      const rResp = getRowResp(it);
       acts.forEach(act => {
         rows.push([
           fStr,
           it.dia, mes, anio,
           it.equipo,
-          responsable,
+          rResp,
           it.frecuencia || 'Diaria',
           act,
           obs,
@@ -4271,7 +4277,7 @@ function ejecutarRegularizacionBatch(data) {
       return [
         fStr,
         it.dia, mes, anio,
-        responsable,
+        getRowResp(it),
         it.muestras_eliminadas,
         ts,
         '', '', ''
