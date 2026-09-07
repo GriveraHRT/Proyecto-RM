@@ -436,7 +436,7 @@ function renderDailyView(reg){
     list.forEach(item=>{
       const c = item.nombre;
       const isNoHabit = !isHabit && item.horarioTurno === 'no';
-      const regFound = centHoy.find(r=>r.centrifuga===c);
+      const regFound = centHoy.find(r=>r.centrifuga===c && r.tipo_mantencion==='Semanal') || centHoy.find(r=>r.centrifuga===c);
       const done = !!regFound;
       const isSemanal = regFound && regFound.tipo_mantencion === 'Semanal';
       if (isNoHabit && !done) {
@@ -2138,7 +2138,7 @@ function showDuplicateConfirmModal(dupInfo) {
     } else if (dupInfo.duplicates && dupInfo.duplicates.length > 0) {
       const listItems = dupInfo.duplicates.map(d => `
         <div class="dup-item-badge">
-          <span class="dup-item-name">📌 ${d.name}</span>
+          <span class="dup-item-name">📌 ${d.name}${d.tipo ? ` [${d.tipo}]` : ''}</span>
           <span class="dup-item-resp">Ingresado por <strong>"${d.resp}"</strong></span>
         </div>
       `).join('');
@@ -2311,14 +2311,22 @@ async function checkDuplicateCentrifugas() {
   }
 
   const duplicates = [];
+  const currentTipo = String(tipoVal || 'Diaria').trim().toLowerCase();
+
   selChips.forEach(chipName => {
-    const found = regs.centrifugas.find(r => 
-      parseInt(r.dia) === dia &&
-      parseInt(r.mes) === mes &&
-      parseInt(r.anio) === anio &&
-      String(r.centrifuga || '').trim().toLowerCase() === String(chipName || '').trim().toLowerCase() &&
-      (r.tipo_mantencion === 'Diaria' || r.tipo_mantencion === 'Semanal')
-    );
+    const found = regs.centrifugas.find(r => {
+      if (parseInt(r.dia) !== dia || parseInt(r.mes) !== mes || parseInt(r.anio) !== anio) return false;
+      if (String(r.centrifuga || '').trim().toLowerCase() !== String(chipName || '').trim().toLowerCase()) return false;
+      
+      const rTipo = String(r.tipo_mantencion || 'Diaria').trim().toLowerCase();
+      if (currentTipo === 'diaria') {
+        return rTipo === 'diaria' || rTipo === 'semanal';
+      } else if (currentTipo === 'semanal') {
+        return rTipo === 'semanal';
+      } else {
+        return rTipo === currentTipo;
+      }
+    });
     if (found) {
       duplicates.push({ 
         name: chipName, 

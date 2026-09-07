@@ -298,7 +298,7 @@ function updateInfoLimpRefri(){const t=document.getElementById('limp-refri-tipo'
 
 // Centrifuga info
 const CENT_INFO={Diaria:{title:'🔁 Mantención Diaria',body:'Realizar <strong>limpieza de superficie interior y exterior</strong> de la centrífuga con paño húmedo.'},Semanal:{title:'📅 Mantención Semanal',body:'<strong>Lavar capachos</strong> con solución jabonosa. <strong>Desinfectar rotor, capachos y superficies</strong> con alcohol 70% o Cloro 0.5%.'},Anual:{title:'🔧 Mantención Anual / Según Necesidad',body:'<strong>Desenchufar la centrífuga</strong> antes de intervenir. <strong>Engrasar capachos</strong>. Realizar mantención <strong>preventiva y/o reparativa</strong> completa.'}};
-function updateInfoCentrifuga(){const t=document.getElementById('cent-tipo').value,i=CENT_INFO[t]||CENT_INFO.Diaria;document.getElementById('info-cent-title').textContent=i.title;document.getElementById('info-cent-body').innerHTML=i.body;document.getElementById('info-centrifuga').classList.add('visible')}
+function updateInfoCentrifuga(){const t=document.getElementById('cent-tipo').value,i=CENT_INFO[t]||CENT_INFO.Diaria;document.getElementById('info-cent-title').textContent=i.title;document.getElementById('info-cent-body').innerHTML=i.body;document.getElementById('info-centrifuga').classList.add('visible');if(typeof checkDuplicateCentrifugas==='function')checkDuplicateCentrifugas()}
 
 function applyMaestrosData(data) {
   if (!data) return;
