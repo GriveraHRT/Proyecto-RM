@@ -481,10 +481,10 @@ function normalizeMsText(s) {
 }
 
 // ── Touch Gesture Guard for MultiSelect ──────────────────────
-let msTouchStartY = 0;
-let msTouchStartX = 0;
-let msIsScrolling = false;
-let msScrollTimer = null;
+var msTouchStartY = 0;
+var msTouchStartX = 0;
+var msIsScrolling = false;
+var msScrollTimer = null;
 
 document.addEventListener('touchstart', (e) => {
   if (e.touches && e.touches.length > 0) {
@@ -627,6 +627,22 @@ function closeAllMultiSelects() {
 }
 
 document.addEventListener('click', (e) => {
+  const removeBtn = e.target.closest('.ms-tag-remove');
+  if (removeBtn) {
+    e.stopPropagation();
+    e.preventDefault();
+    const cId = removeBtn.dataset.container || (removeBtn.closest('.custom-multiselect') ? removeBtn.closest('.custom-multiselect').id : '');
+    removeSelectedItem(cId, removeBtn.dataset.value, e);
+    return;
+  }
+  const clearBtn = e.target.closest('.ms-clear-tray-btn');
+  if (clearBtn) {
+    e.stopPropagation();
+    e.preventDefault();
+    const cId = clearBtn.dataset.container || (clearBtn.closest('.custom-multiselect') ? clearBtn.closest('.custom-multiselect').id : '');
+    clearAllMultiSelect(cId, e);
+    return;
+  }
   if (!e.target.closest('.custom-multiselect')) {
     closeAllMultiSelects();
   }
@@ -639,11 +655,15 @@ document.addEventListener('keydown', (e) => {
 });
 
 function removeSelectedItem(containerId, value, e) {
-  if (msIsScrolling) return;
-  if (e) e.stopPropagation();
+  msIsScrolling = false;
+  if (e) {
+    if (typeof e.stopPropagation === 'function') e.stopPropagation();
+    if (typeof e.preventDefault === 'function') e.preventDefault();
+  }
   const container = document.getElementById(containerId);
   if (!container) return;
-  const chip = Array.from(container.querySelectorAll('.chip-item')).find(c => c.dataset.value === value);
+  const targetVal = String(value ?? '');
+  const chip = Array.from(container.querySelectorAll('.chip-item')).find(c => String(c.dataset.value) === targetVal);
   if (chip) {
     chip.classList.remove('selected');
     chip.setAttribute('aria-selected', 'false');
@@ -671,7 +691,7 @@ function filterMultiSelect(containerId, query) {
 }
 
 function clearMultiSelectSearch(containerId) {
-  if (msIsScrolling) return;
+  msIsScrolling = false;
   const input = document.getElementById(`ms-search-${containerId}`);
   if (input) {
     input.value = '';
@@ -681,7 +701,7 @@ function clearMultiSelectSearch(containerId) {
 }
 
 function selectAllMultiSelect(containerId) {
-  if (msIsScrolling) return;
+  msIsScrolling = false;
   const container = document.getElementById(containerId);
   if (!container) return;
   const items = container.querySelectorAll('.ms-option-item');
@@ -696,8 +716,12 @@ function selectAllMultiSelect(containerId) {
   updateMultiSelectUI(containerId);
 }
 
-function clearAllMultiSelect(containerId) {
-  if (msIsScrolling) return;
+function clearAllMultiSelect(containerId, e) {
+  msIsScrolling = false;
+  if (e) {
+    if (typeof e.stopPropagation === 'function') e.stopPropagation();
+    if (typeof e.preventDefault === 'function') e.preventDefault();
+  }
   const container = document.getElementById(containerId);
   if (!container) return;
   const items = container.querySelectorAll('.chip-item');
@@ -739,11 +763,11 @@ function updateMultiSelectUI(containerId) {
       } else if (count === 1) {
         const firstChip = selectedChips[0];
         const firstLabel = firstChip.dataset.label || firstChip.dataset.value;
-        textEl.textContent = `${cfg.icon} 1 ${cfg.singular}: ${firstLabel}`;
+        textEl.textContent = `1 ${cfg.singular}: ${firstLabel}`;
         textEl.classList.add('has-selection');
       } else {
         const selWord = cfg.gender === 'f' ? 'seleccionadas' : 'seleccionados';
-        textEl.textContent = `${cfg.icon} ${count} ${cfg.plural} ${selWord}`;
+        textEl.textContent = `${count} ${cfg.plural} ${selWord}`;
         textEl.classList.add('has-selection');
       }
     }
@@ -767,9 +791,9 @@ function updateMultiSelectUI(containerId) {
           return `
           <span class="ms-selected-tag" data-value="${escapeHtml(val)}">
             <span class="ms-tag-text">${escapeHtml(lbl)}</span>
-            <button type="button" class="ms-tag-remove" data-container="${containerId}" data-value="${escapeHtml(val)}" title="Quitar ${escapeHtml(lbl)}" aria-label="Quitar ${escapeHtml(lbl)}">✕</button>
+            <button type="button" class="ms-tag-remove" data-container="${containerId}" data-value="${escapeHtml(val)}" onclick="removeSelectedItem('${containerId}', this.dataset.value, event)" title="Quitar ${escapeHtml(lbl)}" aria-label="Quitar ${escapeHtml(lbl)}">✕</button>
           </span>`;
-        }).join('') + (count > 1 ? `<button type="button" class="ms-clear-tray-btn" data-container="${containerId}" title="Quitar todas">Limpiar</button>` : '');
+        }).join('') + (count > 1 ? `<button type="button" class="ms-clear-tray-btn" data-container="${containerId}" onclick="clearAllMultiSelect('${containerId}', event)" title="Quitar todas">Limpiar</button>` : '');
       } else {
         trayEl.style.display = 'none';
         trayEl.innerHTML = '';
@@ -819,27 +843,6 @@ function initMultiSelectObserver(containerId) {
       attributes: true,
       attributeFilter: ['class'],
       subtree: true
-    });
-  }
-
-  const trayEl = document.getElementById(`ms-tags-${containerId}`);
-  if (trayEl && !trayEl._msDelegated) {
-    trayEl._msDelegated = true;
-    trayEl.addEventListener('click', (e) => {
-      if (msIsScrolling) return;
-      const removeBtn = e.target.closest('.ms-tag-remove');
-      if (removeBtn) {
-        e.stopPropagation();
-        e.preventDefault();
-        removeSelectedItem(removeBtn.dataset.container || containerId, removeBtn.dataset.value, e);
-        return;
-      }
-      const clearBtn = e.target.closest('.ms-clear-tray-btn');
-      if (clearBtn) {
-        e.stopPropagation();
-        e.preventDefault();
-        clearAllMultiSelect(clearBtn.dataset.container || containerId);
-      }
     });
   }
 }
