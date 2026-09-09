@@ -660,9 +660,10 @@ function removeSelectedItem(containerId, value, e) {
     if (typeof e.stopPropagation === 'function') e.stopPropagation();
     if (typeof e.preventDefault === 'function') e.preventDefault();
   }
+  if (value === undefined || value === null) return;
   const container = document.getElementById(containerId);
   if (!container) return;
-  const targetVal = String(value ?? '');
+  const targetVal = String(value);
   const chip = Array.from(container.querySelectorAll('.chip-item')).find(c => String(c.dataset.value) === targetVal);
   if (chip) {
     chip.classList.remove('selected');
