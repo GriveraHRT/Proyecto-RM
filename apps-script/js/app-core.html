@@ -3,6 +3,44 @@ if (typeof API_URL === 'undefined') {
   var API_URL = 'https://script.google.com/macros/s/AKfycbxuqcui0-hjJ721uMWZk3w-4l2fVCaBWQgdMJqVMb5Pno339Jqetq4r62p3-1gGBUvFOg/exec';
 }
 const PREANALISIS=[1,2,3,4,5,18,19];
+const ALL_REV_TYPES = [
+  { value: 'termo', label: '🌡️ Temp. Ambiental' },
+  { value: 'centrifugas', label: '⚙️ Centrífugas' },
+  { value: 'mesones', label: '🧽 Mesones' },
+  { value: 'refriTemp', label: '🧊 Temp. Refrigeradores' },
+  { value: 'limpRefri', label: '🧹 Limp. Refrigeradores' },
+  { value: 'conductividad', label: '💧 Conductividad' },
+  { value: 'cobas', label: '🔬 Mantención Cobas' },
+  { value: 'elimMuestras', label: '🗑️ Eliminación Muestras' }
+];
+
+const MULTISELECT_CONFIGS = {
+  'cent-chips': {
+    icon: '⚙️',
+    singular: 'centrífuga',
+    plural: 'centrífugas',
+    placeholder: 'Seleccionar centrífugas…',
+    hasPreanalisis: true
+  },
+  'meson-chips': {
+    icon: '🧽',
+    singular: 'sala',
+    plural: 'salas',
+    placeholder: 'Seleccionar salas…'
+  },
+  'limp-refri-chips': {
+    icon: '🧹',
+    singular: 'equipo',
+    plural: 'equipos',
+    placeholder: 'Seleccionar equipos de refrigeración…'
+  },
+  'rev-chips': {
+    icon: '📋',
+    singular: 'registro',
+    plural: 'registros',
+    placeholder: 'Seleccionar registros a revisar…'
+  }
+};
 const state={
   areas:[],centrifugas:[],salas:[],acciones:[],refrigeradores:[],refriLimpieza:[],
   personal:[],personalMap:{},personalByNameMap:{},
@@ -328,6 +366,7 @@ function applyMaestrosData(data) {
   const refriNames = state.refrigeradores.map(r => r.equipo);
   populateSelect('refri-equipo', refriNames, 'Seleccionar equipo…');
   populateChips('limp-refri-chips', state.refriLimpieza);
+  populateChips('rev-chips', ALL_REV_TYPES);
 
   const acOpts = '<option value="">Seleccionar acción…</option>' + state.acciones.map(a => `<option value="${a}">${a}</option>`).join('');
   const tAcc = document.getElementById('termo-accion');
@@ -423,11 +462,366 @@ async function loadMaestros() {
 
 function populateSelect(id,items,ph){const s=document.getElementById(id);s.innerHTML=`<option value="">${ph}</option>`+items.map(i=>`<option value="${i}">${i}</option>`).join('')}
 function populateDatalist(id,items){const el=document.getElementById(id);if(el){el.innerHTML=items.map(i=>`<option value="${i}">`).join('')}}
-function populateChips(id,items){const c=document.getElementById(id);c.innerHTML=items.map(i=>`<div class="chip-item" data-value="${i}" onclick="toggleChip(this)">${i}</div>`).join('')}
-function toggleChip(el){el.classList.toggle('selected');const parentId=el.parentElement?el.parentElement.id:'';if(parentId==='cent-chips'&&typeof checkDuplicateCentrifugas==='function')checkDuplicateCentrifugas();else if(parentId==='meson-chips'&&typeof checkDuplicateMesones==='function')checkDuplicateMesones();}
-function centNum(name){const m=name.match(/(\d+)/);return m?parseInt(m[1]):0}
-function getSelectedChips(id){return Array.from(document.querySelectorAll(`#${id} .chip-item.selected`)).map(i=>i.dataset.value)}
-function toggleGrupoPreanalisis(){const btn=document.getElementById('btn-grupo-preanalisis');const active=btn.classList.toggle('active');const chips=document.querySelectorAll('#cent-chips .chip-item');chips.forEach(c=>{const v=c.dataset.value;const num=centNum(v);const isP=PREANALISIS.includes(num);if(isP){if(active){c.classList.add('selected')}else{c.classList.remove('selected')}}});if(typeof checkDuplicateCentrifugas==='function')checkDuplicateCentrifugas();}
+// ── Touch Gesture Guard for MultiSelect ──────────────────────
+let msTouchStartY = 0;
+let msTouchStartX = 0;
+let msIsScrolling = false;
+let msScrollTimer = null;
+
+document.addEventListener('touchstart', (e) => {
+  if (e.touches && e.touches.length > 0) {
+    msTouchStartY = e.touches[0].clientY;
+    msTouchStartX = e.touches[0].clientX;
+    msIsScrolling = false;
+  }
+}, { passive: true });
+
+document.addEventListener('touchmove', (e) => {
+  if (!msIsScrolling && e.touches && e.touches.length > 0) {
+    const diffY = Math.abs(e.touches[0].clientY - msTouchStartY);
+    const diffX = Math.abs(e.touches[0].clientX - msTouchStartX);
+    if (diffY > 7 || diffX > 7) {
+      msIsScrolling = true;
+    }
+  }
+}, { passive: true });
+
+document.addEventListener('touchend', () => {
+  if (msScrollTimer) clearTimeout(msScrollTimer);
+  msScrollTimer = setTimeout(() => {
+    msIsScrolling = false;
+  }, 250);
+}, { passive: true });
+
+function handleOptionClick(el, e) {
+  if (msIsScrolling) {
+    msIsScrolling = false;
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    return false;
+  }
+  toggleChip(el);
+}
+
+function toggleChip(el) {
+  el.classList.toggle('selected');
+  const container = el.closest('.custom-multiselect') || el.closest('#cent-chips, #meson-chips, #limp-refri-chips, #rev-chips') || (el.parentElement ? el.parentElement : null);
+  const parentId = container ? container.id : '';
+  if (parentId === 'cent-chips' && typeof checkDuplicateCentrifugas === 'function') checkDuplicateCentrifugas();
+  else if (parentId === 'meson-chips' && typeof checkDuplicateMesones === 'function') checkDuplicateMesones();
+  if (parentId) updateMultiSelectUI(parentId);
+}
+
+function centNum(name) {
+  const m = String(name || '').match(/(\d+)/);
+  return m ? parseInt(m[1], 10) : 0;
+}
+
+function getSelectedChips(id) {
+  return Array.from(document.querySelectorAll(`#${id} .chip-item.selected`)).map(i => i.dataset.value);
+}
+
+function toggleGrupoPreanalisis() {
+  const btn = document.getElementById('btn-grupo-preanalisis');
+  const chips = document.querySelectorAll('#cent-chips .chip-item');
+  const preChips = Array.from(chips).filter(c => PREANALISIS.includes(centNum(c.dataset.value)));
+  const allPreSelected = preChips.length > 0 && preChips.every(c => c.classList.contains('selected'));
+  const willSelect = !allPreSelected;
+
+  if (btn) btn.classList.toggle('active', willSelect);
+  preChips.forEach(c => {
+    if (willSelect) c.classList.add('selected');
+    else c.classList.remove('selected');
+  });
+  if (typeof checkDuplicateCentrifugas === 'function') checkDuplicateCentrifugas();
+  updateMultiSelectUI('cent-chips');
+}
+
+function toggleMultiSelect(containerId, e) {
+  if (msIsScrolling) {
+    msIsScrolling = false;
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    return;
+  }
+  if (e) {
+    e.stopPropagation();
+    e.preventDefault();
+  }
+  const panel = document.getElementById(`ms-dropdown-${containerId}`);
+  const chevron = document.getElementById(`ms-chevron-${containerId}`);
+  const trigger = document.getElementById(`ms-trigger-${containerId}`);
+  if (!panel) return;
+  const isOpen = panel.style.display !== 'none';
+  if (isOpen) {
+    closeMultiSelect(containerId);
+  } else {
+    closeAllMultiSelects();
+    panel.style.display = 'block';
+    if (chevron) chevron.classList.add('open');
+    if (trigger) trigger.classList.add('active');
+    const searchInp = document.getElementById(`ms-search-${containerId}`);
+    if (searchInp) setTimeout(() => searchInp.focus(), 60);
+  }
+}
+
+function closeMultiSelect(containerId) {
+  const panel = document.getElementById(`ms-dropdown-${containerId}`);
+  const chevron = document.getElementById(`ms-chevron-${containerId}`);
+  const trigger = document.getElementById(`ms-trigger-${containerId}`);
+  if (panel) panel.style.display = 'none';
+  if (chevron) chevron.classList.remove('open');
+  if (trigger) trigger.classList.remove('active');
+}
+
+function closeAllMultiSelects() {
+  document.querySelectorAll('.ms-dropdown-panel').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.ms-chevron').forEach(c => c.classList.remove('open'));
+  document.querySelectorAll('.ms-trigger').forEach(t => t.classList.remove('active'));
+}
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.custom-multiselect')) {
+    closeAllMultiSelects();
+  }
+});
+
+function removeSelectedItem(containerId, value, e) {
+  if (e) e.stopPropagation();
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const chip = Array.from(container.querySelectorAll('.chip-item')).find(c => c.dataset.value === value);
+  if (chip) {
+    chip.classList.remove('selected');
+    if (containerId === 'cent-chips' && typeof checkDuplicateCentrifugas === 'function') checkDuplicateCentrifugas();
+    else if (containerId === 'meson-chips' && typeof checkDuplicateMesones === 'function') checkDuplicateMesones();
+    updateMultiSelectUI(containerId);
+  }
+}
+
+function filterMultiSelect(containerId, query) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const q = (query || '').toLowerCase().trim();
+  const items = container.querySelectorAll('.ms-option-item');
+  items.forEach(item => {
+    const text = (item.dataset.value || '').toLowerCase();
+    if (!q || text.includes(q)) {
+      item.style.display = 'flex';
+    } else {
+      item.style.display = 'none';
+    }
+  });
+}
+
+function clearMultiSelectSearch(containerId) {
+  const input = document.getElementById(`ms-search-${containerId}`);
+  if (input) {
+    input.value = '';
+    filterMultiSelect(containerId, '');
+    input.focus();
+  }
+}
+
+function selectAllMultiSelect(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const items = container.querySelectorAll('.ms-option-item');
+  items.forEach(item => {
+    if (item.style.display !== 'none') {
+      item.classList.add('selected');
+    }
+  });
+  if (containerId === 'cent-chips' && typeof checkDuplicateCentrifugas === 'function') checkDuplicateCentrifugas();
+  else if (containerId === 'meson-chips' && typeof checkDuplicateMesones === 'function') checkDuplicateMesones();
+  updateMultiSelectUI(containerId);
+}
+
+function clearAllMultiSelect(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const items = container.querySelectorAll('.chip-item');
+  items.forEach(item => item.classList.remove('selected'));
+  if (containerId === 'cent-chips' && typeof checkDuplicateCentrifugas === 'function') checkDuplicateCentrifugas();
+  else if (containerId === 'meson-chips' && typeof checkDuplicateMesones === 'function') checkDuplicateMesones();
+  updateMultiSelectUI(containerId);
+}
+
+function updateMultiSelectUI(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const cfg = MULTISELECT_CONFIGS[containerId] || {
+    icon: '📌',
+    singular: 'elemento',
+    plural: 'elementos',
+    placeholder: 'Seleccionar elementos…'
+  };
+
+  const allChips = container.querySelectorAll('.chip-item');
+  const selectedChips = container.querySelectorAll('.chip-item.selected');
+  const count = selectedChips.length;
+
+  const textEl = document.getElementById(`ms-text-${containerId}`);
+  const badgeEl = document.getElementById(`ms-badge-${containerId}`);
+
+  if (textEl) {
+    if (count === 0) {
+      textEl.textContent = cfg.placeholder;
+      textEl.classList.remove('has-selection');
+    } else if (count === 1) {
+      const firstVal = selectedChips[0].dataset.value;
+      textEl.textContent = `${cfg.icon} 1 ${cfg.singular}: ${firstVal}`;
+      textEl.classList.add('has-selection');
+    } else {
+      textEl.textContent = `${cfg.icon} ${count} ${cfg.plural} seleccionadas`;
+      textEl.classList.add('has-selection');
+    }
+  }
+
+  if (badgeEl) {
+    if (count > 0) {
+      badgeEl.textContent = String(count);
+      badgeEl.style.display = 'inline-flex';
+    } else {
+      badgeEl.style.display = 'none';
+    }
+  }
+
+  const trayEl = document.getElementById(`ms-tags-${containerId}`);
+  if (trayEl) {
+    if (count > 0) {
+      trayEl.style.display = 'flex';
+      trayEl.innerHTML = Array.from(selectedChips).map(chip => {
+        const val = chip.dataset.value;
+        const escVal = (val || '').replace(/'/g, "\\'");
+        return `
+        <span class="ms-selected-tag" data-value="${val}">
+          <span class="ms-tag-text">${val}</span>
+          <button type="button" class="ms-tag-remove" onclick="removeSelectedItem('${containerId}', '${escVal}', event)" title="Quitar ${val}">✕</button>
+        </span>`;
+      }).join('') + (count > 1 ? `<button type="button" class="ms-clear-tray-btn" onclick="clearAllMultiSelect('${containerId}')" title="Quitar todas">Limpiar</button>` : '');
+    } else {
+      trayEl.style.display = 'none';
+      trayEl.innerHTML = '';
+    }
+  }
+
+  if (containerId === 'cent-chips') {
+    const preBtn = document.getElementById('btn-grupo-preanalisis');
+    const msPreBtn = container.querySelector('.ms-preanalisis-btn');
+    const preChips = Array.from(allChips).filter(ch => PREANALISIS.includes(centNum(ch.dataset.value)));
+    const allPreSelected = preChips.length > 0 && preChips.every(c => c.classList.contains('selected'));
+    if (preBtn) preBtn.classList.toggle('active', allPreSelected);
+    if (msPreBtn) msPreBtn.classList.toggle('active', allPreSelected);
+  }
+
+  if (containerId === 'rev-chips') {
+    const revBtn = document.getElementById('btn-rev-select-all');
+    const allSel = allChips.length > 0 && selectedChips.length === allChips.length;
+    if (revBtn) revBtn.classList.toggle('active', allSel);
+  }
+}
+
+function initMultiSelectObserver(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container || container._msObserverInit) return;
+  container._msObserverInit = true;
+
+  const observer = new MutationObserver((mutations) => {
+    let shouldUpdate = false;
+    for (const m of mutations) {
+      if (m.type === 'attributes' && m.attributeName === 'class') {
+        shouldUpdate = true;
+        break;
+      }
+    }
+    if (shouldUpdate) {
+      updateMultiSelectUI(containerId);
+    }
+  });
+
+  observer.observe(container, {
+    attributes: true,
+    attributeFilter: ['class'],
+    subtree: true
+  });
+}
+
+function populateChips(id, items) {
+  const container = document.getElementById(id);
+  if (!container) return;
+
+  const cfg = MULTISELECT_CONFIGS[id] || {
+    icon: '📌',
+    singular: 'elemento',
+    plural: 'elementos',
+    placeholder: 'Seleccionar elementos…'
+  };
+
+  const prevSelected = getSelectedChips(id);
+
+  container.className = 'custom-multiselect';
+  container.innerHTML = `
+    <div class="ms-trigger" id="ms-trigger-${id}" onclick="toggleMultiSelect('${id}', event)" role="button" tabindex="0" aria-haspopup="listbox" aria-expanded="false">
+      <div class="ms-trigger-left">
+        <span class="ms-trigger-icon">${cfg.icon}</span>
+        <span class="ms-trigger-text" id="ms-text-${id}">${cfg.placeholder}</span>
+      </div>
+      <div class="ms-trigger-right">
+        <span class="ms-badge" id="ms-badge-${id}" style="display:none;">0</span>
+        <span class="ms-chevron" id="ms-chevron-${id}">▼</span>
+      </div>
+    </div>
+
+    <div class="ms-tags-tray" id="ms-tags-${id}" style="display:none;"></div>
+
+    <div class="ms-dropdown-panel" id="ms-dropdown-${id}" style="display:none;">
+      <div class="ms-panel-header">
+        <div class="ms-search-wrap">
+          <input type="text" class="ms-search-input" id="ms-search-${id}" placeholder="🔍 Filtrar…" oninput="filterMultiSelect('${id}', this.value)" autocomplete="off" />
+          <button type="button" class="ms-search-clear" onclick="clearMultiSelectSearch('${id}')" title="Limpiar filtro">✕</button>
+        </div>
+        <div class="ms-actions-bar">
+          <button type="button" class="ms-action-btn" onclick="selectAllMultiSelect('${id}')">✅ Todos</button>
+          <button type="button" class="ms-action-btn" onclick="clearAllMultiSelect('${id}')">✕ Ninguno</button>
+          ${cfg.hasPreanalisis ? `<button type="button" class="ms-action-btn ms-preanalisis-btn" onclick="toggleGrupoPreanalisis()">🏷️ Preanálisis</button>` : ''}
+        </div>
+      </div>
+
+      <div class="ms-options-list" id="ms-list-${id}" role="listbox">
+        ${(items || []).map(item => {
+          const val = typeof item === 'object' ? item.value : item;
+          const lbl = typeof item === 'object' ? item.label : item;
+          const isPrean = cfg.hasPreanalisis && PREANALISIS.includes(centNum(val));
+          const isSel = prevSelected.includes(val);
+          return `
+          <div class="ms-option-item chip-item${isSel ? ' selected' : ''}" data-value="${val}" onclick="handleOptionClick(this, event)">
+            <div class="ms-checkbox">
+              <svg class="ms-check-icon" viewBox="0 0 16 16" fill="none">
+                <path d="M3.5 8.5L6.5 11.5L12.5 4.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <span class="ms-option-text">${lbl}</span>
+            ${isPrean ? `<span class="ms-tag-pill">Preanálisis</span>` : ''}
+          </div>`;
+        }).join('')}
+      </div>
+
+      <div class="ms-panel-footer">
+        <button type="button" class="btn btn-primary btn-sm ms-btn-close" onclick="closeMultiSelect('${id}')">
+          ✓ Listo / Confirmar
+        </button>
+      </div>
+    </div>
+  `;
+
+  initMultiSelectObserver(id);
+  updateMultiSelectUI(id);
+}
 
 // ── Personal & Responsables Helpers (Optimized O(1) Hash Map) ─
 function getNombreResponsable(rawVal) {
@@ -632,6 +1026,7 @@ function checkUrlParams(){
           if(c.dataset.value===sala) c.classList.add('selected');
         });
         clearInterval(w);
+        updateMultiSelectUI('meson-chips');
       }
     },300);
     navigateTo('mesones');
@@ -644,6 +1039,7 @@ function checkUrlParams(){
           if(c.dataset.value===cent) c.classList.add('selected');
         });
         clearInterval(w);
+        updateMultiSelectUI('cent-chips');
       }
     },300);
     navigateTo('centrifugas');
@@ -657,6 +1053,7 @@ function checkUrlParams(){
           if(PREANALISIS.includes(centNum(c.dataset.value))) c.classList.add('selected');
         });
         clearInterval(w);
+        updateMultiSelectUI('cent-chips');
       }
     },300);
     navigateTo('centrifugas');
@@ -680,6 +1077,7 @@ function checkUrlParams(){
           if(c.dataset.value===limprefri) c.classList.add('selected');
         });
         clearInterval(w);
+        updateMultiSelectUI('limp-refri-chips');
       }
     },300);
     navigateTo('limp-refri');

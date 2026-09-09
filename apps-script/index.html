@@ -248,7 +248,7 @@
           <button type="button" class="chip-group-btn" id="btn-grupo-preanalisis" onclick="toggleGrupoPreanalisis()">
             🏷️ Centrífugas de Preanálisis
           </button>
-          <div class="chip-grid" id="cent-chips" style="margin-top:8px;">
+          <div class="custom-multiselect" id="cent-chips">
             <!-- Populated by JS -->
           </div>
         </div>
@@ -329,7 +329,7 @@
 
         <div class="form-group">
           <label class="form-label">Salas</label>
-          <div class="chip-grid" id="meson-chips">
+          <div class="custom-multiselect" id="meson-chips">
             <!-- Populated by JS -->
           </div>
         </div>
@@ -523,7 +523,7 @@
 
         <div class="form-group">
           <label class="form-label">Equipos</label>
-          <div class="chip-grid" id="limp-refri-chips">
+          <div class="custom-multiselect" id="limp-refri-chips">
             <!-- Populated by JS -->
           </div>
         </div>
@@ -1138,15 +1138,8 @@
         <button type="button" class="chip-group-btn" id="btn-rev-select-all" onclick="toggleAllRevChips()">
           ✅ Seleccionar todos
         </button>
-        <div class="chip-grid" id="rev-chips" style="margin-top:8px;">
-          <div class="chip-item" data-value="termo" onclick="toggleChip(this)">🌡️ Temp. Ambiental</div>
-          <div class="chip-item" data-value="centrifugas" onclick="toggleChip(this)">⚙️ Centrífugas</div>
-          <div class="chip-item" data-value="mesones" onclick="toggleChip(this)">🧽 Mesones</div>
-          <div class="chip-item" data-value="refriTemp" onclick="toggleChip(this)">🧊 Temp. Refrigeradores</div>
-          <div class="chip-item" data-value="limpRefri" onclick="toggleChip(this)">🧹 Limp. Refrigeradores</div>
-          <div class="chip-item" data-value="conductividad" onclick="toggleChip(this)">💧 Conductividad</div>
-          <div class="chip-item" data-value="cobas" onclick="toggleChip(this)">🔬 Mantención Cobas</div>
-          <div class="chip-item" data-value="elimMuestras" onclick="toggleChip(this)">🗑️ Eliminación Muestras</div>
+        <div class="custom-multiselect" id="rev-chips">
+          <!-- Populated by JS -->
         </div>
       </div>
 
