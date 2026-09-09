@@ -51,7 +51,7 @@ document.getElementById('form-centrifugas').addEventListener('submit',async e=>{
   try{
     const r=await apiPost({action:'saveCentrifuga',fecha:document.getElementById('cent-fecha').value,centrifugas:sel,responsable:document.getElementById('cent-resp').value,tipo_mantencion:document.getElementById('cent-tipo').value,observaciones:obsVal});
     if(r.success){
-      addDatalistOption('list-cent-obs',obsVal);showToast('✅ '+r.message);e.target.reset();document.getElementById('cent-fecha').value=today();document.getElementById('cent-tipo').value='Diaria';updateInfoCentrifuga();document.querySelectorAll('#cent-chips .chip-item').forEach(c=>c.classList.remove('selected'));document.getElementById('btn-grupo-preanalisis').classList.remove('active');if(typeof updateMultiSelectUI==='function')updateMultiSelectUI('cent-chips');
+      addDatalistOption('list-cent-obs',obsVal);showToast('✅ '+r.message);e.target.reset();document.getElementById('cent-fecha').value=today();document.getElementById('cent-tipo').value='Diaria';updateInfoCentrifuga();document.querySelectorAll('#cent-chips .chip-item').forEach(c=>c.classList.remove('selected'));document.getElementById('btn-grupo-preanalisis').classList.remove('active');if(typeof closeMultiSelect==='function')closeMultiSelect('cent-chips');if(typeof clearMultiSelectSearch==='function')clearMultiSelectSearch('cent-chips');if(typeof updateMultiSelectUI==='function')updateMultiSelectUI('cent-chips');
       clearRecordsMonthCache();
       prefetchDashboard();
       checkDuplicateCentrifugas();
@@ -81,7 +81,7 @@ document.getElementById('form-mesones').addEventListener('submit',async e=>{
   try{
     const r=await apiPost({action:'saveMesones',fecha:document.getElementById('meson-fecha').value,salas:sel,responsable:document.getElementById('meson-resp').value,observaciones:obsVal});
     if(r.success){
-      addDatalistOption('list-meson-obs',obsVal);showToast('✅ '+r.message);e.target.reset();document.getElementById('meson-fecha').value=today();document.querySelectorAll('#meson-chips .chip-item').forEach(c=>c.classList.remove('selected'));if(typeof updateMultiSelectUI==='function')updateMultiSelectUI('meson-chips');
+      addDatalistOption('list-meson-obs',obsVal);showToast('✅ '+r.message);e.target.reset();document.getElementById('meson-fecha').value=today();document.querySelectorAll('#meson-chips .chip-item').forEach(c=>c.classList.remove('selected'));if(typeof closeMultiSelect==='function')closeMultiSelect('meson-chips');if(typeof clearMultiSelectSearch==='function')clearMultiSelectSearch('meson-chips');if(typeof updateMultiSelectUI==='function')updateMultiSelectUI('meson-chips');
       clearRecordsMonthCache();
       prefetchDashboard();
       checkDuplicateMesones();
@@ -128,7 +128,7 @@ document.getElementById('form-limp-refri').addEventListener('submit',async e=>{
   setLoading('btn-limp-refri-submit','spinner-limp-refri','btn-limp-refri-text',true);
   try{
     const r=await apiPost({action:'saveLimpiezaRefri',fecha:document.getElementById('limp-refri-fecha').value,equipos:sel,responsable:document.getElementById('limp-refri-resp').value,tipo_mantencion:document.getElementById('limp-refri-tipo').value,observaciones:obsVal});
-    if(r.success){addDatalistOption('list-limp-refri-obs',obsVal);showToast('✅ '+r.message);e.target.reset();document.getElementById('limp-refri-fecha').value=today();document.getElementById('limp-refri-tipo').value='Semanal (externa)';updateInfoLimpRefri();document.querySelectorAll('#limp-refri-chips .chip-item').forEach(c=>c.classList.remove('selected'));if(typeof updateMultiSelectUI==='function')updateMultiSelectUI('limp-refri-chips');prefetchDashboard();if(typeof loadRecentLimpRefri==='function')loadRecentLimpRefri();}
+    if(r.success){addDatalistOption('list-limp-refri-obs',obsVal);showToast('✅ '+r.message);e.target.reset();document.getElementById('limp-refri-fecha').value=today();document.getElementById('limp-refri-tipo').value='Semanal (externa)';updateInfoLimpRefri();document.querySelectorAll('#limp-refri-chips .chip-item').forEach(c=>c.classList.remove('selected'));if(typeof closeMultiSelect==='function')closeMultiSelect('limp-refri-chips');if(typeof clearMultiSelectSearch==='function')clearMultiSelectSearch('limp-refri-chips');if(typeof updateMultiSelectUI==='function')updateMultiSelectUI('limp-refri-chips');prefetchDashboard();if(typeof loadRecentLimpRefri==='function')loadRecentLimpRefri();}
     else showToast('❌ '+r.error,'error')
   }catch(err){showToast('❌ Error de conexión','error')}
   setLoading('btn-limp-refri-submit','spinner-limp-refri','btn-limp-refri-text',false)
@@ -738,6 +738,8 @@ async function submitRevisadoAdmin(){
       if(obsEl) obsEl.value='';
       document.querySelectorAll('#rev-chips .chip-item').forEach(c=>c.classList.remove('selected'));
       document.getElementById('btn-rev-select-all').classList.remove('active');
+      if(typeof closeMultiSelect==='function')closeMultiSelect('rev-chips');
+      if(typeof clearMultiSelectSearch==='function')clearMultiSelectSearch('rev-chips');
       if(typeof updateMultiSelectUI==='function')updateMultiSelectUI('rev-chips');
       state.dashCache=null; // invalidate cache
       loadRevStatus();

@@ -18,6 +18,7 @@ const MULTISELECT_CONFIGS = {
     icon: '⚙️',
     singular: 'centrífuga',
     plural: 'centrífugas',
+    gender: 'f',
     placeholder: 'Seleccionar centrífugas…',
     hasPreanalisis: true
   },
@@ -25,18 +26,21 @@ const MULTISELECT_CONFIGS = {
     icon: '🧽',
     singular: 'sala',
     plural: 'salas',
+    gender: 'f',
     placeholder: 'Seleccionar salas…'
   },
   'limp-refri-chips': {
     icon: '🧹',
     singular: 'equipo',
     plural: 'equipos',
+    gender: 'm',
     placeholder: 'Seleccionar equipos de refrigeración…'
   },
   'rev-chips': {
     icon: '📋',
     singular: 'registro',
     plural: 'registros',
+    gender: 'm',
     placeholder: 'Seleccionar registros a revisar…'
   }
 };
@@ -461,6 +465,21 @@ async function loadMaestros() {
 
 function populateSelect(id,items,ph){const s=document.getElementById(id);s.innerHTML=`<option value="">${ph}</option>`+items.map(i=>`<option value="${i}">${i}</option>`).join('')}
 function populateDatalist(id,items){const el=document.getElementById(id);if(el){el.innerHTML=items.map(i=>`<option value="${i}">`).join('')}}
+// ── Helpers ───────────────────────────────────────────────────
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function normalizeMsText(s) {
+  return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+}
+
 // ── Touch Gesture Guard for MultiSelect ──────────────────────
 let msTouchStartY = 0;
 let msTouchStartX = 0;
@@ -479,7 +498,7 @@ document.addEventListener('touchmove', (e) => {
   if (!msIsScrolling && e.touches && e.touches.length > 0) {
     const diffY = Math.abs(e.touches[0].clientY - msTouchStartY);
     const diffX = Math.abs(e.touches[0].clientX - msTouchStartX);
-    if (diffY > 7 || diffX > 7) {
+    if (diffY > 10 || diffX > 10) {
       msIsScrolling = true;
     }
   }
@@ -490,6 +509,11 @@ document.addEventListener('touchend', () => {
   msScrollTimer = setTimeout(() => {
     msIsScrolling = false;
   }, 250);
+}, { passive: true });
+
+document.addEventListener('touchcancel', () => {
+  if (msScrollTimer) clearTimeout(msScrollTimer);
+  msIsScrolling = false;
 }, { passive: true });
 
 function handleOptionClick(el, e) {
@@ -506,6 +530,7 @@ function handleOptionClick(el, e) {
 
 function toggleChip(el) {
   el.classList.toggle('selected');
+  el.setAttribute('aria-selected', el.classList.contains('selected') ? 'true' : 'false');
   const container = el.closest('.custom-multiselect') || el.closest('#cent-chips, #meson-chips, #limp-refri-chips, #rev-chips') || (el.parentElement ? el.parentElement : null);
   const parentId = container ? container.id : '';
   if (parentId === 'cent-chips' && typeof checkDuplicateCentrifugas === 'function') checkDuplicateCentrifugas();
@@ -523,6 +548,7 @@ function getSelectedChips(id) {
 }
 
 function toggleGrupoPreanalisis() {
+  if (msIsScrolling) return;
   const btn = document.getElementById('btn-grupo-preanalisis');
   const chips = document.querySelectorAll('#cent-chips .chip-item');
   const preChips = Array.from(chips).filter(c => PREANALISIS.includes(centNum(c.dataset.value)));
@@ -531,8 +557,13 @@ function toggleGrupoPreanalisis() {
 
   if (btn) btn.classList.toggle('active', willSelect);
   preChips.forEach(c => {
-    if (willSelect) c.classList.add('selected');
-    else c.classList.remove('selected');
+    if (willSelect) {
+      c.classList.add('selected');
+      c.setAttribute('aria-selected', 'true');
+    } else {
+      c.classList.remove('selected');
+      c.setAttribute('aria-selected', 'false');
+    }
   });
   if (typeof checkDuplicateCentrifugas === 'function') checkDuplicateCentrifugas();
   updateMultiSelectUI('cent-chips');
@@ -562,25 +593,37 @@ function toggleMultiSelect(containerId, e) {
     closeAllMultiSelects();
     panel.style.display = 'block';
     if (chevron) chevron.classList.add('open');
-    if (trigger) trigger.classList.add('active');
+    if (trigger) {
+      trigger.classList.add('active');
+      trigger.setAttribute('aria-expanded', 'true');
+    }
     const searchInp = document.getElementById(`ms-search-${containerId}`);
-    if (searchInp) setTimeout(() => searchInp.focus(), 60);
+    if (searchInp && !(window.matchMedia && window.matchMedia('(pointer: coarse)').matches)) {
+      setTimeout(() => searchInp.focus(), 60);
+    }
   }
 }
 
 function closeMultiSelect(containerId) {
+  if (msIsScrolling) return;
   const panel = document.getElementById(`ms-dropdown-${containerId}`);
   const chevron = document.getElementById(`ms-chevron-${containerId}`);
   const trigger = document.getElementById(`ms-trigger-${containerId}`);
   if (panel) panel.style.display = 'none';
   if (chevron) chevron.classList.remove('open');
-  if (trigger) trigger.classList.remove('active');
+  if (trigger) {
+    trigger.classList.remove('active');
+    trigger.setAttribute('aria-expanded', 'false');
+  }
 }
 
 function closeAllMultiSelects() {
   document.querySelectorAll('.ms-dropdown-panel').forEach(p => p.style.display = 'none');
   document.querySelectorAll('.ms-chevron').forEach(c => c.classList.remove('open'));
-  document.querySelectorAll('.ms-trigger').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.ms-trigger').forEach(t => {
+    t.classList.remove('active');
+    t.setAttribute('aria-expanded', 'false');
+  });
 }
 
 document.addEventListener('click', (e) => {
@@ -589,13 +632,21 @@ document.addEventListener('click', (e) => {
   }
 });
 
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeAllMultiSelects();
+  }
+});
+
 function removeSelectedItem(containerId, value, e) {
+  if (msIsScrolling) return;
   if (e) e.stopPropagation();
   const container = document.getElementById(containerId);
   if (!container) return;
   const chip = Array.from(container.querySelectorAll('.chip-item')).find(c => c.dataset.value === value);
   if (chip) {
     chip.classList.remove('selected');
+    chip.setAttribute('aria-selected', 'false');
     if (containerId === 'cent-chips' && typeof checkDuplicateCentrifugas === 'function') checkDuplicateCentrifugas();
     else if (containerId === 'meson-chips' && typeof checkDuplicateMesones === 'function') checkDuplicateMesones();
     updateMultiSelectUI(containerId);
@@ -605,10 +656,12 @@ function removeSelectedItem(containerId, value, e) {
 function filterMultiSelect(containerId, query) {
   const container = document.getElementById(containerId);
   if (!container) return;
-  const q = (query || '').toLowerCase().trim();
+  const q = normalizeMsText(query);
   const items = container.querySelectorAll('.ms-option-item');
   items.forEach(item => {
-    const text = (item.dataset.value || '').toLowerCase();
+    const val = item.dataset.value || '';
+    const lbl = item.dataset.label || val;
+    const text = normalizeMsText(val + ' ' + lbl);
     if (!q || text.includes(q)) {
       item.style.display = 'flex';
     } else {
@@ -618,6 +671,7 @@ function filterMultiSelect(containerId, query) {
 }
 
 function clearMultiSelectSearch(containerId) {
+  if (msIsScrolling) return;
   const input = document.getElementById(`ms-search-${containerId}`);
   if (input) {
     input.value = '';
@@ -627,12 +681,14 @@ function clearMultiSelectSearch(containerId) {
 }
 
 function selectAllMultiSelect(containerId) {
+  if (msIsScrolling) return;
   const container = document.getElementById(containerId);
   if (!container) return;
   const items = container.querySelectorAll('.ms-option-item');
   items.forEach(item => {
     if (item.style.display !== 'none') {
       item.classList.add('selected');
+      item.setAttribute('aria-selected', 'true');
     }
   });
   if (containerId === 'cent-chips' && typeof checkDuplicateCentrifugas === 'function') checkDuplicateCentrifugas();
@@ -641,10 +697,14 @@ function selectAllMultiSelect(containerId) {
 }
 
 function clearAllMultiSelect(containerId) {
+  if (msIsScrolling) return;
   const container = document.getElementById(containerId);
   if (!container) return;
   const items = container.querySelectorAll('.chip-item');
-  items.forEach(item => item.classList.remove('selected'));
+  items.forEach(item => {
+    item.classList.remove('selected');
+    item.setAttribute('aria-selected', 'false');
+  });
   if (containerId === 'cent-chips' && typeof checkDuplicateCentrifugas === 'function') checkDuplicateCentrifugas();
   else if (containerId === 'meson-chips' && typeof checkDuplicateMesones === 'function') checkDuplicateMesones();
   updateMultiSelectUI(containerId);
@@ -653,75 +713,85 @@ function clearAllMultiSelect(containerId) {
 function updateMultiSelectUI(containerId) {
   const container = document.getElementById(containerId);
   if (!container) return;
-  const cfg = MULTISELECT_CONFIGS[containerId] || {
-    icon: '📌',
-    singular: 'elemento',
-    plural: 'elementos',
-    placeholder: 'Seleccionar elementos…'
-  };
+  if (container._msUpdating) return;
+  container._msUpdating = true;
 
-  const allChips = container.querySelectorAll('.chip-item');
-  const selectedChips = container.querySelectorAll('.chip-item.selected');
-  const count = selectedChips.length;
+  try {
+    const cfg = MULTISELECT_CONFIGS[containerId] || {
+      icon: '📌',
+      singular: 'elemento',
+      plural: 'elementos',
+      gender: 'm',
+      placeholder: 'Seleccionar elementos…'
+    };
 
-  const textEl = document.getElementById(`ms-text-${containerId}`);
-  const badgeEl = document.getElementById(`ms-badge-${containerId}`);
+    const allChips = container.querySelectorAll('.chip-item');
+    const selectedChips = container.querySelectorAll('.chip-item.selected');
+    const count = selectedChips.length;
 
-  if (textEl) {
-    if (count === 0) {
-      textEl.textContent = cfg.placeholder;
-      textEl.classList.remove('has-selection');
-    } else if (count === 1) {
-      const firstVal = selectedChips[0].dataset.value;
-      textEl.textContent = `${cfg.icon} 1 ${cfg.singular}: ${firstVal}`;
-      textEl.classList.add('has-selection');
-    } else {
-      textEl.textContent = `${cfg.icon} ${count} ${cfg.plural} seleccionadas`;
-      textEl.classList.add('has-selection');
+    const textEl = document.getElementById(`ms-text-${containerId}`);
+    const badgeEl = document.getElementById(`ms-badge-${containerId}`);
+
+    if (textEl) {
+      if (count === 0) {
+        textEl.textContent = cfg.placeholder;
+        textEl.classList.remove('has-selection');
+      } else if (count === 1) {
+        const firstChip = selectedChips[0];
+        const firstLabel = firstChip.dataset.label || firstChip.dataset.value;
+        textEl.textContent = `${cfg.icon} 1 ${cfg.singular}: ${firstLabel}`;
+        textEl.classList.add('has-selection');
+      } else {
+        const selWord = cfg.gender === 'f' ? 'seleccionadas' : 'seleccionados';
+        textEl.textContent = `${cfg.icon} ${count} ${cfg.plural} ${selWord}`;
+        textEl.classList.add('has-selection');
+      }
     }
-  }
 
-  if (badgeEl) {
-    if (count > 0) {
-      badgeEl.textContent = String(count);
-      badgeEl.style.display = 'inline-flex';
-    } else {
-      badgeEl.style.display = 'none';
+    if (badgeEl) {
+      if (count > 0) {
+        badgeEl.textContent = String(count);
+        badgeEl.style.display = 'inline-flex';
+      } else {
+        badgeEl.style.display = 'none';
+      }
     }
-  }
 
-  const trayEl = document.getElementById(`ms-tags-${containerId}`);
-  if (trayEl) {
-    if (count > 0) {
-      trayEl.style.display = 'flex';
-      trayEl.innerHTML = Array.from(selectedChips).map(chip => {
-        const val = chip.dataset.value;
-        const escVal = (val || '').replace(/'/g, "\\'");
-        return `
-        <span class="ms-selected-tag" data-value="${val}">
-          <span class="ms-tag-text">${val}</span>
-          <button type="button" class="ms-tag-remove" onclick="removeSelectedItem('${containerId}', '${escVal}', event)" title="Quitar ${val}">✕</button>
-        </span>`;
-      }).join('') + (count > 1 ? `<button type="button" class="ms-clear-tray-btn" onclick="clearAllMultiSelect('${containerId}')" title="Quitar todas">Limpiar</button>` : '');
-    } else {
-      trayEl.style.display = 'none';
-      trayEl.innerHTML = '';
+    const trayEl = document.getElementById(`ms-tags-${containerId}`);
+    if (trayEl) {
+      if (count > 0) {
+        trayEl.style.display = 'flex';
+        trayEl.innerHTML = Array.from(selectedChips).map(chip => {
+          const val = chip.dataset.value || '';
+          const lbl = chip.dataset.label || val;
+          return `
+          <span class="ms-selected-tag" data-value="${escapeHtml(val)}">
+            <span class="ms-tag-text">${escapeHtml(lbl)}</span>
+            <button type="button" class="ms-tag-remove" data-container="${containerId}" data-value="${escapeHtml(val)}" title="Quitar ${escapeHtml(lbl)}" aria-label="Quitar ${escapeHtml(lbl)}">✕</button>
+          </span>`;
+        }).join('') + (count > 1 ? `<button type="button" class="ms-clear-tray-btn" data-container="${containerId}" title="Quitar todas">Limpiar</button>` : '');
+      } else {
+        trayEl.style.display = 'none';
+        trayEl.innerHTML = '';
+      }
     }
-  }
 
-  if (containerId === 'cent-chips') {
-    const preBtn = document.getElementById('btn-grupo-preanalisis');
-    const msPreBtn = container.querySelector('.ms-preanalisis-btn');
-    const preChips = Array.from(allChips).filter(ch => PREANALISIS.includes(centNum(ch.dataset.value)));
-    const allPreSelected = preChips.length > 0 && preChips.every(c => c.classList.contains('selected'));
-    if (preBtn) preBtn.classList.toggle('active', allPreSelected);
-    if (msPreBtn) msPreBtn.classList.toggle('active', allPreSelected);
-  }
+    if (containerId === 'cent-chips') {
+      const preBtn = document.getElementById('btn-grupo-preanalisis');
+      const msPreBtn = container.querySelector('.ms-preanalisis-btn');
+      const preChips = Array.from(allChips).filter(ch => PREANALISIS.includes(centNum(ch.dataset.value)));
+      const allPreSelected = preChips.length > 0 && preChips.every(c => c.classList.contains('selected'));
+      if (preBtn) preBtn.classList.toggle('active', allPreSelected);
+      if (msPreBtn) msPreBtn.classList.toggle('active', allPreSelected);
+    }
 
-  if (containerId === 'rev-chips') {
-    const revBtn = document.getElementById('btn-rev-select-all');
-    const allSel = allChips.length > 0 && selectedChips.length === allChips.length;
-    if (revBtn) revBtn.classList.toggle('active', allSel);
+    if (containerId === 'rev-chips') {
+      const revBtn = document.getElementById('btn-rev-select-all');
+      const allSel = allChips.length > 0 && selectedChips.length === allChips.length;
+      if (revBtn) revBtn.classList.toggle('active', allSel);
+    }
+  } finally {
+    container._msUpdating = false;
   }
 }
 
@@ -730,24 +800,48 @@ function initMultiSelectObserver(containerId) {
   if (!container || container._msObserverInit) return;
   container._msObserverInit = true;
 
-  const observer = new MutationObserver((mutations) => {
-    let shouldUpdate = false;
-    for (const m of mutations) {
-      if (m.type === 'attributes' && m.attributeName === 'class') {
-        shouldUpdate = true;
-        break;
+  if (typeof MutationObserver !== 'undefined') {
+    const observer = new MutationObserver((mutations) => {
+      if (container._msUpdating) return;
+      let shouldUpdate = false;
+      for (const m of mutations) {
+        if (m.type === 'attributes' && m.attributeName === 'class' && m.target && m.target.classList && m.target.classList.contains('chip-item')) {
+          shouldUpdate = true;
+          break;
+        }
       }
-    }
-    if (shouldUpdate) {
-      updateMultiSelectUI(containerId);
-    }
-  });
+      if (shouldUpdate) {
+        updateMultiSelectUI(containerId);
+      }
+    });
 
-  observer.observe(container, {
-    attributes: true,
-    attributeFilter: ['class'],
-    subtree: true
-  });
+    observer.observe(container, {
+      attributes: true,
+      attributeFilter: ['class'],
+      subtree: true
+    });
+  }
+
+  const trayEl = document.getElementById(`ms-tags-${containerId}`);
+  if (trayEl && !trayEl._msDelegated) {
+    trayEl._msDelegated = true;
+    trayEl.addEventListener('click', (e) => {
+      if (msIsScrolling) return;
+      const removeBtn = e.target.closest('.ms-tag-remove');
+      if (removeBtn) {
+        e.stopPropagation();
+        e.preventDefault();
+        removeSelectedItem(removeBtn.dataset.container || containerId, removeBtn.dataset.value, e);
+        return;
+      }
+      const clearBtn = e.target.closest('.ms-clear-tray-btn');
+      if (clearBtn) {
+        e.stopPropagation();
+        e.preventDefault();
+        clearAllMultiSelect(clearBtn.dataset.container || containerId);
+      }
+    });
+  }
 }
 
 function populateChips(id, items) {
@@ -758,6 +852,7 @@ function populateChips(id, items) {
     icon: '📌',
     singular: 'elemento',
     plural: 'elementos',
+    gender: 'm',
     placeholder: 'Seleccionar elementos…'
   };
 
@@ -765,7 +860,7 @@ function populateChips(id, items) {
 
   container.className = 'custom-multiselect';
   container.innerHTML = `
-    <div class="ms-trigger" id="ms-trigger-${id}" onclick="toggleMultiSelect('${id}', event)" role="button" tabindex="0" aria-haspopup="listbox" aria-expanded="false">
+    <button type="button" class="ms-trigger" id="ms-trigger-${id}" onclick="toggleMultiSelect('${id}', event)" aria-haspopup="listbox" aria-expanded="false">
       <div class="ms-trigger-left">
         <span class="ms-trigger-icon">${cfg.icon}</span>
         <span class="ms-trigger-text" id="ms-text-${id}">${cfg.placeholder}</span>
@@ -774,7 +869,7 @@ function populateChips(id, items) {
         <span class="ms-badge" id="ms-badge-${id}" style="display:none;">0</span>
         <span class="ms-chevron" id="ms-chevron-${id}">▼</span>
       </div>
-    </div>
+    </button>
 
     <div class="ms-tags-tray" id="ms-tags-${id}" style="display:none;"></div>
 
@@ -782,7 +877,7 @@ function populateChips(id, items) {
       <div class="ms-panel-header">
         <div class="ms-search-wrap">
           <input type="text" class="ms-search-input" id="ms-search-${id}" placeholder="🔍 Filtrar…" oninput="filterMultiSelect('${id}', this.value)" autocomplete="off" />
-          <button type="button" class="ms-search-clear" onclick="clearMultiSelectSearch('${id}')" title="Limpiar filtro">✕</button>
+          <button type="button" class="ms-search-clear" onclick="clearMultiSelectSearch('${id}')" title="Limpiar filtro" aria-label="Limpiar filtro">✕</button>
         </div>
         <div class="ms-actions-bar">
           <button type="button" class="ms-action-btn" onclick="selectAllMultiSelect('${id}')">✅ Todos</button>
@@ -791,20 +886,20 @@ function populateChips(id, items) {
         </div>
       </div>
 
-      <div class="ms-options-list" id="ms-list-${id}" role="listbox">
+      <div class="ms-options-list" id="ms-list-${id}" role="listbox" aria-multiselectable="true">
         ${(items || []).map(item => {
           const val = typeof item === 'object' ? item.value : item;
           const lbl = typeof item === 'object' ? item.label : item;
           const isPrean = cfg.hasPreanalisis && PREANALISIS.includes(centNum(val));
           const isSel = prevSelected.includes(val);
           return `
-          <div class="ms-option-item chip-item${isSel ? ' selected' : ''}" data-value="${val}" onclick="handleOptionClick(this, event)">
+          <div class="ms-option-item chip-item${isSel ? ' selected' : ''}" data-value="${escapeHtml(val)}" data-label="${escapeHtml(lbl)}" onclick="handleOptionClick(this, event)" role="option" aria-selected="${isSel ? 'true' : 'false'}">
             <div class="ms-checkbox">
               <svg class="ms-check-icon" viewBox="0 0 16 16" fill="none">
                 <path d="M3.5 8.5L6.5 11.5L12.5 4.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
             </div>
-            <span class="ms-option-text">${lbl}</span>
+            <span class="ms-option-text">${escapeHtml(lbl)}</span>
             ${isPrean ? `<span class="ms-tag-pill">Preanálisis</span>` : ''}
           </div>`;
         }).join('')}

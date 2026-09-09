@@ -778,9 +778,21 @@ body {
 .ms-trigger:hover {
   border-color: var(--primary);
 }
+.ms-trigger:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
 .ms-trigger.active {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px var(--primary-dim);
+}
+[data-theme="dark"] .ms-trigger {
+  background: #132238;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+[data-theme="dark"] .ms-trigger:hover,
+[data-theme="dark"] .ms-trigger.active {
+  border-color: var(--primary);
 }
 .ms-trigger-left {
   display: flex;
@@ -884,6 +896,8 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  min-width: 20px;
+  min-height: 20px;
   transition: all 0.15s;
   -webkit-tap-highlight-color: transparent;
 }
@@ -918,7 +932,9 @@ body {
   animation: msSlideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 [data-theme="dark"] .ms-dropdown-panel {
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  background: #132238;
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55);
 }
 @keyframes msSlideDown {
   from { opacity: 0; transform: translateY(-8px); }
@@ -933,6 +949,10 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+[data-theme="dark"] .ms-panel-header {
+  background: #0d1a2d;
+  border-color: rgba(255, 255, 255, 0.10);
 }
 .ms-search-wrap {
   position: relative;
@@ -949,6 +969,11 @@ body {
   font-size: 13px;
   font-family: inherit;
   transition: border-color 0.2s;
+}
+[data-theme="dark"] .ms-search-input {
+  background: #17273f;
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #F0F6FF;
 }
 .ms-search-input:focus {
   outline: none;
@@ -988,6 +1013,11 @@ body {
   transition: all 0.15s;
   font-family: inherit;
   -webkit-tap-highlight-color: transparent;
+}
+[data-theme="dark"] .ms-action-btn {
+  background: #17273f;
+  border-color: rgba(255, 255, 255, 0.15);
+  color: rgba(240, 246, 255, 0.75);
 }
 .ms-action-btn:hover {
   border-color: var(--primary);
@@ -1034,12 +1064,13 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 42px;
+  min-height: 46px;
   padding: 8px 12px;
   border-radius: 8px;
   border: 1px solid transparent;
   background: transparent;
   cursor: pointer;
+  touch-action: pan-y;
   transition: background 0.15s, border-color 0.15s;
   -webkit-tap-highlight-color: transparent;
 }
@@ -1120,6 +1151,10 @@ body {
   background: var(--bg-card);
   display: flex;
   justify-content: flex-end;
+}
+[data-theme="dark"] .ms-panel-footer {
+  background: #0d1a2d;
+  border-color: rgba(255, 255, 255, 0.10);
 }
 .ms-btn-close {
   width: auto;
