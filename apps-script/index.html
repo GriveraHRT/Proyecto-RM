@@ -1084,6 +1084,7 @@
         <div id="qr-url-text" class="qr-url-display" style="display:none;"></div>
         <button class="btn btn-secondary btn-sm" onclick="printQR()" id="btn-print-qr" style="display:none;width:auto;">🖨️ Imprimir QR</button>
         <button class="btn btn-primary btn-sm" onclick="printLabel50x30()" id="btn-print-label" style="display:none;width:auto;margin-left:8px;background:linear-gradient(135deg, #0066FF, #00D4FF);">🏷️ Imprimir Etiqueta (50x30 mm)</button>
+        <button class="btn btn-secondary btn-sm" onclick="printAllElimLabels50x30()" id="btn-print-all-elim" style="display:none;width:auto;margin-left:8px;">📑 Imprimir Todos los Sectores (21)</button>
       </div>
 
       <div class="note-box" style="margin-top:16px;margin-bottom:0;">
@@ -1335,6 +1336,11 @@
     <p class="section-title">🗑️ Eliminación de muestras</p>
     <p class="section-subtitle">Registro y control diario de eliminación de muestras</p>
 
+    <!-- Indicador de Sector escaneado por QR -->
+    <div id="elim-sector-prefill-indicator" style="display:none; margin-bottom:12px; background:rgba(0,212,255,0.1); border:1px solid rgba(0,212,255,0.3); border-radius:8px; padding:10px 14px; font-size:13px; color:#00D4FF;">
+      🗑️ Sector escaneado: <strong id="elim-sector-prefill-name"></strong>
+    </div>
+
     <!-- Registrar Nueva Eliminación -->
     <div class="card">
       <h3 style="margin:0 0 12px 0; font-size:16px; font-weight:700; color:var(--text-color);">📝 Registrar Eliminación</h3>
@@ -1344,7 +1350,7 @@
         <div class="form-row">
           <div class="form-group">
             <label class="form-label" for="elim-fecha">Fecha de eliminación</label>
-            <input type="date" id="elim-fecha" class="form-control" required />
+            <input type="date" id="elim-fecha" class="form-control" onchange="onElimFechaChange()" oninput="onElimFechaChange()" required />
           </div>
           <div class="form-group">
             <label class="form-label" for="elim-responsable">Responsable (iniciales)</label>
@@ -1354,12 +1360,22 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label" for="elim-fecha-corte">Seleccionar fecha corte de muestras</label>
+          <label class="form-label" for="elim-sector">Sector / Tipo de muestra</label>
+          <select id="elim-sector" class="form-control" onchange="onElimSectorChange()" required>
+            <option value="">— Seleccionar Sector —</option>
+          </select>
+          <div id="elim-almacenamiento-info" style="display:none; margin-top:6px; font-size:12px; color:var(--primary-color); background:rgba(0,102,255,0.08); padding:6px 10px; border-radius:6px; border-left:3px solid var(--primary-color);">
+            ⏱️ <strong>Almacenamiento:</strong> <span id="elim-almacenamiento-desc"></span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="elim-fecha-corte">Fecha corte de muestras (propuesta automáticamente)</label>
           <input type="date" id="elim-fecha-corte" class="form-control" onchange="updateMuestrasEliminadasText()" oninput="updateMuestrasEliminadasText()" required />
         </div>
 
         <div class="form-group">
-          <label class="form-label" for="elim-muestras-texto">Muestras eliminadas (Texto fijo)</label>
+          <label class="form-label" for="elim-muestras-texto">Muestras eliminadas</label>
           <input type="text" id="elim-muestras-texto" class="form-control" readonly style="background:rgba(255,255,255,0.06); cursor:not-allowed; font-weight:600; color:var(--primary-color);" required />
         </div>
 

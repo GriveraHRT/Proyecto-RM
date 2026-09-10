@@ -57,8 +57,33 @@ const SHEETS = {
   DXH900_REG:       'Reg. Reparaciones DxH 900 Urgencias',
   ELIM_MUESTRAS:    'Reg. Eliminación Muestras',
   DIAS_NO_HABILES_HRT: 'Maestro Días No Hábiles HRT',
-  PERSONAL:         'Maestro Personal'
+  PERSONAL:         'Maestro Personal',
+  ELIM_SECTORES_MASTER: 'Maestro Sectores Eliminación'
 };
+
+const DEFAULT_ELIM_SECTORES = [
+  { nombre: 'Suero (Química)', almacenamiento: '7 días (congelada)', dias: 7, meses: 0, nota: '' },
+  { nombre: 'Sangre con EDTA (Hematología)', almacenamiento: '72 horas (refrigerada)', dias: 3, meses: 0, nota: '' },
+  { nombre: 'Sangre con EDTA (Hb. Glicada)', almacenamiento: '72 horas (refrigerada)', dias: 3, meses: 0, nota: '' },
+  { nombre: 'Sangre con EDTA (Citometría de flujo)', almacenamiento: '48 horas (refrigerada)', dias: 2, meses: 0, nota: '' },
+  { nombre: 'Líquidos biológicos', almacenamiento: '14 días (refrigerada)', dias: 14, meses: 0, nota: '' },
+  { nombre: 'Suero (Hanta)', almacenamiento: '45 días (refrigerada)', dias: 45, meses: 0, nota: '' },
+  { nombre: 'Suero (VDRL)', almacenamiento: '48 horas (refrigerada)', dias: 2, meses: 0, nota: '' },
+  { nombre: 'Sangre con EDTA (VIH)', almacenamiento: '48 horas (refrigerada)', dias: 2, meses: 0, nota: '' },
+  { nombre: 'Sangre con EDTA (Hepatitis)', almacenamiento: '24 horas (refrigerada)', dias: 1, meses: 0, nota: '' },
+  { nombre: 'Orinas (Urocultivo)', almacenamiento: '24 horas (refrigerada)', dias: 1, meses: 0, nota: '' },
+  { nombre: 'Secreciones', almacenamiento: '5 días (refrigerada)', dias: 5, meses: 0, nota: '' },
+  { nombre: 'Muestras virus respiratorios', almacenamiento: '5 días (refrigerada)', dias: 5, meses: 0, nota: '' },
+  { nombre: 'Orinas (Química)', almacenamiento: '24 horas (refrigerada)', dias: 1, meses: 0, nota: '' },
+  { nombre: 'Orinas (Screenings positivos)', almacenamiento: '7 días (refrigerada)', dias: 7, meses: 0, nota: '' },
+  { nombre: 'Autoinmunidad (suero/plasma/orina/deposición/LCE)', almacenamiento: '1 mes congeladas/refrigeradas', dias: 0, meses: 1, nota: 'Las muestras del mes anterior se congelan y la del mes en curso se encuentran refrigeradas.' },
+  { nombre: 'Semen', almacenamiento: '7 días (T° ambiente)', dias: 7, meses: 0, nota: '' },
+  { nombre: 'Expectoración (Bacteriología)', almacenamiento: '7 días (refrigerada)', dias: 7, meses: 0, nota: '' },
+  { nombre: 'Expectoración (TBC)', almacenamiento: '2 días (refrigerada)', dias: 2, meses: 0, nota: '' },
+  { nombre: 'Muestras rechazadas', almacenamiento: '3 días (refrigerada)', dias: 3, meses: 0, nota: '' },
+  { nombre: 'Muestras repetidas', almacenamiento: '3 días (refrigerada)', dias: 3, meses: 0, nota: '' },
+  { nombre: 'Líquido Broncoalveolar (Técnicas especiales)', almacenamiento: '3 semanas (refrigerada)', dias: 21, meses: 0, nota: '' }
+];
 
 const COBAS_PERIODIC_TASKS = {
   'Semanal': {
@@ -177,6 +202,7 @@ function clearAllCaches() {
     const keys = [
       'maestros_all',
       'maestros_all_v3',
+      'maestros_all_v4',
       'personal_all_v2',
       'sugerencias_historicas',
       'dxh900_hist',
@@ -382,6 +408,7 @@ function doGet(e) {
       case 'getAcciones':       return jsonResponse(getAcciones());
       case 'getRefrigeradores': return jsonResponse(getRefrigeradores());
       case 'getRefriLimpieza':  return jsonResponse(getRefriLimpieza());
+      case 'getElimSectores':   return jsonResponse(getElimSectores());
       case 'getRegistros':      return jsonResponse(getRegistros(e.parameter.mes, e.parameter.anio));
       case 'getRevisiones':     return jsonResponse(getRevision(e.parameter.mes, e.parameter.anio));
       case 'getMaestros':       return jsonResponse(getMaestros());
@@ -540,6 +567,25 @@ function getRefrigeradores() {
 function getRefriLimpieza() {
   const data = getSheet(SHEETS.REFRI_LIMP_MASTER).getDataRange().getValues();
   return data.slice(1).filter(r => r[0]).map(r => String(r[0]));
+}
+
+function getElimSectores() {
+  try {
+    const sheet = getSheet(SHEETS.ELIM_SECTORES_MASTER);
+    if (!sheet) return DEFAULT_ELIM_SECTORES;
+    const data = sheet.getDataRange().getValues();
+    if (data.length <= 1) return DEFAULT_ELIM_SECTORES;
+    return data.slice(1).filter(r => r[0]).map(r => ({
+      nombre: String(r[0]).trim(),
+      almacenamiento: r[1] ? String(r[1]).trim() : '',
+      dias: r[2] !== '' && !isNaN(parseInt(r[2], 10)) ? parseInt(r[2], 10) : 0,
+      meses: r[3] !== '' && !isNaN(parseInt(r[3], 10)) ? parseInt(r[3], 10) : 0,
+      nota: r[4] ? String(r[4]).trim() : ''
+    }));
+  } catch (e) {
+    Logger.log('Error en getElimSectores: ' + e.toString());
+    return DEFAULT_ELIM_SECTORES;
+  }
 }
 
 /** Determina si una fecha dada es día hábil en Chile y HRT */
@@ -964,9 +1010,9 @@ function migrarInicialesAHistoricos() {
 
 /** Devuelve todos los maestros en una sola llamada para optimizar carga */
 function getMaestros() {
-  const cacheKey = 'maestros_all_v3';
+  const cacheKey = 'maestros_all_v4';
   let cached = getCachedJson(cacheKey);
-  if (cached && cached.centrifugasDetailed && cached.areasDetailed && cached.salasDetailed) {
+  if (cached && cached.centrifugasDetailed && cached.areasDetailed && cached.salasDetailed && cached.elimSectores) {
     cached.serverTime = getServerTime();
     cached.personal = getPersonal();
     return cached;
@@ -985,6 +1031,7 @@ function getMaestros() {
     refrigeradores: getRefrigeradores(),
     refriLimpieza: getRefriLimpieza(),
     etiquetadoras: getEtiquetadoras(),
+    elimSectores: getElimSectores(),
     sugerencias: getSugerenciasHistoricas(),
     modulosActivos: getModulosActivos(),
     serverTime: getServerTime()
@@ -1949,11 +1996,20 @@ function getRegistros(mes, anio) {
       equipo: r[4], responsable: r[5], frecuencia: r[6], actividad: r[7],
       observaciones: r[8], revisado_por: r[10] || '', fecha_revision: r[11] || '', obs_revision: r[12] || ''
     }) },
-    { key: 'elimMuestras',  sheetName: SHEETS.ELIM_MUESTRAS, colMes: 2, colAnio: 3, mapper: r => ({
-      fecha: getFechaFromRow(r), dia: r[1], mes: r[2], anio: r[3],
-      responsable: r[4], muestras_eliminadas: r[5],
-      revisado_por: r[7] || '', fecha_revision: r[8] || '', obs_revision: r[9] || ''
-    }) }
+    { key: 'elimMuestras',  sheetName: SHEETS.ELIM_MUESTRAS, colMes: 2, colAnio: 3, mapper: (r, rowIdx, headerRow) => {
+      const hasSectorCol = (headerRow && headerRow.length >= 5)
+        ? (String(headerRow[4]).trim().toLowerCase() === 'sector')
+        : (r.length >= 11);
+      return {
+        fecha: getFechaFromRow(r), dia: r[1], mes: r[2], anio: r[3],
+        sector: hasSectorCol ? (r[4] || 'General') : 'General',
+        responsable: hasSectorCol ? r[5] : r[4],
+        muestras_eliminadas: hasSectorCol ? r[6] : r[5],
+        revisado_por: hasSectorCol ? (r[8] || '') : (r[7] || ''),
+        fecha_revision: hasSectorCol ? (r[9] || '') : (r[8] || ''),
+        obs_revision: hasSectorCol ? (r[10] || '') : (r[9] || '')
+      };
+    } }
   ];
 
   const result = { mes, anio };
@@ -1970,8 +2026,9 @@ function getRegistros(mes, anio) {
     } else {
       const sheet = getSheet(cfg.sheetName);
       const rows = sheet.getDataRange().getValues();
+      const headerRow = rows.length > 0 ? rows[0] : [];
       const filteredRaw = rows.slice(1).filter(r => parseInt(r[cfg.colMes]) === mes && parseInt(r[cfg.colAnio]) === anio);
-      const mapped = filteredRaw.map(cfg.mapper);
+      const mapped = filteredRaw.map((r, i) => cfg.mapper(r, i, headerRow));
       setCachedJson(cacheKey, mapped, CACHE_TTL_REGISTROS);
       result[cfg.key] = mapped;
     }
@@ -2040,7 +2097,7 @@ function marcarRevisado(data) {
     limpRefri:    { sheet: SHEETS.LIMP_REFRI,    colMes: 2, colAnio: 3, colRev: 9,  colFecha: 10, colObs: 11 },
     conductividad:{ sheet: SHEETS.CONDUCT_REG,   colMes: 2, colAnio: 3, colRev: 9,  colFecha: 10, colObs: 11 },
     cobas:        { sheet: SHEETS.COBAS_REG,     colMes: 2, colAnio: 3, colRev: 10, colFecha: 11, colObs: 12 },
-    elimMuestras: { sheet: SHEETS.ELIM_MUESTRAS, colMes: 2, colAnio: 3, colRev: 7,  colFecha: 8,  colObs: 9  }
+    elimMuestras: { sheet: SHEETS.ELIM_MUESTRAS, colMes: 2, colAnio: 3, colRev: 8,  colFecha: 9,  colObs: 10 }
   };
 
   const cacheKeyMap = {
@@ -3075,8 +3132,9 @@ function getSheetDefs() {
       hideCols: [2,3,4,10] },
     { name: SHEETS.DXH900_REG,  headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Usuario Responsable','Descripción Intervención','Nombre Especialista','Fecha de registro'],
       hideCols: [2,3,4,8] },
-    { name: SHEETS.ELIM_MUESTRAS, headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Responsable','Muestras Eliminadas','Fecha de registro','Revisado Por','Fecha Revisión','Obs. Revisión'],
-      hideCols: [2,3,4,7] },
+    { name: SHEETS.ELIM_MUESTRAS, headers: ['Fecha (dd/mm/aaaa)','Día','Mes','Año','Sector','Responsable','Muestras Eliminadas','Fecha de registro','Revisado Por','Fecha Revisión','Obs. Revisión'],
+      hideCols: [2,3,4,8] },
+    { name: SHEETS.ELIM_SECTORES_MASTER, headers: ['Sector / Tipo de Muestra','Almacenamiento','Días','Meses','Nota'] },
     // Maestros al final
     { name: SHEETS.AREAS,       headers: ['Area', 'Horario turno'] },
     { name: SHEETS.CENTRIFUGAS, headers: ['Centrifuga', 'Horario turno'] },
@@ -3098,6 +3156,21 @@ function ensureSheetHeadersAndVisibility(sheet) {
     const def = getSheetDefs().find(d => d.name === name);
     if (!def) return;
     
+    // Verificación especial de migración para Reg. Eliminación Muestras (agregar columna Sector si antes era Responsable)
+    if (name === SHEETS.ELIM_MUESTRAS && sheet.getMaxColumns() >= 5) {
+      const col5Val = String(sheet.getRange(1, 5).getValue()).trim().toLowerCase();
+      if (col5Val === 'responsable') {
+        sheet.insertColumnBefore(5);
+        sheet.getRange(1, 5).setValue('Sector');
+        if (sheet.getLastRow() > 1) {
+          const numDataRows = sheet.getLastRow() - 1;
+          const defaultSectors = [];
+          for (let i = 0; i < numDataRows; i++) defaultSectors.push(['General']);
+          sheet.getRange(2, 5, numDataRows, 1).setValues(defaultSectors);
+        }
+      }
+    }
+
     const needed = def.headers.length;
     if (sheet.getMaxColumns() < needed) {
       sheet.insertColumnsAfter(sheet.getMaxColumns(), needed - sheet.getMaxColumns());
@@ -3187,6 +3260,14 @@ function initializeSpreadsheet() {
 
   if (newlyCreated[SHEETS.PERSONAL]) {
     setupMaestroPersonal();
+  }
+
+  if (newlyCreated[SHEETS.ELIM_SECTORES_MASTER] || getSheet(SHEETS.ELIM_SECTORES_MASTER).getLastRow() <= 1) {
+    const elimSecSheet = ss.getSheetByName(SHEETS.ELIM_SECTORES_MASTER);
+    const rows = DEFAULT_ELIM_SECTORES.map(s => [s.nombre, s.almacenamiento, s.dias || '', s.meses || '', s.nota || '']);
+    if (rows.length > 0) {
+      elimSecSheet.getRange(2, 1, rows.length, 5).setValues(rows);
+    }
   }
 
   if (newlyCreated[SHEETS.NOTIFICACIONES] || getSheet(SHEETS.NOTIFICACIONES).getLastRow() <= 1) {
@@ -3715,6 +3796,7 @@ function saveElimMuestras(data) {
   if (!data.responsable || !data.fecha || !data.muestras_eliminadas) {
     return { success: false, error: 'Faltan campos obligatorios.' };
   }
+  const sector = data.sector ? String(data.sector).trim() : 'General';
   const resp = resolveNombreResponsable(data.responsable);
   const errFuture = validarFechaNoFutura(data.fecha);
   if (errFuture) return { success: false, error: errFuture };
@@ -3722,9 +3804,11 @@ function saveElimMuestras(data) {
   const ts = getFechaRegistroFormatted();
 
   const sheet = getSheet(SHEETS.ELIM_MUESTRAS);
+  ensureSheetHeadersAndVisibility(sheet);
   insertRowAtTop(sheet, [
     formatFechaDDMMYYYY(f),
     f.dia, f.mes, f.anio,
+    sector,
     resp,
     data.muestras_eliminadas,
     ts,
@@ -3734,7 +3818,7 @@ function saveElimMuestras(data) {
   ]);
 
   try {
-    sheet.hideColumns(7); // Ocultar columna Fecha de registro
+    sheet.hideColumns(8); // Ocultar columna Fecha de registro
   } catch (e) {}
 
   clearSheetCache('elimMuestras', f.mes, f.anio);
@@ -4060,6 +4144,7 @@ function diagnosticarFaltantesMes(data) {
         const fCorteStr = `${String(dtCorte.getDate()).padStart(2, '0')}/${String(dtCorte.getMonth() + 1).padStart(2, '0')}/${dtCorte.getFullYear()}`;
         faltantes.elimMuestras.push({
           dia: d,
+          sector: 'General',
           muestras_eliminadas: 'Muestras eliminadas con fecha de corte ' + fCorteStr
         });
       }
@@ -4271,12 +4356,14 @@ function ejecutarRegularizacionBatch(data) {
   // 7. Eliminación de Muestras
   if (Array.isArray(payload.elimMuestras) && payload.elimMuestras.length > 0) {
     const sheet = getSheet(SHEETS.ELIM_MUESTRAS);
+    ensureSheetHeadersAndVisibility(sheet);
     const rows = payload.elimMuestras.map(it => {
       const f = { dia: it.dia, mes: mes, anio: anio };
       const fStr = formatFechaDDMMYYYY(f);
       return [
         fStr,
         it.dia, mes, anio,
+        it.sector || 'General',
         getRowResp(it),
         it.muestras_eliminadas,
         ts,
@@ -4284,7 +4371,7 @@ function ejecutarRegularizacionBatch(data) {
       ];
     });
     insertRowsAtTopBatch(sheet, rows);
-    try { sheet.hideColumns(7); } catch(e) {}
+    try { sheet.hideColumns(8); } catch(e) {}
     clearSheetCache('elimMuestras', mes, anio);
     stats.elimMuestras = rows.length;
   }

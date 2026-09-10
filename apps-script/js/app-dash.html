@@ -502,7 +502,10 @@ function renderDailyView(reg){
     const elimHoy=(reg.elimMuestras||[]).filter(r=>parseInt(r.dia)===hoy);
     html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🗑️ Eliminación de Muestras</div><div class="status-grid">';
     const doneElim=elimHoy.length>0;
-    html+=`<div class="status-item ${doneElim?'done':'miss'}"><span class="status-dot ${doneElim?'green':'red'}"></span>${doneElim?'Registrado ('+elimHoy[0].responsable+')':'Pendiente del día'}</div>`;
+    const countText = elimHoy.length === 1 
+      ? `1 sector (${elimHoy[0].sector || getInicialesResponsable(elimHoy[0].responsable)})` 
+      : `${elimHoy.length} registros`;
+    html+=`<div class="status-item ${doneElim?'done':'miss'}"><span class="status-dot ${doneElim?'green':'red'}"></span>${doneElim?'Registrado hoy ('+countText+')':'Pendiente del día'}</div>`;
     html+='</div></div>';
   }
 
@@ -649,7 +652,7 @@ function renderTables(reg){
   if(isModuloActivo('limp-refri'))html+=renderTableCard('🧹 Limpieza Refrigeradores',reg.limpiezaRefri||[],['Día','Tipo','Equipo','Resp','Obs','Obs. Rev.'],r=>[r.dia,r.tipo_mantencion,r.equipo,getInicialesResponsable(r.responsable),r.observaciones,r.obs_revision||'']);
   if(isModuloActivo('conductividad'))html+=renderTableCard('💧 Conductividad',reg.conductividad||[],['Día','Turno','µS/cm','Resp','Obs','Obs. Rev.'],r=>[r.dia,r.turno,r.conductividad,getInicialesResponsable(r.responsable),r.observaciones,r.obs_revision||'']);
   if(isModuloActivo('cobas'))html+=renderTableCard('🔬 Mantención Cobas',reg.cobas||[],['Día','Equipo','Resp','Frecuencia','Actividad','Obs','Obs. Rev.'],r=>[r.dia,r.equipo,getInicialesResponsable(r.responsable),r.frecuencia,r.actividad,r.observaciones||'',r.obs_revision||'']);
-  if(isModuloActivo('elim-muestras') && reg.elimMuestras)html+=renderTableCard('🗑️ Eliminación Muestras',reg.elimMuestras||[],['Día','Muestras Eliminadas','Resp','Obs. Rev.'],r=>[r.dia,r.muestras_eliminadas,getInicialesResponsable(r.responsable),r.obs_revision||'']);
+  if(isModuloActivo('elim-muestras') && reg.elimMuestras)html+=renderTableCard('🗑️ Eliminación Muestras',reg.elimMuestras||[],['Día','Sector','Muestras Eliminadas','Resp','Obs. Rev.'],r=>[r.dia,r.sector||'General',r.muestras_eliminadas,getInicialesResponsable(r.responsable),r.obs_revision||'']);
   c.innerHTML=html;
 }
 function renderTableCard(title,rows,headers,mapper){if(!rows.length)return`<div class="card card-sm" style="margin-bottom:16px;"><strong>${title}</strong><div style="color:var(--text-dim);font-size:13px;margin-top:8px;">Sin registros en este período.</div></div>`;const thead=`<tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr>`;const tbody=rows.map(r=>`<tr>${mapper(r).map(v=>`<td>${v??''}</td>`).join('')}</tr>`).join('');return`<div class="card" style="margin-bottom:16px;padding:16px 12px;"><strong style="font-family:'Outfit';font-size:15px;">${title}</strong><span style="color:var(--text-dim);font-size:12px;margin-left:8px;">${rows.length} registros</span><div class="records-table-wrap" style="margin-top:12px;"><table class="records-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table></div></div>`}
@@ -1134,13 +1137,15 @@ function addDatalistOption(id, val) {
 }
 
 // QR
-const QR_TABS=['areas','salas','centrifugas','refrigeradores','refri-limpieza','conductividad','etiquetadoras','cobas','dxh900'];
+const QR_TABS=['areas','salas','centrifugas','refrigeradores','refri-limpieza','conductividad','etiquetadoras','cobas','dxh900','elim-muestras'];
 function switchQrTab(tab){
   state.qrTab=tab;
   const qrTabsElements = document.querySelectorAll('.qr-tab');
   qrTabsElements.forEach((t,i)=>t.classList.toggle('active',QR_TABS[i]===tab));
   const lbl=document.getElementById('qr-select-label');
   const selGroup=document.getElementById('qr-select-group');
+  const btnPrintAll=document.getElementById('btn-print-all-elim');
+  if(btnPrintAll) btnPrintAll.style.display = (tab === 'elim-muestras') ? 'inline-flex' : 'none';
   // Reset QR display
   document.getElementById('qr-canvas-wrap').classList.remove('visible');
   document.getElementById('qr-label-text').style.display='none';
@@ -1156,9 +1161,10 @@ function switchQrTab(tab){
     selGroup.style.display='none';
     generateQR(); // auto-generate
   } else if(tab==='elim-muestras'){
-    // Eliminación de muestras: unique QR, no selector needed
-    selGroup.style.display='none';
-    generateQR(); // auto-generate
+    selGroup.style.display='';
+    lbl.textContent='Selecciona Sector / Tipo de Muestra';
+    const sectorList = (state.elimSectores && state.elimSectores.length) ? state.elimSectores : ELIM_SECTORES_DEF;
+    populateSelect('admin-select', sectorList.map(s => s.nombre), '— Seleccionar Sector —');
   } else {
     selGroup.style.display='';
     if(tab==='areas'){lbl.textContent='Selecciona Área';populateSelect('admin-select',state.areas,'— Seleccionar —')}
@@ -1191,8 +1197,10 @@ function generateQR(){
     url=`${base}?modulo=dxh900`;
     val='Registro de reparaciones DxH 900 Urgencias';
   } else if(state.qrTab==='elim-muestras'){
-    url=`${base}?modulo=elim-muestras`;
-    val='Registro de eliminación de muestras';
+    const rawVal=document.getElementById('admin-select').value;
+    if(!rawVal)return;
+    url=`${base}?modulo=elim-muestras&sector=${encodeURIComponent(rawVal)}`;
+    val=`Eliminación Muestras - ${rawVal}`;
   } else {
     const rawVal=document.getElementById('admin-select').value;
     if(!rawVal)return;
@@ -1281,10 +1289,19 @@ function printLabel50x30() {
     } else {
       details = rawVal;
     }
+  } else if (state.qrTab === 'elim-muestras') {
+    category = 'Eliminación Muestras';
+    const rawVal = document.getElementById('admin-select').value;
+    details = rawVal;
+    const sectorList = (state.elimSectores && state.elimSectores.length) ? state.elimSectores : ELIM_SECTORES_DEF;
+    const s = sectorList.find(x => x.nombre === rawVal);
+    if (s && s.almacenamiento) {
+      details2 = s.almacenamiento;
+    }
   } else {
     const parts = val.split('-');
     category = parts[0] ? parts[0].trim() : '';
-    details = parts[1] ? parts[1].trim() : '';
+    details = parts.slice(1).join('-').trim();
   }
 
   const removeAccents = (str) => {
@@ -1324,6 +1341,7 @@ function printLabel50x30() {
   const htmlDetails = details;
   const htmlDetails2 = cleanText(details2);
 
+  const isElim = (state.qrTab === 'elim-muestras');
   const slblDetails2Lines = wrapText(slblDetails2, 18);
 
   // 1. Generate SLBL file content (using literal #10 and #13)
@@ -1332,12 +1350,30 @@ function printLabel50x30() {
   slbl += 'A190,30,0,3,1,1,N,"Lab. Clinico HRT"#10#13';
   slbl += 'LO190,55,195,2#10#13';
   slbl += `A190,70,0,1,1,1,N,"${slblCategory.substring(0, 24)}"#10#13`;
-  slbl += `A190,95,0,2,1,1,N,"${slblDetails.substring(0, 20)}"#10#13`;
-  if (slblDetails2Lines[0]) {
-    slbl += `A190,122,0,2,1,1,N,"${slblDetails2Lines[0]}"#10#13`;
-  }
-  if (slblDetails2Lines[1]) {
-    slbl += `A190,148,0,2,1,1,N,"${slblDetails2Lines[1].substring(0, 20)}"#10#13`;
+  if (isElim) {
+    const slblDetailsLines = wrapText(slblDetails, 19);
+    slbl += `A190,92,0,2,1,1,N,"${slblDetailsLines[0]}"#10#13`;
+    if (slblDetailsLines[1]) {
+      slbl += `A190,116,0,2,1,1,N,"${slblDetailsLines[1].substring(0, 20)}"#10#13`;
+      if (slblDetails2Lines[0]) {
+        slbl += `A190,140,0,1,1,1,N,"${slblDetails2Lines[0].substring(0, 22)}"#10#13`;
+      }
+    } else {
+      if (slblDetails2Lines[0]) {
+        slbl += `A190,122,0,2,1,1,N,"${slblDetails2Lines[0]}"#10#13`;
+      }
+      if (slblDetails2Lines[1]) {
+        slbl += `A190,148,0,2,1,1,N,"${slblDetails2Lines[1].substring(0, 20)}"#10#13`;
+      }
+    }
+  } else {
+    slbl += `A190,95,0,2,1,1,N,"${slblDetails.substring(0, 20)}"#10#13`;
+    if (slblDetails2Lines[0]) {
+      slbl += `A190,122,0,2,1,1,N,"${slblDetails2Lines[0]}"#10#13`;
+    }
+    if (slblDetails2Lines[1]) {
+      slbl += `A190,148,0,2,1,1,N,"${slblDetails2Lines[1].substring(0, 20)}"#10#13`;
+    }
   }
   slbl += 'A190,195,0,1,1,1,N,"Escanear para registrar"#10#13';
   slbl += 'P1#10#13';
@@ -1430,20 +1466,20 @@ function printLabel50x30() {
       width: 100%;
     }
     .details {
-      font-size: 7.5pt;
+      font-size: ${isElim ? (details.length > 30 ? '6.5pt' : '7.5pt') : '7.5pt'};
       font-weight: 700;
       line-height: 1.1;
       margin: 0 0 0.5mm 0;
       color: #000;
       word-break: break-word;
       display: -webkit-box;
-      -webkit-line-clamp: ${details2 ? '1' : '2'};
+      -webkit-line-clamp: ${isElim ? '2' : (details2 ? '1' : '2')};
       -webkit-box-orient: vertical;
       overflow: hidden;
       width: 100%;
     }
     .details-secondary {
-      font-size: 6.5pt;
+      font-size: ${isElim ? '5.5pt' : '6.5pt'};
       font-weight: 600;
       line-height: 1.1;
       margin: 0 0 1mm 0;
@@ -1478,6 +1514,192 @@ function printLabel50x30() {
     window.onload = () => {
       window.print();
       setTimeout(() => { window.close(); }, 500);
+    };
+  <\/script>
+</body>
+</html>`);
+  w.document.close();
+}
+
+function printAllElimLabels50x30() {
+  let base = API_URL;
+  if (!base || base.includes('googleusercontent.com') || base.includes('userCodeAppPanel')) {
+    base = 'https://script.google.com/macros/s/AKfycbxuqcui0-hjJ721uMWZk3w-4l2fVCaBWQgdMJqVMb5Pno339Jqetq4r62p3-1gGBUvFOg/exec';
+  }
+  const sectorList = (state.elimSectores && state.elimSectores.length) ? state.elimSectores : ELIM_SECTORES_DEF;
+  if (!sectorList || !sectorList.length) {
+    showToast('⚠️ No hay sectores configurados para imprimir', 'error');
+    return;
+  }
+
+  const w = window.open('', '_blank');
+  if (!w) {
+    showToast('⚠️ Permita ventanas emergentes para poder imprimir en papel', 'error');
+    return;
+  }
+
+  const generateQrDataUrl = (text) => {
+    try {
+      if (typeof QRCode !== 'undefined') {
+        const div = document.createElement('div');
+        new QRCode(div, {
+          text: text,
+          width: 220,
+          height: 220,
+          correctLevel: (QRCode.CorrectLevel && QRCode.CorrectLevel.H) || 2
+        });
+        const img = div.querySelector('img');
+        if (img && img.src) return img.src;
+        const canvas = div.querySelector('canvas');
+        if (canvas && canvas.toDataURL) return canvas.toDataURL('image/png');
+      }
+    } catch (e) {
+      console.warn('Fallback a qrserver para URL:', text, e);
+    }
+    return `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(text)}`;
+  };
+
+  const pagesHtml = sectorList.map(s => {
+    const url = `${base}?modulo=elim-muestras&sector=${encodeURIComponent(s.nombre)}`;
+    const qrImg = generateQrDataUrl(url);
+    const cleanCategory = escapeHtml('Eliminación Muestras');
+    const cleanDetails = escapeHtml(s.nombre);
+    const storageNote = s.almacenamiento ? escapeHtml(s.almacenamiento) : '';
+    const detailsFontSize = s.nombre.length > 30 ? '6.5pt' : '7.5pt';
+
+    return `
+      <div class="label-page">
+        <div class="qr-container">
+          <img src="${qrImg}" alt="QR" />
+        </div>
+        <div class="text-container">
+          <div class="title">Lab. Clínico HRT</div>
+          <div class="category">${cleanCategory}</div>
+          <div class="details" style="font-size:${detailsFontSize};">${cleanDetails}</div>
+          ${storageNote ? `<div class="details-secondary">${storageNote}</div>` : ''}
+          <div class="footer">Escanear para registrar</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  w.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <title>Etiquetas 50x30 - Eliminación de Muestras (Todos los Sectores)</title>
+  <style>
+    @page {
+      size: 50mm 30mm;
+      margin: 0;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: white;
+      color: black;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    .label-page {
+      width: 50mm;
+      height: 30mm;
+      padding: 1.5mm 1mm 1.5mm 4.2mm;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 1.2mm;
+      overflow: hidden;
+      page-break-after: always;
+      page-break-inside: avoid;
+    }
+    .qr-container {
+      width: 24mm;
+      height: 24mm;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .qr-container img {
+      width: 23mm;
+      height: 23mm;
+      display: block;
+    }
+    .text-container {
+      width: 19.8mm;
+      height: 26mm;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: flex-start;
+      padding-left: 0.5mm;
+      overflow: hidden;
+    }
+    .title {
+      font-size: 5pt;
+      font-weight: 800;
+      text-transform: uppercase;
+      margin: 0 0 1mm 0;
+      border-bottom: 0.5px solid #000;
+      width: 100%;
+      padding-bottom: 0.5mm;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .category {
+      font-size: 5pt;
+      font-weight: 600;
+      color: #333;
+      margin: 0 0 0.5mm 0;
+      text-transform: uppercase;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      width: 100%;
+    }
+    .details {
+      font-size: 7.5pt;
+      font-weight: 700;
+      line-height: 1.1;
+      margin: 0 0 0.5mm 0;
+      color: #000;
+      word-break: break-word;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      width: 100%;
+    }
+    .details-secondary {
+      font-size: 5.5pt;
+      font-weight: 600;
+      line-height: 1.1;
+      margin: 0 0 0.5mm 0;
+      color: #444;
+      word-break: break-word;
+      display: -webkit-box;
+      -webkit-line-clamp: 1;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      width: 100%;
+    }
+    .footer {
+      font-size: 4.5pt;
+      color: #555;
+      margin-top: auto;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+  ${pagesHtml}
+  <script>
+    window.onload = () => {
+      window.print();
     };
   <\/script>
 </body>
@@ -1981,6 +2203,76 @@ async function saveDxH900RegistroForm(e) {
 
 // ── Eliminación de Muestras ──────────────────────────────────
 
+function parseAlmacenamientoToOffset(almacenamiento) {
+  if (!almacenamiento) return null;
+  const str = almacenamiento.toLowerCase();
+  if (str.includes('mes')) {
+    const m = str.match(/(\d+)\s*mes/);
+    return { meses: m ? parseInt(m[1], 10) : 1 };
+  }
+  if (str.includes('semana')) {
+    const m = str.match(/(\d+)\s*semana/);
+    const semanas = m ? parseInt(m[1], 10) : 1;
+    return { dias: semanas * 7 };
+  }
+  if (str.includes('hora')) {
+    const m = str.match(/(\d+)\s*hora/);
+    const horas = m ? parseInt(m[1], 10) : 24;
+    return { dias: Math.max(1, Math.round(horas / 24)) };
+  }
+  if (str.includes('día') || str.includes('dia')) {
+    const m = str.match(/(\d+)\s*d[íi]a/);
+    return { dias: m ? parseInt(m[1], 10) : 1 };
+  }
+  return null;
+}
+
+function calcularFechaCorte(fechaBaseStr, sectorDef) {
+  if (!fechaBaseStr || !sectorDef) return '';
+  const parts = fechaBaseStr.split('-').map(Number);
+  if (parts.length !== 3 || isNaN(parts[0]) || isNaN(parts[1]) || isNaN(parts[2])) return '';
+  
+  let offset = null;
+  if (typeof sectorDef === 'object') {
+    if (sectorDef.meses || sectorDef.dias) {
+      offset = { meses: sectorDef.meses || 0, dias: sectorDef.dias || 0 };
+    } else if (sectorDef.almacenamiento) {
+      offset = parseAlmacenamientoToOffset(sectorDef.almacenamiento);
+    }
+  } else if (typeof sectorDef === 'string') {
+    const sectorList = (state.elimSectores && state.elimSectores.length) ? state.elimSectores : ELIM_SECTORES_DEF;
+    const found = sectorList.find(s => s.nombre === sectorDef);
+    if (found) {
+      offset = { meses: found.meses || 0, dias: found.dias || 0 };
+      if (!offset.meses && !offset.dias && found.almacenamiento) {
+        offset = parseAlmacenamientoToOffset(found.almacenamiento);
+      }
+    } else {
+      offset = parseAlmacenamientoToOffset(sectorDef);
+    }
+  }
+
+  if (!offset) return '';
+
+  // Use noon (12:00) to be completely immune to DST midnight transitions
+  const dt = new Date(parts[0], parts[1] - 1, parts[2], 12, 0, 0);
+  if (offset.meses) {
+    const origDay = dt.getDate();
+    dt.setMonth(dt.getMonth() - offset.meses);
+    if (dt.getDate() !== origDay) {
+      dt.setDate(0); // overflow correction
+    }
+  }
+  if (offset.dias) {
+    dt.setDate(dt.getDate() - offset.dias);
+  }
+
+  const resY = dt.getFullYear();
+  const resM = String(dt.getMonth() + 1).padStart(2, '0');
+  const resD = String(dt.getDate()).padStart(2, '0');
+  return `${resY}-${resM}-${resD}`;
+}
+
 function updateMuestrasEliminadasText() {
   const cutoffInput = document.getElementById('elim-fecha-corte');
   const textInput = document.getElementById('elim-muestras-texto');
@@ -1998,11 +2290,86 @@ function updateMuestrasEliminadasText() {
   }
 }
 
+function onElimSectorChange() {
+  const sectorSel = document.getElementById('elim-sector');
+  const infoEl = document.getElementById('elim-almacenamiento-info');
+  const descEl = document.getElementById('elim-almacenamiento-desc');
+  const fechaInput = document.getElementById('elim-fecha');
+  const corteInput = document.getElementById('elim-fecha-corte');
+  const textInput = document.getElementById('elim-muestras-texto');
+  
+  if (!sectorSel) return;
+  const val = sectorSel.value;
+  if (!val) {
+    if (infoEl) infoEl.style.display = 'none';
+    if (descEl) descEl.textContent = '';
+    if (corteInput) corteInput.value = '';
+    if (textInput) textInput.value = '';
+    if (typeof checkDuplicateElimMuestras === 'function') {
+      checkDuplicateElimMuestras();
+    }
+    return;
+  }
+
+  const sectorList = (state.elimSectores && state.elimSectores.length) ? state.elimSectores : ELIM_SECTORES_DEF;
+  const found = sectorList.find(s => s.nombre === val);
+
+  if (found) {
+    if (infoEl && descEl) {
+      descEl.textContent = found.almacenamiento + (found.nota ? ` (${found.nota})` : '');
+      infoEl.style.display = 'block';
+    }
+    const fechaBase = (fechaInput && fechaInput.value) ? fechaInput.value : today();
+    const proposedCutoff = calcularFechaCorte(fechaBase, found);
+    if (corteInput && proposedCutoff) {
+      corteInput.value = proposedCutoff;
+      updateMuestrasEliminadasText();
+    }
+  } else {
+    if (infoEl) infoEl.style.display = 'none';
+  }
+
+  if (typeof checkDuplicateElimMuestras === 'function') {
+    checkDuplicateElimMuestras();
+  }
+}
+
+function onElimFechaChange() {
+  const sectorSel = document.getElementById('elim-sector');
+  const corteInput = document.getElementById('elim-fecha-corte');
+  const fechaInput = document.getElementById('elim-fecha');
+  if (sectorSel && sectorSel.value) {
+    const sectorList = (state.elimSectores && state.elimSectores.length) ? state.elimSectores : ELIM_SECTORES_DEF;
+    const found = sectorList.find(s => s.nombre === sectorSel.value);
+    if (found && fechaInput && fechaInput.value) {
+      const proposedCutoff = calcularFechaCorte(fechaInput.value, found);
+      if (corteInput && proposedCutoff) {
+        corteInput.value = proposedCutoff;
+        updateMuestrasEliminadasText();
+      }
+    }
+  }
+  if (typeof checkDuplicateElimMuestras === 'function') {
+    checkDuplicateElimMuestras();
+  }
+}
+
 async function loadElimMuestrasHistorialForm() {
-  if (document.getElementById('elim-fecha')) {
+  const sectorSel = document.getElementById('elim-sector');
+  if (sectorSel && sectorSel.options.length <= 1) {
+    const sectorList = (state.elimSectores && state.elimSectores.length) ? state.elimSectores : ELIM_SECTORES_DEF;
+    const currentVal = sectorSel.value;
+    sectorSel.innerHTML = '<option value="">— Seleccionar Sector —</option>' + sectorList.map(s => `<option value="${escapeHtml(s.nombre)}">${escapeHtml(s.nombre)}</option>`).join('');
+    if (currentVal) sectorSel.value = currentVal;
+  }
+
+  if (document.getElementById('elim-fecha') && !document.getElementById('elim-fecha').value) {
     document.getElementById('elim-fecha').value = today();
   }
-  if (document.getElementById('elim-fecha-corte')) {
+
+  if (sectorSel && sectorSel.value) {
+    onElimSectorChange();
+  } else if (document.getElementById('elim-fecha-corte')) {
     if (!document.getElementById('elim-fecha-corte').value) {
       document.getElementById('elim-fecha-corte').value = today();
     }
@@ -2030,7 +2397,7 @@ async function loadElimMuestrasHistorialForm() {
       list.innerHTML = data.map(r => `
         <div style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.04); font-size:13px; line-height:1.4;">
           <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-weight:700;">
-            <span style="color:var(--primary-color);">🗑️ ${r.muestras_eliminadas}</span>
+            <span style="color:var(--primary-color);">🗑️ ${r.sector ? `<strong>${escapeHtml(r.sector)}</strong>: ` : ''}${escapeHtml(r.muestras_eliminadas)}</span>
             <span style="color:var(--text-dim); font-size:11px;" title="${getNombreResponsable(r.responsable)}">📅 ${r.fecha} — 👤 ${getInicialesResponsable(r.responsable)}</span>
           </div>
           ${r.revisado_por ? `<div style="font-size:11px; color:#10B981; margin-top:2px;">✓ Revisado por ${getInicialesResponsable(r.revisado_por)} (${r.fecha_revision})${r.obs_revision ? ` — Obs: <em>${escapeHtml(r.obs_revision)}</em>` : ''}</div>` : ''}
@@ -2049,6 +2416,7 @@ async function saveElimMuestrasForm(e) {
   e.preventDefault();
   updateMuestrasEliminadasText();
   const respInput = document.getElementById('elim-responsable');
+  const sectorInput = document.getElementById('elim-sector');
   const textInput = document.getElementById('elim-muestras-texto');
   const fechaInput = document.getElementById('elim-fecha');
   
@@ -2059,8 +2427,20 @@ async function saveElimMuestrasForm(e) {
   }
   if (!(await ensureResponsableRegistered(respVal))) return;
 
+  const sectorVal = sectorInput ? sectorInput.value.trim() : '';
+  if (!sectorVal) {
+    showToast('Debe seleccionar un sector / tipo de muestra.', 'error');
+    return;
+  }
+
   if (!textInput.value.trim()) {
     showToast('Debe seleccionar una fecha corte de muestras.', 'error');
+    return;
+  }
+
+  const corteInput = document.getElementById('elim-fecha-corte');
+  if (corteInput && fechaInput && corteInput.value && fechaInput.value && corteInput.value > fechaInput.value) {
+    showToast('La fecha de corte no puede ser posterior a la fecha de eliminación.', 'error');
     return;
   }
 
@@ -2079,6 +2459,7 @@ async function saveElimMuestrasForm(e) {
   const payload = {
     action: 'saveElimMuestras',
     fecha: fechaInput.value,
+    sector: sectorVal,
     responsable: respVal,
     muestras_eliminadas: textInput.value.trim()
   };
@@ -2091,10 +2472,19 @@ async function saveElimMuestrasForm(e) {
     if (res.success) {
       showToast('Registro de eliminación guardado con éxito ✓', 'success');
       respInput.value = '';
-      if (document.getElementById('elim-fecha-corte')) {
-        document.getElementById('elim-fecha-corte').value = today();
-        updateMuestrasEliminadasText();
+      
+      const prefillIndicator = document.getElementById('elim-sector-prefill-indicator');
+      const isPrefilled = prefillIndicator && prefillIndicator.style.display !== 'none';
+      if (!isPrefilled) {
+        if (sectorInput) sectorInput.value = '';
+        if (corteInput) corteInput.value = '';
+        if (textInput) textInput.value = '';
+        const infoEl = document.getElementById('elim-almacenamiento-info');
+        if (infoEl) infoEl.style.display = 'none';
+      } else {
+        onElimSectorChange();
       }
+
       clearRecordsMonthCache();
       loadElimMuestrasHistorialForm();
       checkDuplicateElimMuestras();
@@ -2447,6 +2837,14 @@ async function checkDuplicateElimMuestras() {
     return null;
   }
 
+  const sectorVal = document.getElementById('elim-sector') ? document.getElementById('elim-sector').value.trim() : '';
+  if (!sectorVal) {
+    alertEl.classList.remove('visible');
+    alertEl.style.display = 'none';
+    alertEl.innerHTML = '';
+    return null;
+  }
+
   const parts = fechaVal.split('-');
   const dia = parseInt(parts[2]);
   const mes = parseInt(parts[1]);
@@ -2462,21 +2860,24 @@ async function checkDuplicateElimMuestras() {
   const existing = regs.elimMuestras.find(r => 
     parseInt(r.dia) === dia &&
     parseInt(r.mes) === mes &&
-    parseInt(r.anio) === anio
+    parseInt(r.anio) === anio &&
+    ((r.sector || '').trim().toLowerCase() === sectorVal.toLowerCase())
   );
 
   if (existing) {
     const respUser = existing.responsable || 'Desconocido';
     const fechaFmt = `${String(dia).padStart(2,'0')}/${String(mes).padStart(2,'0')}/${anio}`;
-    const htmlMsg = `⚠️ <strong>Aviso de Duplicidad:</strong> El registro de eliminación de muestras para el día <strong>${fechaFmt}</strong> ya fue realizado por <strong>"${respUser}"</strong>.<br>¿Está seguro que desea continuar?`;
+    const sectorTxt = existing.sector ? ` para <strong>${escapeHtml(existing.sector)}</strong>` : '';
+    const sectorTxtPlain = existing.sector ? ` (${existing.sector})` : '';
+    const htmlMsg = `⚠️ <strong>Aviso de Duplicidad:</strong> El registro de eliminación de muestras${sectorTxt} para el día <strong>${fechaFmt}</strong> ya fue realizado por <strong>"${escapeHtml(respUser)}"</strong>.<br>¿Está seguro que desea continuar?`;
     alertEl.innerHTML = htmlMsg;
     alertEl.classList.add('visible');
     alertEl.style.display = 'block';
 
     return {
       existing,
-      cleanMessage: `Se detectó un registro previo de eliminación de muestras para la fecha <strong>${fechaFmt}</strong>:`,
-      message: `El registro de eliminación de muestras para el día ${fechaFmt} ya fue realizado por "${respUser}".`
+      cleanMessage: `Se detectó un registro previo de eliminación de muestras${sectorTxt} para la fecha <strong>${fechaFmt}</strong>:`,
+      message: `El registro de eliminación de muestras${sectorTxtPlain} para el día ${fechaFmt} ya fue realizado por "${respUser}".`
     };
   } else {
     alertEl.classList.remove('visible');
@@ -2506,7 +2907,9 @@ function initDuplicateCheckListeners() {
   if (mesonFecha) { mesonFecha.addEventListener('change', checkDuplicateMesones); mesonFecha.addEventListener('input', debouncedMeson); }
 
   const elimFecha = document.getElementById('elim-fecha');
+  const elimSector = document.getElementById('elim-sector');
   if (elimFecha) { elimFecha.addEventListener('change', checkDuplicateElimMuestras); elimFecha.addEventListener('input', debouncedElim); }
+  if (elimSector) { elimSector.addEventListener('change', checkDuplicateElimMuestras); }
 }
 
 if (document.readyState === 'loading') {
@@ -4332,5 +4735,6 @@ function finalizarAsistente() {
   }
   navigateTo('dashboard');
 }
+
 
 </script>
