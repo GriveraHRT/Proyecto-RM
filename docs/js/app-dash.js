@@ -676,7 +676,7 @@ function renderTables(reg){
   if(isModuloActivo('elim-muestras') && reg.elimMuestras)html+=renderTableCard('🗑️ Eliminación Muestras',reg.elimMuestras||[],['Día','Sector','Muestras Eliminadas','Resp','Obs. Rev.'],r=>[r.dia,r.sector||'General',r.muestras_eliminadas,getInicialesResponsable(r.responsable),r.obs_revision||'']);
   c.innerHTML=html;
 }
-function renderTableCard(title,rows,headers,mapper){if(!rows.length)return`<div class="card card-sm" style="margin-bottom:16px;"><strong>${title}</strong><div style="color:var(--text-dim);font-size:13px;margin-top:8px;">Sin registros en este período.</div></div>`;const thead=`<tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr>`;const tbody=rows.map(r=>`<tr>${mapper(r).map(v=>`<td>${v??''}</td>`).join('')}</tr>`).join('');return`<div class="card" style="margin-bottom:16px;padding:16px 12px;"><strong style="font-family:'Outfit';font-size:15px;">${title}</strong><span style="color:var(--text-dim);font-size:12px;margin-left:8px;">${rows.length} registros</span><div class="records-table-wrap" style="margin-top:12px;"><table class="records-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table></div></div>`}
+function renderTableCard(title,rows,headers,mapper){if(!rows.length)return`<div class="card card-sm" style="margin-bottom:16px;"><strong>${title}</strong><div style="color:var(--text-dim);font-size:13px;margin-top:8px;">Sin registros en este período.</div></div>`;const thead=`<tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr>`;const tbody=rows.map(r=>`<tr>${mapper(r).map(v=>`<td>${(v !== undefined && v !== null ? v : '')}</td>`).join('')}</tr>`).join('');return`<div class="card" style="margin-bottom:16px;padding:16px 12px;"><strong style="font-family:'Outfit';font-size:15px;">${title}</strong><span style="color:var(--text-dim);font-size:12px;margin-left:8px;">${rows.length} registros</span><div class="records-table-wrap" style="margin-top:12px;"><table class="records-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table></div></div>`}
 
 // Modals
 function closeModal(e){if(e&&e.target!==document.getElementById('modal-overlay'))return;document.getElementById('modal-overlay').classList.remove('active')}
@@ -2980,7 +2980,7 @@ async function loadRecentTermo() {
         if (hasCache) {
           showToast('⚠️ No se pudo sincronizar en este momento. Mostrando registros previos.', 'warning');
         } else {
-          tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${res?.error || 'Error al cargar registros.'}</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${(res && res.error) || 'Error al cargar registros.'}</td></tr>`;
         }
       }
     } catch (err) {
@@ -3364,7 +3364,7 @@ async function loadRecentCentrifugas() {
         if (hasCache) {
           showToast('⚠️ No se pudo sincronizar en este momento. Mostrando registros previos.', 'warning');
         } else {
-          tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${res?.error || 'Error al cargar registros.'}</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${(res && res.error) || 'Error al cargar registros.'}</td></tr>`;
         }
       }
     } catch (err) {
@@ -3529,7 +3529,7 @@ async function loadRecentMesones() {
         if (hasCache) {
           showToast('⚠️ No se pudo sincronizar en este momento. Mostrando registros previos.', 'warning');
         } else {
-          tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${res?.error || 'Error al cargar registros.'}</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${(res && res.error) || 'Error al cargar registros.'}</td></tr>`;
         }
       }
     } catch (err) {
@@ -3690,7 +3690,7 @@ async function loadRecentRefriTemp() {
         if (hasCache) {
           showToast('⚠️ No se pudo sincronizar en este momento. Mostrando registros previos.', 'warning');
         } else {
-          tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${res?.error || 'Error al cargar registros.'}</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${(res && res.error) || 'Error al cargar registros.'}</td></tr>`;
         }
       }
     } catch (err) {
@@ -3874,7 +3874,7 @@ async function loadRecentLimpRefri() {
         if (hasCache) {
           showToast('⚠️ No se pudo sincronizar en este momento. Mostrando registros previos.', 'warning');
         } else {
-          tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${res?.error || 'Error al cargar registros.'}</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${(res && res.error) || 'Error al cargar registros.'}</td></tr>`;
         }
       }
     } catch (err) {
@@ -4040,7 +4040,7 @@ async function loadRecentConductividad() {
         if (hasCache) {
           showToast('⚠️ No se pudo sincronizar en este momento. Mostrando registros previos.', 'warning');
         } else {
-          tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${res?.error || 'Error al cargar registros.'}</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${(res && res.error) || 'Error al cargar registros.'}</td></tr>`;
         }
       }
     } catch (err) {
@@ -4213,7 +4213,7 @@ async function loadRecentCobas() {
         if (hasCache) {
           showToast('⚠️ No se pudo sincronizar en este momento. Mostrando registros previos.', 'warning');
         } else {
-          tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${res?.error || 'Error al cargar registros.'}</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${(res && res.error) || 'Error al cargar registros.'}</td></tr>`;
         }
       }
     } catch (err) {

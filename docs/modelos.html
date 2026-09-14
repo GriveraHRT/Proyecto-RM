@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Modelos de Renovación de Interfaz — Proyecto RM (Hospital de Talca)</title>
+  <script src="https://cdn.tailwindcss.com"></script><script>if(!window.tailwind) document.write('<script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"><\/script>');</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    h1, h2, h3, h4, .font-heading { font-family: 'Outfit', sans-serif; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    
+    /* Device Frame Simulator Styles */
+    .device-mobile { width: 390px; height: 780px; }
+    .device-tablet { width: 768px; height: 840px; }
+    .device-desktop { width: 100%; max-width: 1240px; height: 840px; }
+
+    /* Custom scrollbars */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.4); border-radius: 999px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.7); }
+
+    .glow-primary {
+      box-shadow: 0 0 25px -5px rgba(14, 165, 233, 0.35);
+    }
+    .badge-pulse {
+      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: .75; transform: scale(1.05); }
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen p-3 md:p-6 antialiased">
+
+  <!-- TOP CONTROL BAR (Simulator Controls) -->
+  <header class="max-w-7xl mx-auto mb-6 bg-slate-900/90 border border-slate-800 backdrop-blur-xl rounded-2xl p-4 shadow-2xl">
+    <div class="flex flex-col lg:flex-row items-center justify-between gap-4">
+      
+      <!-- Brand & Info -->
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-xl bg-gradient-to-tr from-sky-600 via-cyan-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/20 text-white text-xl">
+          🔬
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-lg font-bold tracking-tight text-white">Modelos de Renovación UI/UX</h1>
+            <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">HRT LAB v2.0</span>
+          </div>
+          <p class="text-xs text-slate-400">Hospital Clínico de Talca — Laboratorio Clínico</p>
+        </div>
+      </div>
+
+      <!-- Controls: Model Selector, Device Viewport & Theme -->
+      <div class="flex flex-wrap items-center justify-center gap-2 md:gap-3 w-full lg:w-auto">
+        
+        <!-- Model Selection Tabs -->
+        <div class="bg-slate-950/80 p-1 rounded-xl border border-slate-800 flex items-center gap-1 text-xs font-medium">
+          <button id="tab-model-1" onclick="selectModel(1)" class="px-3 py-1.5 rounded-lg transition-all text-white bg-sky-600 shadow-sm font-semibold flex items-center gap-1.5">
+            <span>✨</span> Opción 1: Clinical Pro
+          </button>
+          <button id="tab-model-2" onclick="selectModel(2)" class="px-3 py-1.5 rounded-lg transition-all text-slate-400 hover:text-white flex items-center gap-1.5">
+            <span>🏢</span> Opción 2: Enterprise Sidebar
+          </button>
+          <button id="tab-model-3" onclick="selectModel(3)" class="px-3 py-1.5 rounded-lg transition-all text-slate-400 hover:text-white flex items-center gap-1.5">
+            <span>⚡</span> Opción 3: Touch Focus
+          </button>
+        </div>
+
+        <!-- Viewport Switcher -->
+        <div class="bg-slate-950/80 p-1 rounded-xl border border-slate-800 flex items-center gap-1 text-xs">
+          <button id="view-mobile" onclick="setViewMode('mobile')" title="Vista Smartphone" class="p-2 rounded-lg text-slate-400 hover:text-white transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+          </button>
+          <button id="view-tablet" onclick="setViewMode('tablet')" title="Vista Tablet" class="p-2 rounded-lg text-slate-400 hover:text-white transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+          </button>
+          <button id="view-desktop" onclick="setViewMode('desktop')" title="Vista Escritorio PC" class="p-2 rounded-lg text-white bg-slate-800 transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+          </button>
+        </div>
+
+        <!-- Simulated Theme Toggle (Light / Dark inside simulator) -->
+        <button id="btn-theme-sim" onclick="toggleSimTheme()" class="px-3 py-1.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-all text-slate-200">
+          <span id="theme-sim-icon">☀️</span> <span id="theme-sim-text">Claro</span>
+        </button>
+
+        <!-- Back to App Button -->
+        <a href="javascript:goToIndex()" class="px-3 py-1.5 rounded-xl border border-sky-500/50 bg-sky-600/20 hover:bg-sky-600/40 text-xs font-semibold flex items-center gap-1.5 transition-all text-sky-300" title="Ver el aplicativo real index.html">
+          <span>🚀</span> <span>Ir a la App (index.html)</span>
+        </a>
+
+      </div>
+    </div>
+  </header>
+
+  <!-- MODEL EXPLANATION BANNER -->
+  <div id="model-description-banner" class="max-w-7xl mx-auto mb-6 bg-gradient-to-r from-sky-950/70 via-slate-900/90 to-indigo-950/70 border border-sky-800/40 rounded-2xl p-4 text-sm text-slate-300 shadow-xl">
+    <!-- Injected via JS -->
+  </div>
+
+  <!-- SIMULATOR CONTAINER WRAPPER -->
+  <main class="max-w-7xl mx-auto flex justify-center items-start overflow-hidden pb-12">
+    
+    <!-- DEVICE FRAME -->
+    <div id="device-wrapper" class="device-desktop transition-all duration-300 bg-slate-900 rounded-3xl border-4 border-slate-800 shadow-2xl overflow-hidden flex flex-col relative">
+      
+      <!-- PHONE / BROWSER TOP NOTCH & HEADER BAR -->
+      <div id="sim-device-bar" class="h-8 bg-slate-950/90 border-b border-slate-800/80 px-4 flex items-center justify-between text-[11px] text-slate-400 select-none">
+        <div class="flex items-center gap-2">
+          <span class="inline-block w-2.5 h-2.5 rounded-full bg-rose-500/80"></span>
+          <span class="inline-block w-2.5 h-2.5 rounded-full bg-amber-500/80"></span>
+          <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500/80"></span>
+          <span class="ml-2 font-mono text-[10px] text-slate-500">app-laboratorio.hospitaltalca.cl</span>
+        </div>
+        <div class="flex items-center gap-3 font-mono text-[10px]">
+          <span class="flex items-center gap-1 text-emerald-400">● 100% Funcional</span>
+          <span id="sim-clock-top">16:45</span>
+        </div>
+      </div>
+
+      <!-- INNER SIMULATOR SCREEN -->
+      <div id="sim-screen" class="flex-1 overflow-y-auto overflow-x-hidden bg-slate-50 text-slate-800 relative transition-colors duration-200">
+        <!-- RENDERED MODEL UI GOES HERE -->
+        <div id="sim-content-area" class="min-h-full flex flex-col"></div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- COMPARISON MATRIX & ARCHITECTURAL HIGHLIGHTS -->
+  <section class="max-w-7xl mx-auto mt-8 bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl">
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <h2 class="text-xl font-bold text-white flex items-center gap-2">
+          <span>📊</span> Matriz Comparativa de Modelos y Garantía Funcional
+        </h2>
+        <p class="text-xs text-slate-400 mt-1">Cómo cada opción resuelve los problemas actuales sin tocar la lógica de negocio ni romper IDs de JavaScript</p>
+      </div>
+      <span class="px-3 py-1 bg-sky-500/10 text-sky-400 text-xs font-semibold rounded-lg border border-sky-500/20">
+        Cero riesgo en Apps Script
+      </span>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+      
+      <!-- Card Opción 1 -->
+      <div class="bg-slate-950/60 border border-sky-500/30 rounded-xl p-4 relative">
+        <div class="absolute -top-2.5 right-3 px-2 py-0.5 rounded-full bg-sky-500 text-white font-bold text-[10px] shadow">
+          Recomendada
+        </div>
+        <h3 class="font-bold text-sky-400 text-sm mb-1.5">Opción 1: Clinical Pro Adaptive</h3>
+        <p class="text-slate-300 mb-3 leading-relaxed">
+          Evolución natural y refinada de la interfaz actual. Corrige la navegación inferior en móvil mediante un <strong>Bottom Bar inteligente (4 principales + botón "Explorar Módulos")</strong> y en Desktop expande el contenido a pantalla ancha con Header enriquecido.
+        </p>
+        <ul class="space-y-1.5 text-slate-400">
+          <li class="flex items-start gap-1.5"><span class="text-emerald-400">✓</span> <strong>En móvil:</strong> adiós al scroll horizontal ciego de 12 botones.</li>
+          <li class="flex items-start gap-1.5"><span class="text-emerald-400">✓</span> <strong>En escritorio:</strong> aprovecha pantallas grandes para tablas del Dashboard.</li>
+          <li class="flex items-start gap-1.5"><span class="text-emerald-400">✓</span> <strong>Curva de adopción:</strong> inmediata para todo el personal clínico.</li>
+        </ul>
+      </div>
+
+      <!-- Card Opción 2 -->
+      <div class="bg-slate-950/60 border border-slate-800 hover:border-slate-700 rounded-xl p-4">
+        <h3 class="font-bold text-indigo-400 text-sm mb-1.5">Opción 2: Enterprise Sidebar</h3>
+        <p class="text-slate-300 mb-3 leading-relaxed">
+          Inspirada en sistemas hospitalarios consolidados (NovusLIS / Cobas Infinity). Incorpora una <strong>barra lateral (Sidebar)</strong> colapsable en escritorio que agrupa los 12 módulos en 4 categorías clínicas bien estructuradas.
+        </p>
+        <ul class="space-y-1.5 text-slate-400">
+          <li class="flex items-start gap-1.5"><span class="text-emerald-400">✓</span> <strong>Máxima jerarquía:</strong> orden riguroso por áreas (Salas, Equipos, Calidad).</li>
+          <li class="flex items-start gap-1.5"><span class="text-emerald-400">✓</span> <strong>Desktop ideal:</strong> excelente para jefaturas y tecnólogos de supervisión.</li>
+          <li class="flex items-start gap-1.5"><span class="text-amber-400">ℹ</span> Requiere adaptar visualmente el layout lateral en monitores anchos.</li>
+        </ul>
+      </div>
+
+      <!-- Card Opción 3 -->
+      <div class="bg-slate-950/60 border border-slate-800 hover:border-slate-700 rounded-xl p-4">
+        <h3 class="font-bold text-teal-400 text-sm mb-1.5">Opción 3: Touch Focus Lab</h3>
+        <p class="text-slate-300 mb-3 leading-relaxed">
+          Diseño centrado 100% en la velocidad táctil para smartphones y tablets en mesón de trabajo. Botones de gran formato (48px+ touch targets), contraste reforzado para visualización con guantes y bajo luces de laboratorio.
+        </p>
+        <ul class="space-y-1.5 text-slate-400">
+          <li class="flex items-start gap-1.5"><span class="text-emerald-400">✓</span> <strong>Ergonomía táctil:</strong> botones grandes, cero toques falsos.</li>
+          <li class="flex items-start gap-1.5"><span class="text-emerald-400">✓</span> <strong>Ultra veloz:</strong> minimalismo limpio sin distracciones.</li>
+          <li class="flex items-start gap-1.5"><span class="text-amber-400">ℹ</span> Estilo más plano y sobrio, con menor ornamentación gráfica.</li>
+        </ul>
+      </div>
+
+    </div>
+
+    <!-- Contract Preservation Guarantee -->
+    <div class="mt-6 pt-4 border-t border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold">
+          🛡️
+        </div>
+        <div class="text-xs">
+          <p class="font-semibold text-slate-200">Garantía de Compatibilidad Total</p>
+          <p class="text-slate-400">Se mantienen al 100% los IDs de formularios, funciones `navigateTo()`, lector QR, modales y llamadas a Apps Script.</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-mono px-2.5 py-1 rounded bg-slate-800 text-slate-300 border border-slate-700">style.css / style.html</span>
+        <span class="text-xs font-mono px-2.5 py-1 rounded bg-slate-800 text-slate-300 border border-slate-700">index.html (docs + apps-script)</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- JAVASCRIPT SIMULATOR ENGINE -->
+  <script>
+    let currentModel = 1;
+    let currentView = 'desktop';
+    let isDark = false;
+    let activeSimSection = 'dashboard';
+    let mobileSheetOpen = false;
+
+    const MODEL_INFOS = {
+      1: {
+        title: "Opción 1: Clinical Pro Adaptive (Evolución Natural)",
+        desc: "<strong>Lo mejor de ambos mundos:</strong> Mantiene la cercanía visual del sistema pero elimina los cuellos de botella actuales. En móviles agrupa la navegación en 4 atajos directos + un botón 'Más módulos' que despliega una cuadrícula completa limpia. En monitores de PC de laboratorio, el sistema se ensancha para que las tablas no queden aplastadas en 600px."
+      },
+      2: {
+        title: "Opción 2: Enterprise Sidebar (Estilo LIS Hospitalario)",
+        desc: "<strong>Arquitectura de software clínico institucional:</strong> Los 12 módulos se dividen en 4 áreas funcionales (1. Dashboard, 2. Ambiente y Bioseguridad, 3. Equipos y Analizadores, 4. Control y Calidad). En escritorio cuenta con barra lateral navegable y en móvil ofrece acceso rápido con drawer superior o barra inferior simplificada."
+      },
+      3: {
+        title: "Opción 3: Touch Focus Lab (Minimalismo de Alto Contraste)",
+        desc: "<strong>Diseñado para la velocidad y la bioseguridad:</strong> Elementos táctiles extra-grandes, tarjetas con micro-bordes de alto contraste, tipografía nítida para pantallas de bajo brillo o personal con elementos de protección personal (EPP). Enfoque sin distracciones ni gradientes densos."
+      }
+    };
+
+    function selectModel(m) {
+      currentModel = m;
+      for (let i = 1; i <= 3; i++) {
+        const btn = document.getElementById(`tab-model-${i}`);
+        if (i === m) {
+          btn.className = "px-3 py-1.5 rounded-lg transition-all text-white bg-sky-600 shadow-sm font-semibold flex items-center gap-1.5";
+        } else {
+          btn.className = "px-3 py-1.5 rounded-lg transition-all text-slate-400 hover:text-white flex items-center gap-1.5";
+        }
+      }
+      renderModelDescription();
+      renderSimulatedUI();
+    }
+
+    function setViewMode(mode) {
+      currentView = mode;
+      const wrap = document.getElementById('device-wrapper');
+      
+      document.getElementById('view-mobile').className = mode === 'mobile' ? 'p-2 rounded-lg text-white bg-slate-800 transition-all' : 'p-2 rounded-lg text-slate-400 hover:text-white transition-all';
+      document.getElementById('view-tablet').className = mode === 'tablet' ? 'p-2 rounded-lg text-white bg-slate-800 transition-all' : 'p-2 rounded-lg text-slate-400 hover:text-white transition-all';
+      document.getElementById('view-desktop').className = mode === 'desktop' ? 'p-2 rounded-lg text-white bg-slate-800 transition-all' : 'p-2 rounded-lg text-slate-400 hover:text-white transition-all';
+
+      wrap.classList.remove('device-mobile', 'device-tablet', 'device-desktop');
+      if (mode === 'mobile') wrap.classList.add('device-mobile');
+      else if (mode === 'tablet') wrap.classList.add('device-tablet');
+      else wrap.classList.add('device-desktop');
+
+      renderSimulatedUI();
+    }
+
+    function toggleSimTheme() {
+      isDark = !isDark;
+      const icon = document.getElementById('theme-sim-icon');
+      const text = document.getElementById('theme-sim-text');
+      const screen = document.getElementById('sim-screen');
+      
+      if (isDark) {
+        icon.textContent = '🌙';
+        text.textContent = 'Oscuro';
+        screen.classList.remove('bg-slate-50', 'text-slate-800');
+        screen.classList.add('bg-slate-950', 'text-slate-100');
+      } else {
+        icon.textContent = '☀️';
+        text.textContent = 'Claro';
+        screen.classList.remove('bg-slate-950', 'text-slate-100');
+        screen.classList.add('bg-slate-50', 'text-slate-800');
+      }
+      renderSimulatedUI();
+    }
+
+    function renderModelDescription() {
+      const banner = document.getElementById('model-description-banner');
+      const info = MODEL_INFOS[currentModel];
+      banner.innerHTML = `
+        <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-2">
+          <div>
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <span class="text-sky-400">Modelo Activo:</span> ${info.title}
+            </h3>
+            <p class="text-xs text-slate-300 mt-0.5 leading-relaxed">${info.desc}</p>
+          </div>
+          <span class="text-[11px] font-mono px-2 py-1 rounded bg-slate-800 text-sky-300 border border-slate-700 whitespace-nowrap">
+            Vista: ${currentView.toUpperCase()} • Tema: ${isDark ? 'OSCURO' : 'CLARO'}
+          </span>
+        </div>
+      `;
+    }
+
+    function simNavigateTo(sec) {
+      activeSimSection = sec;
+      mobileSheetOpen = false;
+      renderSimulatedUI();
+    }
+
+    function toggleMobileSheet() {
+      mobileSheetOpen = !mobileSheetOpen;
+      renderSimulatedUI();
+    }
+
+    // MAIN RENDERER FOR SIMULATED APP
+    function renderSimulatedUI() {
+      const container = document.getElementById('sim-content-area');
+      const isMobile = currentView === 'mobile';
+      const isTablet = currentView === 'tablet';
+      const isDesktop = currentView === 'desktop';
+
+      if (currentModel === 1) {
+        container.innerHTML = renderModel1(isMobile, isTablet, isDesktop);
+      } else if (currentModel === 2) {
+        container.innerHTML = renderModel2(isMobile, isTablet, isDesktop);
+      } else {
+        container.innerHTML = renderModel3(isMobile, isTablet, isDesktop);
+      }
+    }
+
+    // =========================================================================
+    // MODEL 1: CLINICAL PRO ADAPTIVE (Natural Evolution, High Contrast, Responsive)
+    // =========================================================================
+    function renderModel1(isMobile, isTablet, isDesktop) {
+      const bgCard = isDark ? 'bg-slate-900/90 border-slate-800 shadow-slate-950/40' : 'bg-white border-slate-200/80 shadow-slate-200/50';
+      const textHeading = isDark ? 'text-white' : 'text-slate-900';
+      const textMuted = isDark ? 'text-slate-400' : 'text-slate-500';
+      const borderSubtle = isDark ? 'border-slate-800' : 'border-slate-200';
+      const headerBg = isDark ? 'bg-slate-900/95 border-slate-800' : 'bg-white/95 border-slate-200';
+      const inputBg = isDark ? 'bg-slate-950/80 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900';
+
+      return `
+        <!-- HEADER APP -->
+        <header class="sticky top-0 z-30 ${headerBg} backdrop-blur-md border-b px-4 py-2.5 flex items-center justify-between shadow-sm">
+          <div class="flex items-center gap-3">
+            <div class="h-9 w-9 rounded-xl bg-gradient-to-tr from-sky-600 to-cyan-500 flex items-center justify-center text-white font-bold text-base shadow-sm">
+              🔬
+            </div>
+            <div>
+              <div class="font-heading font-extrabold text-sm md:text-base tracking-tight ${textHeading} flex items-center gap-2">
+                <span>Registros Unidad de Laboratorio</span>
+                <span class="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-bold rounded bg-sky-500/10 text-sky-500 border border-sky-500/20">HRT</span>
+              </div>
+              <p class="text-[10px] md:text-xs font-medium ${textMuted}">Hospital Regional de Talca</p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <!-- Server / Online Status Pill -->
+            <div class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium ${isDark ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-800/40' : 'bg-emerald-50 text-emerald-600 border border-emerald-200'}">
+              <span class="w-2 h-2 rounded-full bg-emerald-500 badge-pulse"></span> Sincronizado
+            </div>
+
+            <!-- Digital Clock Badge -->
+            <div class="text-right flex flex-col justify-center">
+              <div class="flex items-center justify-end gap-1">
+                <span class="font-heading font-bold text-sm text-sky-600">16:45</span>
+                <span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-indigo-500/10 text-indigo-500">PM</span>
+              </div>
+              <span class="text-[10px] ${textMuted}">10 Sep 2026</span>
+            </div>
+          </div>
+        </header>
+
+        <!-- DESKTOP / TABLET CATEGORY NAV BAR (Shown when >= 768px) -->
+        ${!isMobile ? `
+          <nav class="sticky top-[53px] z-20 ${isDark ? 'bg-slate-950/90 border-slate-800' : 'bg-slate-100/90 border-slate-200'} border-b px-4 py-1.5 flex items-center justify-between text-xs backdrop-blur-sm">
+            <div class="flex items-center gap-1 overflow-x-auto py-0.5">
+              <button onclick="simNavigateTo('dashboard')" class="px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 ${activeSimSection === 'dashboard' ? 'bg-sky-600 text-white shadow-sm' : `${textMuted} hover:${textHeading}`}">
+                <span>🏠</span> Dashboard
+              </button>
+              <span class="text-slate-400 mx-1">|</span>
+              <button onclick="simNavigateTo('termo')" class="px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1 ${activeSimSection === 'termo' ? 'bg-sky-600 text-white font-semibold' : `${textMuted} hover:${textHeading}`}">
+                <span>🌡️</span> Ambiental
+              </button>
+              <button onclick="simNavigateTo('centrifugas')" class="px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1 ${activeSimSection === 'centrifugas' ? 'bg-sky-600 text-white font-semibold' : `${textMuted} hover:${textHeading}`}">
+                <span>⚙️</span> Centrífugas
+              </button>
+              <button onclick="simNavigateTo('mesones')" class="px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1 ${activeSimSection === 'mesones' ? 'bg-sky-600 text-white font-semibold' : `${textMuted} hover:${textHeading}`}">
+                <span>🧽</span> Mesones
+              </button>
+              <button onclick="simNavigateTo('refri-temp')" class="px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1 ${activeSimSection === 'refri-temp' ? 'bg-sky-600 text-white font-semibold' : `${textMuted} hover:${textHeading}`}">
+                <span>🧊</span> Refrigeradores
+              </button>
+              <button onclick="simNavigateTo('cobas')" class="px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1 ${activeSimSection === 'cobas' ? 'bg-sky-600 text-white font-semibold' : `${textMuted} hover:${textHeading}`}">
+                <span>🔬</span> Cobas 1 y 2
+              </button>
+              <button onclick="simNavigateTo('dxh900')" class="px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1 ${activeSimSection === 'dxh900' ? 'bg-sky-600 text-white font-semibold' : `${textMuted} hover:${textHeading}`}">
+                <span>🛠️</span> DxH 900
+              </button>
+              <button onclick="simNavigateTo('elim-muestras')" class="px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1 ${activeSimSection === 'elim-muestras' ? 'bg-sky-600 text-white font-semibold' : `${textMuted} hover:${textHeading}`}">
+                <span>🗑️</span> Muestras
+              </button>
+              <button onclick="simNavigateTo('admin')" class="px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1 ${activeSimSection === 'admin' ? 'bg-sky-600 text-white font-semibold' : `${textMuted} hover:${textHeading}`}">
+                <span>🔑</span> Admin
+              </button>
+            </div>
+          </nav>
+        ` : ''}
+
+        <!-- MAIN BODY CONTENT (Responsive grid on desktop, smooth card on mobile) -->
+        <div class="flex-1 p-4 md:p-6 ${isDesktop ? 'max-w-6xl mx-auto w-full' : 'max-w-xl mx-auto w-full'} pb-24">
+          
+          <!-- SECTION TITLE & STATUS -->
+          <div class="mb-5 flex items-center justify-between">
+            <div>
+              <h2 class="font-heading font-extrabold text-lg md:text-xl ${textHeading} flex items-center gap-2">
+                ${activeSimSection === 'dashboard' ? '🏠 Panel General — Laboratorio' : ''}
+                ${activeSimSection === 'termo' ? '🌡️ Temperatura & Humedad Ambiental' : ''}
+                ${activeSimSection === 'cobas' ? '🔬 Mantención Analizadores Cobas' : ''}
+                ${activeSimSection === 'centrifugas' ? '⚙️ Control Diario Centrífugas' : ''}
+                ${activeSimSection === 'elim-muestras' ? '🗑️ Eliminación y Descarte de Muestras' : ''}
+                ${!['dashboard','termo','cobas','centrifugas','elim-muestras'].includes(activeSimSection) ? '📋 Registro Clínico de Laboratorio' : ''}
+              </h2>
+              <p class="text-xs ${textMuted}">Seguimiento en tiempo real y aseguramiento de trazabilidad</p>
+            </div>
+
+            <!-- Month/Year Control Bar (Refined Segmented Controller) -->
+            <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border ${borderSubtle} ${bgCard} text-xs font-semibold">
+              <button class="hover:text-sky-500">◀</button>
+              <span>Septiembre 2026</span>
+              <button class="hover:text-sky-500">▶</button>
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            </div>
+          </div>
+
+          <!-- DYNAMIC CONTENT BASED ON ACTIVE SECTION -->
+          ${activeSimSection === 'dashboard' ? renderSampleDashboard(bgCard, textHeading, textMuted, borderSubtle, isDesktop) : ''}
+          ${activeSimSection === 'termo' ? renderSampleTermoForm(bgCard, textHeading, textMuted, borderSubtle, inputBg) : ''}
+          ${activeSimSection === 'cobas' ? renderSampleCobas(bgCard, textHeading, textMuted, borderSubtle, inputBg) : ''}
+          ${activeSimSection === 'elim-muestras' ? renderSampleMuestras(bgCard, textHeading, textMuted, borderSubtle, inputBg) : ''}
+          ${!['dashboard','termo','cobas','elim-muestras'].includes(activeSimSection) ? renderGenericSection(activeSimSection, bgCard, textHeading, textMuted) : ''}
+
+        </div>
+
+        <!-- MOBILE INTELLIGENT BOTTOM BAR (Shown only on Mobile < 768px) -->
+        ${isMobile ? `
+          <nav class="sticky bottom-0 z-30 ${headerBg} backdrop-blur-lg border-t px-2 py-1.5 flex items-center justify-around shadow-lg">
+            <button onclick="simNavigateTo('dashboard')" class="flex flex-col items-center gap-0.5 py-1 px-2 rounded-lg ${activeSimSection === 'dashboard' ? 'text-sky-600 font-bold' : textMuted}">
+              <span class="text-lg">🏠</span>
+              <span class="text-[10px]">Inicio</span>
+            </button>
+            <button onclick="simNavigateTo('termo')" class="flex flex-col items-center gap-0.5 py-1 px-2 rounded-lg ${activeSimSection === 'termo' ? 'text-sky-600 font-bold' : textMuted}">
+              <span class="text-lg">🌡️</span>
+              <span class="text-[10px]">Ambiental</span>
+            </button>
+            <button onclick="simNavigateTo('cobas')" class="flex flex-col items-center gap-0.5 py-1 px-2 rounded-lg ${activeSimSection === 'cobas' ? 'text-sky-600 font-bold' : textMuted}">
+              <span class="text-lg">🔬</span>
+              <span class="text-[10px]">Cobas</span>
+            </button>
+            <button onclick="simNavigateTo('elim-muestras')" class="flex flex-col items-center gap-0.5 py-1 px-2 rounded-lg ${activeSimSection === 'elim-muestras' ? 'text-sky-600 font-bold' : textMuted}">
+              <span class="text-lg">🗑️</span>
+              <span class="text-[10px]">Muestras</span>
+            </button>
+            <!-- MORE / EXPLORER BUTTON (Bottom Sheet Trigger) -->
+            <button onclick="toggleMobileSheet()" class="flex flex-col items-center gap-0.5 py-1 px-2 rounded-lg ${mobileSheetOpen ? 'text-indigo-500 font-bold' : textMuted}">
+              <span class="text-lg">✨</span>
+              <span class="text-[10px]">Más (8+)</span>
+            </button>
+          </nav>
+        ` : ''}
+
+        <!-- MOBILE BOTTOM SHEET MODAL (Quick Category Menu) -->
+        ${isMobile && mobileSheetOpen ? `
+          <div class="fixed inset-0 z-40 bg-slate-950/60 backdrop-blur-xs flex flex-col justify-end" onclick="toggleMobileSheet()">
+            <div class="${headerBg} border-t rounded-t-3xl p-5 shadow-2xl animate-fade-in" onclick="event.stopPropagation()">
+              <div class="w-10 h-1 rounded-full bg-slate-300 mx-auto mb-4"></div>
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="font-heading font-bold text-sm ${textHeading}">Todos los Formularios y Módulos</h3>
+                <button onclick="toggleMobileSheet()" class="text-xs text-slate-400 font-bold p-1">✕ Cerrar</button>
+              </div>
+              <div class="grid grid-cols-3 gap-2 text-center text-xs">
+                <button onclick="simNavigateTo('centrifugas')" class="p-3 rounded-xl border ${borderSubtle} ${bgCard} flex flex-col items-center gap-1.5 hover:border-sky-500">
+                  <span class="text-xl">⚙️</span>
+                  <span class="font-medium">Centrífugas</span>
+                </button>
+                <button onclick="simNavigateTo('mesones')" class="p-3 rounded-xl border ${borderSubtle} ${bgCard} flex flex-col items-center gap-1.5 hover:border-sky-500">
+                  <span class="text-xl">🧽</span>
+                  <span class="font-medium">Mesones</span>
+                </button>
+                <button onclick="simNavigateTo('refri-temp')" class="p-3 rounded-xl border ${borderSubtle} ${bgCard} flex flex-col items-center gap-1.5 hover:border-sky-500">
+                  <span class="text-xl">🧊</span>
+                  <span class="font-medium">Refrigerador T°</span>
+                </button>
+                <button onclick="simNavigateTo('limp-refri')" class="p-3 rounded-xl border ${borderSubtle} ${bgCard} flex flex-col items-center gap-1.5 hover:border-sky-500">
+                  <span class="text-xl">🧹</span>
+                  <span class="font-medium">Limp. Refri</span>
+                </button>
+                <button onclick="simNavigateTo('conductividad')" class="p-3 rounded-xl border ${borderSubtle} ${bgCard} flex flex-col items-center gap-1.5 hover:border-sky-500">
+                  <span class="text-xl">💧</span>
+                  <span class="font-medium">Conductividad</span>
+                </button>
+                <button onclick="simNavigateTo('etiquetadoras')" class="p-3 rounded-xl border ${borderSubtle} ${bgCard} flex flex-col items-center gap-1.5 hover:border-sky-500">
+                  <span class="text-xl">🏷️</span>
+                  <span class="font-medium">Etiquetas QR</span>
+                </button>
+                <button onclick="simNavigateTo('dxh900')" class="p-3 rounded-xl border ${borderSubtle} ${bgCard} flex flex-col items-center gap-1.5 hover:border-sky-500">
+                  <span class="text-xl">🛠️</span>
+                  <span class="font-medium">DxH 900</span>
+                </button>
+                <button onclick="simNavigateTo('admin')" class="p-3 rounded-xl border ${borderSubtle} ${bgCard} flex flex-col items-center gap-1.5 hover:border-sky-500">
+                  <span class="text-xl">🔑</span>
+                  <span class="font-medium">Admin / QR</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        ` : ''}
+      `;
+    }
+
+    // =========================================================================
+    // MODEL 2: ENTERPRISE SIDEBAR (Hospital LIS / HIS Professional Style)
+    // =========================================================================
+    function renderModel2(isMobile, isTablet, isDesktop) {
+      const bgCard = isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200';
+      const textHeading = isDark ? 'text-white' : 'text-slate-900';
+      const textMuted = isDark ? 'text-slate-400' : 'text-slate-500';
+      const borderSubtle = isDark ? 'border-slate-800' : 'border-slate-200';
+      const sidebarBg = isDark ? 'bg-slate-950 border-slate-800' : 'bg-slate-900 border-slate-800 text-white';
+      const inputBg = isDark ? 'bg-slate-950/80 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900';
+
+      return `
+        <div class="flex-1 flex flex-col md:flex-row min-h-full">
+          
+          <!-- ENTERPRISE SIDEBAR (Desktop & Tablet) -->
+          <aside class="${sidebarBg} md:w-64 border-r flex flex-col flex-shrink-0 select-none">
+            
+            <!-- Sidebar Header -->
+            <div class="p-4 border-b border-slate-800 flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-lg bg-sky-500 flex items-center justify-center font-bold text-white shadow">
+                  HRT
+                </div>
+                <div>
+                  <h3 class="font-heading font-extrabold text-xs text-white uppercase tracking-wider">Unidad Laboratorio</h3>
+                  <p class="text-[10px] text-sky-400">Hospital de Talca</p>
+                </div>
+              </div>
+              <span class="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-mono">v2.0</span>
+            </div>
+
+            <!-- Categorized Navigation Tree -->
+            <div class="p-3 flex-1 overflow-y-auto space-y-4 text-xs">
+              
+              <!-- Cat 1: Dashboard -->
+              <div>
+                <p class="px-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Visión General</p>
+                <button onclick="simNavigateTo('dashboard')" class="w-full text-left px-3 py-2 rounded-lg font-medium transition-all flex items-center gap-2.5 ${activeSimSection === 'dashboard' ? 'bg-sky-600 text-white shadow' : 'text-slate-300 hover:bg-slate-800/60'}">
+                  <span class="text-base">🏠</span> Dashboard Diario / Mes
+                </button>
+              </div>
+
+              <!-- Cat 2: Ambiente & Salas -->
+              <div>
+                <p class="px-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Ambiente & Salas</p>
+                <div class="space-y-0.5">
+                  <button onclick="simNavigateTo('termo')" class="w-full text-left px-3 py-1.5 rounded-lg transition-all flex items-center gap-2 ${activeSimSection === 'termo' ? 'bg-sky-600 text-white font-medium' : 'text-slate-300 hover:bg-slate-800/60'}">
+                    <span>🌡️</span> Temp / Humedad
+                  </button>
+                  <button onclick="simNavigateTo('mesones')" class="w-full text-left px-3 py-1.5 rounded-lg transition-all flex items-center gap-2 ${activeSimSection === 'mesones' ? 'bg-sky-600 text-white font-medium' : 'text-slate-300 hover:bg-slate-800/60'}">
+                    <span>🧽</span> Mesones de Trabajo
+                  </button>
+                  <button onclick="simNavigateTo('conductividad')" class="w-full text-left px-3 py-1.5 rounded-lg transition-all flex items-center gap-2 ${activeSimSection === 'conductividad' ? 'bg-sky-600 text-white font-medium' : 'text-slate-300 hover:bg-slate-800/60'}">
+                    <span>💧</span> Conductividad Agua
+                  </button>
+                </div>
+              </div>
+
+              <!-- Cat 3: Equipos e Instrumental -->
+              <div>
+                <p class="px-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Equipos Clínicos</p>
+                <div class="space-y-0.5">
+                  <button onclick="simNavigateTo('cobas')" class="w-full text-left px-3 py-1.5 rounded-lg transition-all flex items-center gap-2 ${activeSimSection === 'cobas' ? 'bg-sky-600 text-white font-medium' : 'text-slate-300 hover:bg-slate-800/60'}">
+                    <span>🔬</span> Cobas 1 y 2
+                  </button>
+                  <button onclick="simNavigateTo('dxh900')" class="w-full text-left px-3 py-1.5 rounded-lg transition-all flex items-center gap-2 ${activeSimSection === 'dxh900' ? 'bg-sky-600 text-white font-medium' : 'text-slate-300 hover:bg-slate-800/60'}">
+                    <span>🛠️</span> DxH 900 Urgencias
+                  </button>
+                  <button onclick="simNavigateTo('centrifugas')" class="w-full text-left px-3 py-1.5 rounded-lg transition-all flex items-center gap-2 ${activeSimSection === 'centrifugas' ? 'bg-sky-600 text-white font-medium' : 'text-slate-300 hover:bg-slate-800/60'}">
+                    <span>⚙️</span> Centrífugas
+                  </button>
+                  <button onclick="simNavigateTo('refri-temp')" class="w-full text-left px-3 py-1.5 rounded-lg transition-all flex items-center gap-2 ${activeSimSection === 'refri-temp' ? 'bg-sky-600 text-white font-medium' : 'text-slate-300 hover:bg-slate-800/60'}">
+                    <span>🧊</span> Refrigeradores T°
+                  </button>
+                </div>
+              </div>
+
+              <!-- Cat 4: Gestión & Trazabilidad -->
+              <div>
+                <p class="px-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Gestión & Control</p>
+                <div class="space-y-0.5">
+                  <button onclick="simNavigateTo('elim-muestras')" class="w-full text-left px-3 py-1.5 rounded-lg transition-all flex items-center gap-2 ${activeSimSection === 'elim-muestras' ? 'bg-sky-600 text-white font-medium' : 'text-slate-300 hover:bg-slate-800/60'}">
+                    <span>🗑️</span> Eliminación Muestras
+                  </button>
+                  <button onclick="simNavigateTo('etiquetadoras')" class="w-full text-left px-3 py-1.5 rounded-lg transition-all flex items-center gap-2 ${activeSimSection === 'etiquetadoras' ? 'bg-sky-600 text-white font-medium' : 'text-slate-300 hover:bg-slate-800/60'}">
+                    <span>🏷️</span> Etiquetas QR
+                  </button>
+                  <button onclick="simNavigateTo('admin')" class="w-full text-left px-3 py-1.5 rounded-lg transition-all flex items-center gap-2 ${activeSimSection === 'admin' ? 'bg-sky-600 text-white font-medium' : 'text-slate-300 hover:bg-slate-800/60'}">
+                    <span>🔑</span> Administración
+                  </button>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- User initials badge at bottom of sidebar -->
+            <div class="p-3 border-t border-slate-800 text-[11px] text-slate-400 flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="w-6 h-6 rounded-full bg-slate-800 text-white font-bold flex items-center justify-center text-[10px]">TM</span>
+                <span>Personal en turno</span>
+              </div>
+              <span class="text-emerald-400 font-bold">Activo</span>
+            </div>
+          </aside>
+
+          <!-- CONTENT AREA -->
+          <div class="flex-1 flex flex-col overflow-y-auto">
+            
+            <!-- Top App Bar in Enterprise Mode -->
+            <header class="h-14 border-b ${borderSubtle} px-6 flex items-center justify-between ${isDark ? 'bg-slate-900/60' : 'bg-white'} backdrop-blur-md">
+              <div class="flex items-center gap-2">
+                <span class="text-sm font-bold ${textHeading}">Portal de Control Clínico</span>
+                <span class="text-xs ${textMuted}">/</span>
+                <span class="text-xs text-sky-500 font-semibold uppercase">${activeSimSection}</span>
+              </div>
+              <div class="flex items-center gap-3">
+                <div class="text-right text-xs">
+                  <span class="font-bold text-sky-600 font-mono">16:45 PM</span>
+                  <span class="text-slate-400 text-[10px] ml-1">Jueves, 10 Sep</span>
+                </div>
+              </div>
+            </header>
+
+            <main class="flex-1 p-6 max-w-5xl w-full mx-auto">
+              ${activeSimSection === 'dashboard' ? renderSampleDashboard(bgCard, textHeading, textMuted, borderSubtle, isDesktop) : ''}
+              ${activeSimSection === 'termo' ? renderSampleTermoForm(bgCard, textHeading, textMuted, borderSubtle, inputBg) : ''}
+              ${activeSimSection === 'cobas' ? renderSampleCobas(bgCard, textHeading, textMuted, borderSubtle, inputBg) : ''}
+              ${activeSimSection === 'elim-muestras' ? renderSampleMuestras(bgCard, textHeading, textMuted, borderSubtle, inputBg) : ''}
+              ${!['dashboard','termo','cobas','elim-muestras'].includes(activeSimSection) ? renderGenericSection(activeSimSection, bgCard, textHeading, textMuted) : ''}
+            </main>
+
+          </div>
+
+        </div>
+      `;
+    }
+
+    // =========================================================================
+    // MODEL 3: TOUCH FOCUS LAB (Minimalist, High Legibility, Rapid Data-Entry)
+    // =========================================================================
+    function renderModel3(isMobile, isTablet, isDesktop) {
+      const bgCard = isDark ? 'bg-slate-900/70 border-slate-800' : 'bg-white border-slate-300';
+      const textHeading = isDark ? 'text-white' : 'text-slate-900';
+      const textMuted = isDark ? 'text-slate-400' : 'text-slate-600';
+      const borderSubtle = isDark ? 'border-slate-800' : 'border-slate-300';
+      const inputBg = isDark ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-900';
+
+      return `
+        <!-- CLEAN MINIMAL HEADER -->
+        <header class="border-b ${borderSubtle} px-4 py-3 flex items-center justify-between ${isDark ? 'bg-slate-950' : 'bg-white'}">
+          <div class="flex items-center gap-2">
+            <span class="font-heading font-black text-base tracking-tight ${textHeading}">HRT LAB</span>
+            <span class="text-xs px-2 py-0.5 rounded bg-slate-200 text-slate-800 dark:bg-slate-800 dark:text-slate-200 font-bold">Unidad Clínico</span>
+          </div>
+          <div class="flex items-center gap-2 text-xs font-mono font-bold">
+            <span class="text-emerald-500">● 16:45 PM</span>
+          </div>
+        </header>
+
+        <!-- HORIZONTAL QUICK PILL SELECTOR -->
+        <div class="p-2 border-b ${borderSubtle} overflow-x-auto flex items-center gap-1.5 text-xs font-semibold ${isDark ? 'bg-slate-900/50' : 'bg-slate-100'}">
+          <button onclick="simNavigateTo('dashboard')" class="px-3 py-1.5 rounded-full ${activeSimSection === 'dashboard' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950' : 'text-slate-600 dark:text-slate-400'}">
+            Dashboard
+          </button>
+          <button onclick="simNavigateTo('termo')" class="px-3 py-1.5 rounded-full ${activeSimSection === 'termo' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950' : 'text-slate-600 dark:text-slate-400'}">
+            T° Ambiental
+          </button>
+          <button onclick="simNavigateTo('cobas')" class="px-3 py-1.5 rounded-full ${activeSimSection === 'cobas' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950' : 'text-slate-600 dark:text-slate-400'}">
+            Cobas
+          </button>
+          <button onclick="simNavigateTo('elim-muestras')" class="px-3 py-1.5 rounded-full ${activeSimSection === 'elim-muestras' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950' : 'text-slate-600 dark:text-slate-400'}">
+            Muestras
+          </button>
+          <button onclick="simNavigateTo('centrifugas')" class="px-3 py-1.5 rounded-full ${activeSimSection === 'centrifugas' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-950' : 'text-slate-600 dark:text-slate-400'}">
+            Centrífugas
+          </button>
+        </div>
+
+        <!-- MAIN TOUCH FOCUS BODY -->
+        <div class="flex-1 p-4 max-w-xl mx-auto w-full pb-20">
+          ${activeSimSection === 'dashboard' ? renderSampleDashboard(bgCard, textHeading, textMuted, borderSubtle, isDesktop) : ''}
+          ${activeSimSection === 'termo' ? renderSampleTermoForm(bgCard, textHeading, textMuted, borderSubtle, inputBg) : ''}
+          ${activeSimSection === 'cobas' ? renderSampleCobas(bgCard, textHeading, textMuted, borderSubtle, inputBg) : ''}
+          ${activeSimSection === 'elim-muestras' ? renderSampleMuestras(bgCard, textHeading, textMuted, borderSubtle, inputBg) : ''}
+          ${!['dashboard','termo','cobas','elim-muestras'].includes(activeSimSection) ? renderGenericSection(activeSimSection, bgCard, textHeading, textMuted) : ''}
+        </div>
+      `;
+    }
+
+    // =========================================================================
+    // REUSABLE SAMPLE COMPONENTS (Render real-world simulation data)
+    // =========================================================================
+
+    function renderSampleDashboard(bgCard, textHeading, textMuted, borderSubtle, isDesktop) {
+      return `
+        <!-- STATS ROW (3 or 4 responsive cards) -->
+        <div class="grid grid-cols-3 md:grid-cols-4 gap-2.5 md:gap-4 mb-5">
+          <div class="p-3.5 rounded-2xl border ${borderSubtle} ${bgCard} text-center shadow-xs">
+            <div class="font-heading font-black text-2xl md:text-3xl text-emerald-500">96%</div>
+            <div class="text-[10px] md:text-xs uppercase font-bold tracking-wider ${textMuted} mt-1">Cumplimiento</div>
+          </div>
+          <div class="p-3.5 rounded-2xl border ${borderSubtle} ${bgCard} text-center shadow-xs">
+            <div class="font-heading font-black text-2xl md:text-3xl text-sky-500">42</div>
+            <div class="text-[10px] md:text-xs uppercase font-bold tracking-wider ${textMuted} mt-1">Registros Hoy</div>
+          </div>
+          <div class="p-3.5 rounded-2xl border ${borderSubtle} ${bgCard} text-center shadow-xs">
+            <div class="font-heading font-black text-2xl md:text-3xl text-amber-500">2</div>
+            <div class="text-[10px] md:text-xs uppercase font-bold tracking-wider ${textMuted} mt-1">Pendientes PM</div>
+          </div>
+          <div class="hidden md:block p-3.5 rounded-2xl border ${borderSubtle} ${bgCard} text-center shadow-xs">
+            <div class="font-heading font-black text-2xl md:text-3xl text-indigo-500">100%</div>
+            <div class="text-[10px] md:text-xs uppercase font-bold tracking-wider ${textMuted} mt-1">Cobas Listo</div>
+          </div>
+        </div>
+
+        <!-- TABS DIARIO / MENSUAL -->
+        <div class="flex items-center gap-2 mb-4 bg-slate-200/60 dark:bg-slate-800/60 p-1 rounded-xl w-fit text-xs font-bold">
+          <button class="px-4 py-1.5 rounded-lg bg-sky-600 text-white shadow-xs">📅 Registros de Hoy</button>
+          <button class="px-4 py-1.5 rounded-lg text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">📆 Resumen Mensual</button>
+        </div>
+
+        <!-- SAMPLE DATA TABLE (Demonstrating clean wide layout on desktop) -->
+        <div class="rounded-2xl border ${borderSubtle} ${bgCard} overflow-hidden shadow-xs mb-5">
+          <div class="p-3.5 border-b ${borderSubtle} flex items-center justify-between">
+            <span class="font-heading font-bold text-xs ${textHeading} flex items-center gap-2">
+              <span>🌡️</span> Temperatura y Humedad Ambiental (Últimos Registros)
+            </span>
+            <span class="text-[10px] px-2 py-0.5 rounded bg-sky-500/10 text-sky-600 font-semibold">19 Salas</span>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr class="border-b ${borderSubtle} text-[11px] ${textMuted} bg-slate-50/50 dark:bg-slate-800/40">
+                  <th class="p-2.5 font-semibold">Área / Sala</th>
+                  <th class="p-2.5 font-semibold">Turno</th>
+                  <th class="p-2.5 font-semibold">Temperatura</th>
+                  <th class="p-2.5 font-semibold">Humedad</th>
+                  <th class="p-2.5 font-semibold">Resp.</th>
+                  <th class="p-2.5 font-semibold text-right">Estado</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y ${borderSubtle}">
+                <tr class="hover:bg-slate-500/5">
+                  <td class="p-2.5 font-medium ${textHeading}">Sala Preanalítica 1</td>
+                  <td class="p-2.5"><span class="px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-500 text-[10px] font-bold">AM</span></td>
+                  <td class="p-2.5 font-mono font-semibold">21.4 °C</td>
+                  <td class="p-2.5 font-mono">48 %</td>
+                  <td class="p-2.5 font-bold text-slate-500">GRC</td>
+                  <td class="p-2.5 text-right"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-500">Normal</span></td>
+                </tr>
+                <tr class="hover:bg-slate-500/5">
+                  <td class="p-2.5 font-medium ${textHeading}">Química Cobas 1 y 2</td>
+                  <td class="p-2.5"><span class="px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-500 text-[10px] font-bold">AM</span></td>
+                  <td class="p-2.5 font-mono font-semibold">22.0 °C</td>
+                  <td class="p-2.5 font-mono">51 %</td>
+                  <td class="p-2.5 font-bold text-slate-500">VAA</td>
+                  <td class="p-2.5 text-right"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-500">Normal</span></td>
+                </tr>
+                <tr class="hover:bg-slate-500/5">
+                  <td class="p-2.5 font-medium ${textHeading}">Hematología DxH 900</td>
+                  <td class="p-2.5"><span class="px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-500 text-[10px] font-bold">PM</span></td>
+                  <td class="p-2.5 font-mono font-semibold">23.1 °C</td>
+                  <td class="p-2.5 font-mono">54 %</td>
+                  <td class="p-2.5 font-bold text-slate-500">LRP</td>
+                  <td class="p-2.5 text-right"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-500">Normal</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderSampleTermoForm(bgCard, textHeading, textMuted, borderSubtle, inputBg) {
+      return `
+        <div class="rounded-2xl border ${borderSubtle} ${bgCard} p-5 shadow-sm">
+          <form class="space-y-4" onsubmit="event.preventDefault();">
+            
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[11px] font-bold uppercase tracking-wider ${textMuted} mb-1.5">Fecha</label>
+                <input type="date" value="2026-09-10" class="w-full p-2.5 rounded-xl border ${inputBg} text-xs font-medium focus:ring-2 focus:ring-sky-500 outline-none" />
+              </div>
+              <div>
+                <label class="block text-[11px] font-bold uppercase tracking-wider ${textMuted} mb-1.5">Turno</label>
+                <div class="grid grid-cols-2 gap-1.5">
+                  <button type="button" class="py-2 rounded-xl text-xs font-bold border border-sky-500 bg-sky-500/10 text-sky-500">AM</button>
+                  <button type="button" class="py-2 rounded-xl text-xs font-bold border ${borderSubtle} ${inputBg} ${textMuted}">PM</button>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-bold uppercase tracking-wider ${textMuted} mb-1.5">Área / Sala Escaneada</label>
+              <select class="w-full p-2.5 rounded-xl border ${inputBg} text-xs font-medium focus:ring-2 focus:ring-sky-500 outline-none">
+                <option>01. Sala de Preanalítica 1</option>
+                <option>02. Sala de Química Clínica</option>
+                <option>03. Sala de Hematología</option>
+              </select>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[11px] font-bold uppercase tracking-wider ${textMuted} mb-1.5">Temperatura (°C)</label>
+                <input type="number" step="0.1" value="21.5" class="w-full p-2.5 rounded-xl border ${inputBg} text-base font-bold font-mono focus:ring-2 focus:ring-sky-500 outline-none" />
+                <span class="text-[10px] text-emerald-500 font-semibold mt-1 block">Rango: 15.0 - 25.0 °C</span>
+              </div>
+              <div>
+                <label class="block text-[11px] font-bold uppercase tracking-wider ${textMuted} mb-1.5">Humedad (%)</label>
+                <input type="number" step="1" value="48" class="w-full p-2.5 rounded-xl border ${inputBg} text-base font-bold font-mono focus:ring-2 focus:ring-sky-500 outline-none" />
+                <span class="text-[10px] text-emerald-500 font-semibold mt-1 block">Rango: 30 - 70 %</span>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-bold uppercase tracking-wider ${textMuted} mb-1.5">Responsable (Siglas)</label>
+              <input type="text" maxlength="4" value="GRC" class="w-full p-2.5 rounded-xl border ${inputBg} text-sm font-bold tracking-widest uppercase focus:ring-2 focus:ring-sky-500 outline-none" />
+            </div>
+
+            <button type="button" class="w-full py-3 rounded-xl bg-gradient-to-r from-sky-600 to-cyan-600 hover:from-sky-500 hover:to-cyan-500 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2">
+              <span>💾</span> Guardar Registro Ambiental
+            </button>
+          </form>
+        </div>
+      `;
+    }
+
+    function renderSampleCobas(bgCard, textHeading, textMuted, borderSubtle, inputBg) {
+      return `
+        <div class="rounded-2xl border ${borderSubtle} ${bgCard} p-5 shadow-sm">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="font-heading font-bold text-sm ${textHeading}">Mantenimiento Analizador Cobas</h3>
+            <span class="text-xs px-2 py-0.5 rounded bg-sky-500/10 text-sky-600 font-bold">Cobas 1 & 2</span>
+          </div>
+
+          <div class="space-y-3 text-xs">
+            <div class="p-3 rounded-xl border border-sky-500/30 bg-sky-500/5">
+              <div class="flex items-center justify-between font-bold text-sky-600 mb-2">
+                <span>🔁 Actividades Diarias</span>
+                <span class="text-[10px] bg-sky-500 text-white px-2 py-0.5 rounded-full">4 / 4 Realizadas</span>
+              </div>
+              <div class="space-y-1.5 text-slate-600 dark:text-slate-300">
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked class="rounded text-sky-600 focus:ring-0" />
+                  <span>Inspección visual del sistema de lavado y agujas</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked class="rounded text-sky-600 focus:ring-0" />
+                  <span>Verificación de niveles de reactivos y agua</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked class="rounded text-sky-600 focus:ring-0" />
+                  <span>Purga de jeringas de pipeteo y reactivos</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="p-3 rounded-xl border ${borderSubtle} bg-slate-50/50 dark:bg-slate-800/30">
+              <div class="flex items-center justify-between font-bold ${textHeading}">
+                <span>📅 Actividades Semanales</span>
+                <span class="text-[10px] text-slate-400">Verificar los Viernes</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderSampleMuestras(bgCard, textHeading, textMuted, borderSubtle, inputBg) {
+      return `
+        <div class="rounded-2xl border ${borderSubtle} ${bgCard} p-5 shadow-sm">
+          <div class="mb-4">
+            <h3 class="font-heading font-bold text-sm ${textHeading}">Control de Eliminación de Muestras</h3>
+            <p class="text-xs ${textMuted}">Cálculo automático de fecha de corte según protocolo de conservación</p>
+          </div>
+
+          <div class="space-y-3 text-xs">
+            <div>
+              <label class="block text-[11px] font-bold uppercase tracking-wider ${textMuted} mb-1.5">Sector / Tipo de Muestra</label>
+              <select class="w-full p-2.5 rounded-xl border ${inputBg} text-xs font-medium focus:ring-2 focus:ring-sky-500 outline-none">
+                <option>Suero (Química) — 7 días (congelada)</option>
+                <option>Sangre con EDTA (Hematología) — 72 horas</option>
+                <option>Orinas (Screenings positivos) — 7 días</option>
+              </select>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[11px] font-bold uppercase tracking-wider ${textMuted} mb-1.5">Fecha de Eliminación</label>
+                <input type="date" value="2026-09-10" class="w-full p-2.5 rounded-xl border ${inputBg} text-xs font-medium focus:ring-2 focus:ring-sky-500 outline-none" />
+              </div>
+              <div>
+                <label class="block text-[11px] font-bold uppercase tracking-wider ${textMuted} mb-1.5">Fecha de Corte Propuesta</label>
+                <input type="date" value="2026-09-03" class="w-full p-2.5 rounded-xl border ${inputBg} text-xs font-bold text-sky-600 focus:ring-2 focus:ring-sky-500 outline-none" />
+              </div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-600 font-medium">
+              💡 Muestras a eliminar: Tubos recepcionados hasta el <strong>03 de Septiembre de 2026</strong>.
+            </div>
+
+            <button type="button" class="w-full py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold shadow transition-all">
+              Confirmar y Registrar Eliminación
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderGenericSection(sec, bgCard, textHeading, textMuted) {
+      return `
+        <div class="rounded-2xl border border-slate-200 dark:border-slate-800 ${bgCard} p-6 text-center">
+          <span class="text-3xl mb-2 block">📋</span>
+          <h3 class="font-heading font-bold text-sm ${textHeading} mb-1">Módulo: ${sec.toUpperCase()}</h3>
+          <p class="text-xs ${textMuted}">Formulario clínico adaptado a los estándares de alta legibilidad y rapidez táctil.</p>
+        </div>
+      `;
+    }
+
+    function goToIndex() {
+      if (window.location.pathname.toLowerCase().includes('/docs/') || window.location.pathname.toLowerCase().includes('\\docs\\')) {
+        window.location.href = 'index.html';
+      } else {
+        window.location.href = 'docs/index.html';
+      }
+    }
+
+    // INITIALIZATION
+    window.addEventListener('DOMContentLoaded', () => {
+      selectModel(1);
+    });
+  </script>
+</body>
+</html>
+
