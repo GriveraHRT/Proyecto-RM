@@ -165,23 +165,40 @@ function getCachedJson(key) {
     }
     if (!val) return null;
 
-    if (val.indexOf('{"__chunked__":true') === 0) {
-      const meta = JSON.parse(val);
-      const chunkKeys = [];
-      for (let i = 0; i < meta.chunks; i++) {
-        chunkKeys.push(key + '_part_' + i);
-      }
-      const parts = cache.getAll(chunkKeys);
-      let fullStr = '';
-      for (let i = 0; i < meta.chunks; i++) {
-        const part = parts[key + '_part_' + i];
-        if (part === undefined || part === null) {
-          Logger.log('Chunk faltante para ' + key + ' en parte ' + i);
-          return null;
+    if (val.indexOf('__chunked__') !== -1) {
+      let meta = null;
+      try {
+        const parsed = JSON.parse(val);
+        if (parsed && parsed.__chunked__ === true) {
+          meta = parsed;
         }
-        fullStr += part;
+      } catch (e) {}
+
+      if (meta && meta.chunks) {
+        const chunkKeys = [];
+        for (let i = 0; i < meta.chunks; i++) {
+          chunkKeys.push(key + '_part_' + i);
+        }
+        let parts = {};
+        try {
+          parts = cache.getAll(chunkKeys) || {};
+        } catch (e) {
+          parts = {};
+        }
+        let fullStr = '';
+        for (let i = 0; i < meta.chunks; i++) {
+          let part = parts[key + '_part_' + i];
+          if (part === undefined || part === null) {
+            try { part = cache.get(key + '_part_' + i); } catch (e) {}
+          }
+          if (part === undefined || part === null) {
+            Logger.log('Chunk faltante para ' + key + ' en parte ' + i);
+            return null;
+          }
+          fullStr += part;
+        }
+        return JSON.parse(fullStr);
       }
-      return JSON.parse(fullStr);
     }
     return JSON.parse(val);
   } catch (e) {
@@ -208,7 +225,13 @@ function setCachedJson(key, data, ttl) {
       const metaPayload = JSON.stringify({ __chunked__: true, chunks: numChunks, size: str.length });
       chunkMap[key] = metaPayload;
       chunkMap[key + '_meta'] = metaPayload;
-      cache.putAll(chunkMap, effectiveTtl);
+      try {
+        cache.putAll(chunkMap, effectiveTtl);
+      } catch (errPutAll) {
+        for (const k in chunkMap) {
+          try { cache.put(k, chunkMap[k], effectiveTtl); } catch (e) {}
+        }
+      }
       Logger.log('Caché fragmentada para ' + key + ' en ' + numChunks + ' partes (' + str.length + ' bytes)');
     }
   } catch (e) {
@@ -222,7 +245,7 @@ function clearCacheKeys(keys) {
     keys.forEach(k => {
       allKeys.push(k);
       allKeys.push(k + '_meta');
-      for (let i = 0; i < 15; i++) {
+      for (let i = 0; i < 30; i++) {
         allKeys.push(k + '_part_' + i);
       }
     });
@@ -2076,21 +2099,21 @@ function saveCobas(data) {
   const f = parseFecha(data.fecha);
   const ts = getFechaRegistroFormatted();
   const sheet = getSheet(SHEETS.COBAS_REG);
+  const respName = resolveNombreResponsable(data.responsable);
   
-  data.actividades.forEach(act => {
-    insertRowAtTop(sheet, [
-      formatFechaDDMMYYYY(f), f.dia, f.mes, f.anio,
-      data.equipo,
-      resolveNombreResponsable(data.responsable),
-      act.frecuencia,
-      act.nombre,
-      data.observaciones || '',
-      ts,
-      '',  // Revisado_Por
-      '',  // Fecha_Revisión
-      ''   // Obs._Revisión
-    ]);
-  });
+  const rows = data.actividades.map(act => [
+    formatFechaDDMMYYYY(f), f.dia, f.mes, f.anio,
+    data.equipo,
+    respName,
+    act.frecuencia,
+    act.nombre,
+    data.observaciones || '',
+    ts,
+    '',  // Revisado_Por
+    '',  // Fecha_Revisión
+    ''   // Obs._Revisión
+  ]);
+  insertRowsAtTopBatch(sheet, rows);
   
   clearSheetCache('cobas', f.mes, f.anio);
   return {

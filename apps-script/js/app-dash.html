@@ -114,7 +114,7 @@ document.getElementById('form-refri-temp').addEventListener('submit',async e=>{
   try{
     const r=await apiPost({action:'saveRefriTemp',fecha:document.getElementById('refri-fecha').value,ampm:state.ampmRefri,equipo:document.getElementById('refri-equipo').value,temperatura:document.getElementById('refri-temp-input').value,responsable:document.getElementById('refri-resp').value,observaciones:obsVal,accion_correctiva:document.getElementById('refri-accion').value||''});
     if(r.success){
-      addDatalistOption('list-refri-obs', obsVal);showToast('✅ '+r.message);e.target.reset();document.getElementById('refri-fecha').value=today();resetRangoRefri();autoSetAmPm();prefetchDashboard();
+      addDatalistOption('list-refri-obs', obsVal);showToast('✅ '+r.message);e.target.reset();document.getElementById('refri-fecha').value=today();resetRangoRefri();autoSetAmPm();if(typeof clearRecordsMonthCache==='function')clearRecordsMonthCache();prefetchDashboard();
       if(r.recentRecords && Array.isArray(r.recentRecords)){recentRefriTempCache=r.recentRecords;renderRecentRefriTempTable(recentRefriTempCache);}
       else if(typeof loadRecentRefriTemp==='function')loadRecentRefriTemp();
     }
@@ -137,7 +137,7 @@ document.getElementById('form-limp-refri').addEventListener('submit',async e=>{
   try{
     const r=await apiPost({action:'saveLimpiezaRefri',fecha:document.getElementById('limp-refri-fecha').value,equipos:sel,responsable:document.getElementById('limp-refri-resp').value,tipo_mantencion:document.getElementById('limp-refri-tipo').value,observaciones:obsVal});
     if(r.success){
-      addDatalistOption('list-limp-refri-obs',obsVal);showToast('✅ '+r.message);e.target.reset();document.getElementById('limp-refri-fecha').value=today();document.getElementById('limp-refri-tipo').value='Semanal (externa)';updateInfoLimpRefri();document.querySelectorAll('#limp-refri-chips .chip-item').forEach(c=>c.classList.remove('selected'));if(typeof closeMultiSelect==='function')closeMultiSelect('limp-refri-chips');if(typeof clearMultiSelectSearch==='function')clearMultiSelectSearch('limp-refri-chips');if(typeof updateMultiSelectUI==='function')updateMultiSelectUI('limp-refri-chips');prefetchDashboard();
+      addDatalistOption('list-limp-refri-obs',obsVal);showToast('✅ '+r.message);e.target.reset();document.getElementById('limp-refri-fecha').value=today();document.getElementById('limp-refri-tipo').value='Semanal (externa)';updateInfoLimpRefri();document.querySelectorAll('#limp-refri-chips .chip-item').forEach(c=>c.classList.remove('selected'));if(typeof closeMultiSelect==='function')closeMultiSelect('limp-refri-chips');if(typeof clearMultiSelectSearch==='function')clearMultiSelectSearch('limp-refri-chips');if(typeof updateMultiSelectUI==='function')updateMultiSelectUI('limp-refri-chips');if(typeof clearRecordsMonthCache==='function')clearRecordsMonthCache();prefetchDashboard();
       if(r.recentRecords && Array.isArray(r.recentRecords)){recentLimpRefriCache=r.recentRecords;renderRecentLimpRefriTable(recentLimpRefriCache);}
       else if(typeof loadRecentLimpRefri==='function')loadRecentLimpRefri();
     }
@@ -162,7 +162,7 @@ document.getElementById('form-conductividad').addEventListener('submit',async e=
   try{
     const r=await apiPost({action:'saveConductividad',fecha:document.getElementById('conduct-fecha').value,ampm:state.ampmConduct,conductividad:document.getElementById('conduct-valor').value,responsable:document.getElementById('conduct-resp').value,observaciones:obsVal});
     if(r.success){
-      addDatalistOption('list-conduct-obs', obsVal);showToast('✅ '+r.message);e.target.reset();document.getElementById('conduct-fecha').value=today();resetRangoConductividad();autoSetAmPm();prefetchDashboard();
+      addDatalistOption('list-conduct-obs', obsVal);showToast('✅ '+r.message);e.target.reset();document.getElementById('conduct-fecha').value=today();resetRangoConductividad();autoSetAmPm();if(typeof clearRecordsMonthCache==='function')clearRecordsMonthCache();prefetchDashboard();
       if(r.recentRecords && Array.isArray(r.recentRecords)){recentConductividadCache=r.recentRecords;renderRecentConductividadTable(recentConductividadCache);}
       else if(typeof loadRecentConductividad==='function')loadRecentConductividad();
     }
@@ -318,6 +318,9 @@ if (formCobas) {
         addDatalistOption('list-cobas-obs', obsVal);
         showToast('✅ ' + r.message);
         e.target.reset();
+        document.getElementById('cobas-fecha').value = today();
+        if (typeof clearRecordsMonthCache === 'function') clearRecordsMonthCache();
+        prefetchDashboard();
         if (r.recentRecords && Array.isArray(r.recentRecords)) {
           recentCobasCache = r.recentRecords;
           renderRecentCobasTable(recentCobasCache);
@@ -3039,15 +3042,18 @@ function renderRecentTermoTable(records) {
 
 function parseFechaToInput(fechaStr) {
   if (!fechaStr) return '';
-  if (fechaStr.includes('-')) return fechaStr;
-  const parts = fechaStr.split('/');
+  const isoMatch = String(fechaStr).match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (isoMatch) {
+    return `${isoMatch[1]}-${isoMatch[2].padStart(2, '0')}-${isoMatch[3].padStart(2, '0')}`;
+  }
+  const parts = String(fechaStr).split('/');
   if (parts.length === 3) {
     const day = parts[0].padStart(2, '0');
     const month = parts[1].padStart(2, '0');
     const year = parts[2].length === 2 ? '20' + parts[2] : parts[2];
     return `${year}-${month}-${day}`;
   }
-  return fechaStr;
+  return String(fechaStr).substring(0, 10);
 }
 
 function openEditTermoModal(index) {
@@ -3077,7 +3083,7 @@ function openEditTermoModal(index) {
 
   document.getElementById('edit-termo-temp').value = rec.temperatura;
   document.getElementById('edit-termo-hum').value = rec.humedad;
-  document.getElementById('edit-termo-resp').value = rec.responsable;
+  document.getElementById('edit-termo-resp').value = getInicialesResponsable(rec.responsable);
   document.getElementById('edit-termo-obs').value = rec.observaciones || '';
 
   checkEditTermoRangos();
@@ -3408,7 +3414,7 @@ function openEditCentrifugaModal(idx) {
   document.getElementById('edit-cent-old-anio').value = rec.anio || '';
   document.getElementById('edit-cent-fecha').value = parseFechaToInput(rec.fecha);
   document.getElementById('edit-cent-tipo').value = rec.tipo_mantencion || 'Diaria';
-  document.getElementById('edit-cent-resp').value = rec.responsable || '';
+  document.getElementById('edit-cent-resp').value = getInicialesResponsable(rec.responsable);
   document.getElementById('edit-cent-obs').value = rec.observaciones || '';
 
   const selectCent = document.getElementById('edit-cent-nombre');
@@ -3571,7 +3577,7 @@ function openEditMesonModal(idx) {
   document.getElementById('edit-meson-old-mes').value = rec.mes || '';
   document.getElementById('edit-meson-old-anio').value = rec.anio || '';
   document.getElementById('edit-meson-fecha').value = parseFechaToInput(rec.fecha);
-  document.getElementById('edit-meson-resp').value = rec.responsable || '';
+  document.getElementById('edit-meson-resp').value = getInicialesResponsable(rec.responsable);
   document.getElementById('edit-meson-obs').value = rec.observaciones || '';
 
   const selectSala = document.getElementById('edit-meson-sala');
@@ -3739,7 +3745,7 @@ function openEditRefriTempModal(idx) {
   document.getElementById('edit-refri-fecha').value = parseFechaToInput(rec.fecha);
   document.getElementById('edit-refri-turno').value = rec.turno === 'Tarde' ? 'Tarde' : 'Mañana';
   document.getElementById('edit-refri-temp-val').value = rec.temperatura;
-  document.getElementById('edit-refri-resp').value = rec.responsable || '';
+  document.getElementById('edit-refri-resp').value = getInicialesResponsable(rec.responsable);
   document.getElementById('edit-refri-obs').value = rec.observaciones || '';
 
   const selectEq = document.getElementById('edit-refri-equipo');
@@ -3919,7 +3925,7 @@ function openEditLimpRefriModal(idx) {
   document.getElementById('edit-limp-refri-old-anio').value = rec.anio || '';
   document.getElementById('edit-limp-refri-fecha').value = parseFechaToInput(rec.fecha);
   document.getElementById('edit-limp-refri-tipo').value = rec.tipo_mantencion || 'Semanal (externa)';
-  document.getElementById('edit-limp-refri-resp').value = rec.responsable || '';
+  document.getElementById('edit-limp-refri-resp').value = getInicialesResponsable(rec.responsable);
   document.getElementById('edit-limp-refri-obs').value = rec.observaciones || '';
 
   const selectEq = document.getElementById('edit-limp-refri-equipo');
@@ -4093,7 +4099,7 @@ function openEditConductividadModal(idx) {
   document.getElementById('edit-conduct-fecha').value = parseFechaToInput(rec.fecha);
   document.getElementById('edit-conduct-turno').value = rec.turno === 'Tarde' ? 'Tarde' : 'Mañana';
   document.getElementById('edit-conduct-valor').value = rec.conductividad;
-  document.getElementById('edit-conduct-resp').value = rec.responsable || '';
+  document.getElementById('edit-conduct-resp').value = getInicialesResponsable(rec.responsable);
   document.getElementById('edit-conduct-obs').value = rec.observaciones || '';
 
   document.querySelectorAll('.modal-card').forEach(m => m.style.display = 'none');
@@ -4261,7 +4267,7 @@ function openEditCobasModal(idx) {
   document.getElementById('edit-cobas-equipo').value = rec.equipo || 'Cobas 1';
   document.getElementById('edit-cobas-frecuencia').value = rec.frecuencia || '';
   document.getElementById('edit-cobas-actividad').value = rec.actividad || '';
-  document.getElementById('edit-cobas-resp').value = rec.responsable || '';
+  document.getElementById('edit-cobas-resp').value = getInicialesResponsable(rec.responsable);
   document.getElementById('edit-cobas-obs').value = rec.observaciones || '';
 
   document.querySelectorAll('.modal-card').forEach(m => m.style.display = 'none');
@@ -4989,4 +4995,5 @@ function finalizarAsistente() {
   }
   navigateTo('dashboard');
 }
+
 </script>
