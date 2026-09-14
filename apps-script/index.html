@@ -37,10 +37,14 @@
     </div>
     <div class="header-title-group">
       <div class="logo-text">Registros Unidad de Laboratorio</div>
-      
+      <div class="header-hospital-pill">Hospital Regional de Talca</div>
     </div>
   </div>
   <div class="header-right">
+    <div class="header-status-pill" title="Sistema en línea y sincronizado">
+      <span class="status-pulse-dot"></span>
+      <span class="status-pill-text">En línea</span>
+    </div>
     <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Cambiar tema">☀️</button>
     <div id="header-clock">
       <div class="clock-time-wrap">
@@ -92,6 +96,8 @@
       <div style="color:var(--text-dim);margin-top:12px;font-size:13px;">Cargando datos…</div>
     </div>
 
+    <!-- Tablas por módulo -->
+    <div id="dash-tables"></div>
   </section>
 
   <!-- ── SECCIÓN: TEMPERATURA & HUMEDAD ─────────────────── -->
@@ -187,7 +193,7 @@
           <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-color, #1e293b);">📋 Últimos 20 Registros</h3>
           <p style="margin: 2px 0 0 0; font-size: 0.85rem; color: #64748b;">Visualiza, edita o elimina datos recientes de temperatura y humedad</p>
         </div>
-        <button type="button" class="btn btn-secondary" onclick="loadRecentTermo()" style="padding: 6px 12px; font-size: 0.85rem;">
+        <button type="button" class="btn btn-secondary" id="btn-refresh-recent-termo" onclick="loadRecentTermo()" style="padding: 6px 12px; font-size: 0.85rem;">
           🔄 Actualizar Lista
         </button>
       </div>
@@ -281,7 +287,7 @@
           <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-color, #1e293b);">📋 Últimos Registros</h3>
           <p style="margin: 2px 0 0 0; font-size: 0.85rem; color: #64748b;">Visualiza los datos recientes de mantención de centrífugas</p>
         </div>
-        <button type="button" class="btn btn-secondary" onclick="loadRecentCentrifugas()" style="padding: 6px 12px; font-size: 0.85rem;">
+        <button type="button" class="btn btn-secondary" id="btn-refresh-recent-centrifugas" onclick="loadRecentCentrifugas()" style="padding: 6px 12px; font-size: 0.85rem;">
           🔄 Actualizar Lista
         </button>
       </div>
@@ -362,7 +368,7 @@
           <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-color, #1e293b);">📋 Últimos Registros</h3>
           <p style="margin: 2px 0 0 0; font-size: 0.85rem; color: #64748b;">Visualiza los datos recientes de limpieza de mesones</p>
         </div>
-        <button type="button" class="btn btn-secondary" onclick="loadRecentMesones()" style="padding: 6px 12px; font-size: 0.85rem;">
+        <button type="button" class="btn btn-secondary" id="btn-refresh-recent-mesones" onclick="loadRecentMesones()" style="padding: 6px 12px; font-size: 0.85rem;">
           🔄 Actualizar Lista
         </button>
       </div>
@@ -466,7 +472,7 @@
           <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-color, #1e293b);">📋 Últimos Registros</h3>
           <p style="margin: 2px 0 0 0; font-size: 0.85rem; color: #64748b;">Visualiza los datos recientes de temperatura de refrigeradores</p>
         </div>
-        <button type="button" class="btn btn-secondary" onclick="loadRecentRefriTemp()" style="padding: 6px 12px; font-size: 0.85rem;">
+        <button type="button" class="btn btn-secondary" id="btn-refresh-recent-refri-temp" onclick="loadRecentRefriTemp()" style="padding: 6px 12px; font-size: 0.85rem;">
           🔄 Actualizar Lista
         </button>
       </div>
@@ -556,7 +562,7 @@
           <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-color, #1e293b);">📋 Últimos Registros</h3>
           <p style="margin: 2px 0 0 0; font-size: 0.85rem; color: #64748b;">Visualiza los datos recientes de limpieza de refrigeradores</p>
         </div>
-        <button type="button" class="btn btn-secondary" onclick="loadRecentLimpRefri()" style="padding: 6px 12px; font-size: 0.85rem;">
+        <button type="button" class="btn btn-secondary" id="btn-refresh-recent-limp-refri" onclick="loadRecentLimpRefri()" style="padding: 6px 12px; font-size: 0.85rem;">
           🔄 Actualizar Lista
         </button>
       </div>
@@ -660,7 +666,7 @@
           <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-color, #1e293b);">📋 Últimos Registros</h3>
           <p style="margin: 2px 0 0 0; font-size: 0.85rem; color: #64748b;">Visualiza los datos recientes de conductividad del agua</p>
         </div>
-        <button type="button" class="btn btn-secondary" onclick="loadRecentConductividad()" style="padding: 6px 12px; font-size: 0.85rem;">
+        <button type="button" class="btn btn-secondary" id="btn-refresh-recent-conductividad" onclick="loadRecentConductividad()" style="padding: 6px 12px; font-size: 0.85rem;">
           🔄 Actualizar Lista
         </button>
       </div>
@@ -1022,7 +1028,7 @@
           <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-color, #1e293b);">📋 Últimos Registros</h3>
           <p style="margin: 2px 0 0 0; font-size: 0.85rem; color: #64748b;">Visualiza los datos recientes de mantención Cobas</p>
         </div>
-        <button type="button" class="btn btn-secondary" onclick="loadRecentCobas()" style="padding: 6px 12px; font-size: 0.85rem;">
+        <button type="button" class="btn btn-secondary" id="btn-refresh-recent-cobas" onclick="loadRecentCobas()" style="padding: 6px 12px; font-size: 0.85rem;">
           🔄 Actualizar Lista
         </button>
       </div>
@@ -1416,47 +1422,149 @@
     <span class="nav-icon">🌡️</span>
     <span class="nav-label">Ambiental</span>
   </button>
-  <button class="nav-item" data-section="centrifugas" onclick="navigateTo('centrifugas')">
-    <span class="nav-icon">⚙️</span>
-    <span class="nav-label">Centríf.</span>
-  </button>
-  <button class="nav-item" data-section="mesones" onclick="navigateTo('mesones')">
-    <span class="nav-icon">🧽</span>
-    <span class="nav-label">Mesones</span>
-  </button>
-  <button class="nav-item" data-section="refri-temp" onclick="navigateTo('refri-temp')">
-    <span class="nav-icon">🧊</span>
-    <span class="nav-label">Refri.</span>
-  </button>
-  <button class="nav-item" data-section="limp-refri" onclick="navigateTo('limp-refri')">
-    <span class="nav-icon">🧹</span>
-    <span class="nav-label">Limp.R.</span>
-  </button>
-  <button class="nav-item" data-section="conductividad" onclick="navigateTo('conductividad')">
-    <span class="nav-icon">💧</span>
-    <span class="nav-label">Conduct.</span>
-  </button>
-  <button class="nav-item" data-section="etiquetadoras" onclick="navigateTo('etiquetadoras')">
-    <span class="nav-icon">🏷️</span>
-    <span class="nav-label">Etiquet.</span>
-  </button>
   <button class="nav-item" data-section="cobas" onclick="navigateTo('cobas')">
     <span class="nav-icon">🔬</span>
     <span class="nav-label">Cobas</span>
-  </button>
-  <button class="nav-item" data-section="dxh900" onclick="navigateTo('dxh900')">
-    <span class="nav-icon">🛠️</span>
-    <span class="nav-label">DxH 900</span>
   </button>
   <button class="nav-item" data-section="elim-muestras" onclick="navigateTo('elim-muestras')">
     <span class="nav-icon">🗑️</span>
     <span class="nav-label">Muestras</span>
   </button>
-  <button class="nav-item" data-section="admin" onclick="navigateTo('admin')">
+  <button class="nav-item nav-item-more" id="btn-more-modules" onclick="toggleModuleDrawer(event)" title="Todos los módulos">
+    <span class="nav-icon">📑</span>
+    <span class="nav-label">Módulos</span>
+  </button>
+
+  <!-- Módulos adicionales visibles en Desktop / Tablet (>= 768px) -->
+  <button class="nav-item nav-desktop-only" data-section="centrifugas" onclick="navigateTo('centrifugas')">
+    <span class="nav-icon">⚙️</span>
+    <span class="nav-label">Centrífugas</span>
+  </button>
+  <button class="nav-item nav-desktop-only" data-section="mesones" onclick="navigateTo('mesones')">
+    <span class="nav-icon">🧽</span>
+    <span class="nav-label">Mesones</span>
+  </button>
+  <button class="nav-item nav-desktop-only" data-section="refri-temp" onclick="navigateTo('refri-temp')">
+    <span class="nav-icon">🧊</span>
+    <span class="nav-label">Refrigeradores</span>
+  </button>
+  <button class="nav-item nav-desktop-only" data-section="limp-refri" onclick="navigateTo('limp-refri')">
+    <span class="nav-icon">🧹</span>
+    <span class="nav-label">Limp. Refri</span>
+  </button>
+  <button class="nav-item nav-desktop-only" data-section="conductividad" onclick="navigateTo('conductividad')">
+    <span class="nav-icon">💧</span>
+    <span class="nav-label">Conductividad</span>
+  </button>
+  <button class="nav-item nav-desktop-only" data-section="dxh900" onclick="navigateTo('dxh900')">
+    <span class="nav-icon">🛠️</span>
+    <span class="nav-label">DxH 900</span>
+  </button>
+  <button class="nav-item nav-desktop-only" data-section="etiquetadoras" onclick="navigateTo('etiquetadoras')">
+    <span class="nav-icon">🏷️</span>
+    <span class="nav-label">Etiquetas</span>
+  </button>
+  <button class="nav-item nav-desktop-only" data-section="admin" onclick="navigateTo('admin')">
     <span class="nav-icon">🔑</span>
     <span class="nav-label">Admin</span>
   </button>
 </nav>
+
+<!-- ══ DRAWER / BOTTOM SHEET DE MÓDULOS (MÓVIL) ═════════════ -->
+<div id="module-drawer-backdrop" class="module-drawer-backdrop" style="display:none;" onclick="closeModuleDrawer()"></div>
+<div id="module-drawer" class="module-drawer" aria-hidden="true">
+  <div class="drawer-handle-bar" onclick="closeModuleDrawer()">
+    <div class="drawer-handle"></div>
+  </div>
+  <div class="drawer-header">
+    <div class="drawer-title-group">
+      <span class="drawer-icon">📑</span>
+      <div>
+        <h3 class="drawer-title">Módulos del Laboratorio</h3>
+        <p class="drawer-subtitle">Acceso directo a todos los registros y formularios</p>
+      </div>
+    </div>
+    <button type="button" class="drawer-close-btn" onclick="closeModuleDrawer()" title="Cerrar">✕</button>
+  </div>
+  <div class="drawer-body">
+    
+    <!-- Categoría 1: Ambiente y Salas -->
+    <div class="drawer-category">
+      <div class="drawer-cat-label">
+        <span>🌡️</span> Salas y Control Ambiental
+      </div>
+      <div class="drawer-grid">
+        <button type="button" class="drawer-item nav-item" data-section="termo" onclick="navigateTo('termo')">
+          <span class="drawer-item-icon">🌡️</span>
+          <span class="drawer-item-text">T° y Humedad</span>
+        </button>
+        <button type="button" class="drawer-item nav-item" data-section="mesones" onclick="navigateTo('mesones')">
+          <span class="drawer-item-icon">🧽</span>
+          <span class="drawer-item-text">Mesones</span>
+        </button>
+        <button type="button" class="drawer-item nav-item" data-section="conductividad" onclick="navigateTo('conductividad')">
+          <span class="drawer-item-icon">💧</span>
+          <span class="drawer-item-text">Conductividad</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Categoría 2: Equipos e Instrumental -->
+    <div class="drawer-category">
+      <div class="drawer-cat-label">
+        <span>🔬</span> Equipos e Instrumental Clínico
+      </div>
+      <div class="drawer-grid">
+        <button type="button" class="drawer-item nav-item" data-section="cobas" onclick="navigateTo('cobas')">
+          <span class="drawer-item-icon">🔬</span>
+          <span class="drawer-item-text">Cobas 1 y 2</span>
+        </button>
+        <button type="button" class="drawer-item nav-item" data-section="dxh900" onclick="navigateTo('dxh900')">
+          <span class="drawer-item-icon">🛠️</span>
+          <span class="drawer-item-text">DxH 900</span>
+        </button>
+        <button type="button" class="drawer-item nav-item" data-section="centrifugas" onclick="navigateTo('centrifugas')">
+          <span class="drawer-item-icon">⚙️</span>
+          <span class="drawer-item-text">Centrífugas</span>
+        </button>
+        <button type="button" class="drawer-item nav-item" data-section="refri-temp" onclick="navigateTo('refri-temp')">
+          <span class="drawer-item-icon">🧊</span>
+          <span class="drawer-item-text">Refri. T°</span>
+        </button>
+        <button type="button" class="drawer-item nav-item" data-section="limp-refri" onclick="navigateTo('limp-refri')">
+          <span class="drawer-item-icon">🧹</span>
+          <span class="drawer-item-text">Limp. Refri.</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Categoría 3: Gestión y Calidad -->
+    <div class="drawer-category">
+      <div class="drawer-cat-label">
+        <span>📋</span> Gestión, Calidad y Control
+      </div>
+      <div class="drawer-grid">
+        <button type="button" class="drawer-item nav-item" data-section="elim-muestras" onclick="navigateTo('elim-muestras')">
+          <span class="drawer-item-icon">🗑️</span>
+          <span class="drawer-item-text">Muestras</span>
+        </button>
+        <button type="button" class="drawer-item nav-item" data-section="etiquetadoras" onclick="navigateTo('etiquetadoras')">
+          <span class="drawer-item-icon">🏷️</span>
+          <span class="drawer-item-text">Etiquetas QR</span>
+        </button>
+        <button type="button" class="drawer-item nav-item" data-section="admin" onclick="navigateTo('admin')">
+          <span class="drawer-item-icon">🔑</span>
+          <span class="drawer-item-text">Administración</span>
+        </button>
+        <button type="button" class="drawer-item nav-item" data-section="dashboard" onclick="navigateTo('dashboard')">
+          <span class="drawer-item-icon">🏠</span>
+          <span class="drawer-item-text">Dashboard</span>
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>
 
 <!-- ══ MODALES ═══════════════════════════════════════════════ -->
 <div id="modal-overlay" onclick="closeModal(event)">

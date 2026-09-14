@@ -167,17 +167,34 @@ function formatDDMMYYYY(val) {
 }
 function showToast(m,t='success'){const el=document.getElementById('toast');if(el){el.textContent=m;el.className=`show toast-${t}`;setTimeout(()=>{el.className=''},3200)}}
 function setLoading(b,s,t,l){const btn=document.getElementById(b);if(btn)btn.disabled=l;const spin=document.getElementById(s);if(spin)spin.classList.toggle('visible',l);const txt=document.getElementById(t);if(txt)txt.style.display=l?'none':''}
-async function fetchWithTimeout(url, options = {}, timeout = 25000) {
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), timeout);
-  try {
-    const response = await fetch(url, { ...options, signal: controller.signal });
-    clearTimeout(id);
-    return response;
-  } catch (error) {
-    clearTimeout(id);
-    throw error;
+async function fetchWithTimeout(url, options = {}, timeout = 35000, maxRetries = 2) {
+  let lastError;
+  const isPost = (options.method || 'GET').toUpperCase() === 'POST';
+  const retries = isPost ? 0 : maxRetries;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    try {
+      const response = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(id);
+      if (response.ok) return response;
+      if (!isPost && attempt < retries && (response.status >= 500 || response.status === 404)) {
+        await new Promise(res => setTimeout(res, 800 * (attempt + 1)));
+        continue;
+      }
+      return response;
+    } catch (error) {
+      clearTimeout(id);
+      lastError = error;
+      if (attempt < retries) {
+        await new Promise(res => setTimeout(res, 800 * (attempt + 1)));
+        continue;
+      }
+      throw error;
+    }
   }
+  throw lastError;
 }
 async function apiGet(p){const u=new URL(API_URL);Object.entries(p).forEach(([k,v])=>u.searchParams.set(k,v));u.searchParams.set('_t',Date.now());const r=await fetchWithTimeout(u.toString(),{redirect:'follow'});if(!r.ok)throw new Error(`HTTP ${r.status}`);return r.json()}
 async function apiPost(b){const r=await fetchWithTimeout(API_URL,{method:'POST',redirect:'follow',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(b)});if(!r.ok)throw new Error(`HTTP ${r.status}`);return r.json()}
@@ -198,10 +215,68 @@ function toggleTheme(){const d=document.documentElement,dark=d.getAttribute('dat
 
 // Modulos Activos Control
 function isModuloActivo(k){if(!state.modulosActivos)return true;return state.modulosActivos[k]!==false}
-function applyModulosVisibilidad(){if(!state.modulosActivos)return;try{localStorage.setItem('modulosActivos',JSON.stringify(state.modulosActivos))}catch(e){};document.querySelectorAll('#bottom-nav .nav-item[data-section]').forEach(el=>{const s=el.getAttribute('data-section');if(s==='dashboard'||s==='admin'){el.style.display=''}else{el.style.display=isModuloActivo(s)?'':'none'}});const statMap={'termo':'stat-termo','centrifugas':'stat-cent','mesones':'stat-limp','refri-temp':'stat-refri','limp-refri':'stat-limp-refri','conductividad':'stat-conduct','cobas':'stat-cobas'};Object.entries(statMap).forEach(([k,id])=>{const el=document.getElementById(id);if(el){const c=el.closest('.stat-card');if(c)c.style.display=isModuloActivo(k)?'':'none'}});document.querySelectorAll('.stats-row').forEach(row=>{const vis=Array.from(row.querySelectorAll('.stat-card')).filter(c=>c.style.display!=='none');row.style.display=vis.length>0?'':'none'});if(state.dashData&&typeof renderDashContent==='function'){renderDashContent(state.dashData)}if(state.dashData&&typeof renderTables==='function'){renderTables(state.dashData)}}
+function applyModulosVisibilidad(){if(!state.modulosActivos)return;try{localStorage.setItem('modulosActivos',JSON.stringify(state.modulosActivos))}catch(e){};document.querySelectorAll('.nav-item[data-section]').forEach(el=>{const s=el.getAttribute('data-section');if(s==='dashboard'||s==='admin'){el.style.display=''}else{el.style.display=isModuloActivo(s)?'':'none'}});const statMap={'termo':'stat-termo','centrifugas':'stat-cent','mesones':'stat-limp','refri-temp':'stat-refri','limp-refri':'stat-limp-refri','conductividad':'stat-conduct','cobas':'stat-cobas'};Object.entries(statMap).forEach(([k,id])=>{const el=document.getElementById(id);if(el){const c=el.closest('.stat-card');if(c)c.style.display=isModuloActivo(k)?'':'none'}});document.querySelectorAll('.stats-row').forEach(row=>{const vis=Array.from(row.querySelectorAll('.stat-card')).filter(c=>c.style.display!=='none');row.style.display=vis.length>0?'':'none'});if(state.dashData&&typeof renderDashContent==='function'){renderDashContent(state.dashData)}if(state.dashData&&typeof renderTables==='function'){renderTables(state.dashData)}}
 
 // Navigation
-function navigateTo(s){document.querySelectorAll('.section').forEach(el=>el.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));const sec=document.getElementById('section-'+s);if(sec)sec.classList.add('active');const navBtn=document.querySelector(`[data-section="${s}"]`);if(navBtn)navBtn.classList.add('active');if(s==='dashboard')loadDashboard();if(s==='admin'){initRevAdminSelectors();loadNotificacionesAdmin();if(typeof loadModulosAdmin==='function')loadModulosAdmin();if(typeof loadDiasNoHabilesAdmin==='function')loadDiasNoHabilesAdmin();}if(s==='dxh900'){loadDxH900HistorialForm()}if(s==='elim-muestras'){loadElimMuestrasHistorialForm()}if(s==='termo'){if(typeof checkDuplicateTermo==='function')checkDuplicateTermo();if(typeof loadRecentTermo==='function')loadRecentTermo();}if(s==='centrifugas'){if(typeof checkDuplicateCentrifugas==='function')checkDuplicateCentrifugas();if(typeof loadRecentCentrifugas==='function')loadRecentCentrifugas();}if(s==='mesones'){if(typeof checkDuplicateMesones==='function')checkDuplicateMesones();if(typeof loadRecentMesones==='function')loadRecentMesones();}if(s==='refri-temp'&&typeof loadRecentRefriTemp==='function')loadRecentRefriTemp();if(s==='limp-refri'&&typeof loadRecentLimpRefri==='function')loadRecentLimpRefri();if(s==='conductividad'&&typeof loadRecentConductividad==='function')loadRecentConductividad();if(s==='cobas'&&typeof loadRecentCobas==='function')loadRecentCobas();if(s==='elim-muestras'&&typeof checkDuplicateElimMuestras==='function')checkDuplicateElimMuestras();}
+function navigateTo(s){
+  document.querySelectorAll('.section').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  const sec=document.getElementById('section-'+s);
+  if(sec)sec.classList.add('active');
+  document.querySelectorAll(`[data-section="${s}"]`).forEach(navBtn=>navBtn.classList.add('active'));
+  const moreBtn = document.getElementById('btn-more-modules');
+  if (moreBtn) {
+    const isPrimary = ['dashboard', 'termo', 'cobas', 'elim-muestras'].includes(s);
+    moreBtn.classList.toggle('sub-active', !isPrimary);
+  }
+  if (typeof closeModuleDrawer === 'function') {
+    closeModuleDrawer();
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  if(s==='dashboard')loadDashboard();
+  if(s==='admin'){initRevAdminSelectors();loadNotificacionesAdmin();if(typeof loadModulosAdmin==='function')loadModulosAdmin();if(typeof loadDiasNoHabilesAdmin==='function')loadDiasNoHabilesAdmin();}
+  if(s==='dxh900'){loadDxH900HistorialForm()}
+  if(s==='elim-muestras'){loadElimMuestrasHistorialForm()}
+  if(s==='termo'){if(typeof checkDuplicateTermo==='function')checkDuplicateTermo();if(typeof loadRecentTermo==='function')loadRecentTermo();}
+  if(s==='centrifugas'){if(typeof checkDuplicateCentrifugas==='function')checkDuplicateCentrifugas();if(typeof loadRecentCentrifugas==='function')loadRecentCentrifugas();}
+  if(s==='mesones'){if(typeof checkDuplicateMesones==='function')checkDuplicateMesones();if(typeof loadRecentMesones==='function')loadRecentMesones();}
+  if(s==='refri-temp'&&typeof loadRecentRefriTemp==='function')loadRecentRefriTemp();
+  if(s==='limp-refri'&&typeof loadRecentLimpRefri==='function')loadRecentLimpRefri();
+  if(s==='conductividad'&&typeof loadRecentConductividad==='function')loadRecentConductividad();
+  if(s==='cobas'&&typeof loadRecentCobas==='function')loadRecentCobas();
+  if(s==='elim-muestras'&&typeof checkDuplicateElimMuestras==='function')checkDuplicateElimMuestras();
+}
+
+function toggleModuleDrawer(e){
+  if(e) e.stopPropagation();
+  const drawer=document.getElementById('module-drawer');
+  if(!drawer) return;
+  if(drawer.classList.contains('open')) closeModuleDrawer();
+  else openModuleDrawer();
+}
+
+function openModuleDrawer(){
+  const drawer=document.getElementById('module-drawer');
+  const backdrop=document.getElementById('module-drawer-backdrop');
+  if(drawer && backdrop){
+    backdrop.style.display='block';
+    void drawer.offsetHeight;
+    backdrop.classList.add('visible');
+    drawer.classList.add('open');
+  }
+}
+
+function closeModuleDrawer(){
+  const drawer=document.getElementById('module-drawer');
+  const backdrop=document.getElementById('module-drawer-backdrop');
+  if(drawer && backdrop){
+    drawer.classList.remove('open');
+    backdrop.classList.remove('visible');
+    setTimeout(()=>{
+      if(!drawer.classList.contains('open')) backdrop.style.display='none';
+    }, 250);
+  }
+}
 
 // AM/PM — Termo (ambiental)
 function setAmPm(v){
@@ -1282,14 +1357,18 @@ function checkUrlParams(){
   }
 }
 
-// Dashboard cache & prefetch
-function prefetchDashboard(){
-  const mes=state.dashMes,anio=state.dashAnio;
-  const key=mes+'-'+anio;
-  apiGet({action:'getRegistros',mes:mes,anio:anio}).then(function(reg){
-    const rev = reg.revisiones || null;
-    state.dashCache={key:key,data:reg,rev:rev,timestamp:Date.now()};
-  }).catch(function(){/* silent fail */});
+// Dashboard cache & prefetch (decoupled with debounce)
+let _prefetchDashboardTimer = null;
+function prefetchDashboard(delay = 2000){
+  if (_prefetchDashboardTimer) clearTimeout(_prefetchDashboardTimer);
+  _prefetchDashboardTimer = setTimeout(() => {
+    const mes=state.dashMes,anio=state.dashAnio;
+    const key=mes+'-'+anio;
+    apiGet({action:'getRegistros',mes:mes,anio:anio}).then(function(reg){
+      const rev = reg.revisiones || null;
+      state.dashCache={key:key,data:reg,rev:rev,timestamp:Date.now()};
+    }).catch(function(){/* silent fail */});
+  }, delay);
 }
 function getCacheAge(){
   if(!state.dashCache)return Infinity;
@@ -1305,6 +1384,4 @@ function updateCacheIndicator(){
   else{el.textContent='hace '+mins+' min';el.className='cache-indicator cache-stale'}
   el.style.display='inline-block';
 }
-
-
 </script>

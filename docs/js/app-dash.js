@@ -25,7 +25,8 @@ document.getElementById('form-termo').addEventListener('submit',async e=>{
       clearRecordsMonthCache();
       prefetchDashboard();
       checkDuplicateTermo();
-      if(typeof loadRecentTermo==='function')loadRecentTermo();
+      if(r.recentRecords && Array.isArray(r.recentRecords)){recentTermoCache=r.recentRecords;renderRecentTermoTable(recentTermoCache);}
+      else if(typeof loadRecentTermo==='function')loadRecentTermo();
     }
     else showToast('❌ '+r.error,'error');
   }catch(err){showToast('❌ Error de conexión','error')}
@@ -55,7 +56,8 @@ document.getElementById('form-centrifugas').addEventListener('submit',async e=>{
       clearRecordsMonthCache();
       prefetchDashboard();
       checkDuplicateCentrifugas();
-      if(typeof loadRecentCentrifugas==='function')loadRecentCentrifugas();
+      if(r.recentRecords && Array.isArray(r.recentRecords)){recentCentrifugasCache=r.recentRecords;renderRecentCentrifugasTable(recentCentrifugasCache);}
+      else if(typeof loadRecentCentrifugas==='function')loadRecentCentrifugas();
     }
     else showToast('❌ '+r.error,'error')
   }catch(err){showToast('❌ Error de conexión','error')}
@@ -85,7 +87,8 @@ document.getElementById('form-mesones').addEventListener('submit',async e=>{
       clearRecordsMonthCache();
       prefetchDashboard();
       checkDuplicateMesones();
-      if(typeof loadRecentMesones==='function')loadRecentMesones();
+      if(r.recentRecords && Array.isArray(r.recentRecords)){recentMesonesCache=r.recentRecords;renderRecentMesonesTable(recentMesonesCache);}
+      else if(typeof loadRecentMesones==='function')loadRecentMesones();
     }
     else showToast('❌ '+r.error,'error')
   }catch(err){showToast('❌ Error de conexión','error')}
@@ -109,7 +112,11 @@ document.getElementById('form-refri-temp').addEventListener('submit',async e=>{
   setLoading('btn-refri-submit','spinner-refri','btn-refri-text',true);
   try{
     const r=await apiPost({action:'saveRefriTemp',fecha:document.getElementById('refri-fecha').value,ampm:state.ampmRefri,equipo:document.getElementById('refri-equipo').value,temperatura:document.getElementById('refri-temp-input').value,responsable:document.getElementById('refri-resp').value,observaciones:obsVal,accion_correctiva:document.getElementById('refri-accion').value||''});
-    if(r.success){addDatalistOption('list-refri-obs', obsVal);showToast('✅ '+r.message);e.target.reset();document.getElementById('refri-fecha').value=today();resetRangoRefri();autoSetAmPm();prefetchDashboard();if(typeof loadRecentRefriTemp==='function')loadRecentRefriTemp();}
+    if(r.success){
+      addDatalistOption('list-refri-obs', obsVal);showToast('✅ '+r.message);e.target.reset();document.getElementById('refri-fecha').value=today();resetRangoRefri();autoSetAmPm();prefetchDashboard();
+      if(r.recentRecords && Array.isArray(r.recentRecords)){recentRefriTempCache=r.recentRecords;renderRecentRefriTempTable(recentRefriTempCache);}
+      else if(typeof loadRecentRefriTemp==='function')loadRecentRefriTemp();
+    }
     else showToast('❌ '+r.error,'error');
   }catch(err){showToast('❌ Error de conexión','error')}
   setLoading('btn-refri-submit','spinner-refri','btn-refri-text',false);
@@ -128,7 +135,11 @@ document.getElementById('form-limp-refri').addEventListener('submit',async e=>{
   setLoading('btn-limp-refri-submit','spinner-limp-refri','btn-limp-refri-text',true);
   try{
     const r=await apiPost({action:'saveLimpiezaRefri',fecha:document.getElementById('limp-refri-fecha').value,equipos:sel,responsable:document.getElementById('limp-refri-resp').value,tipo_mantencion:document.getElementById('limp-refri-tipo').value,observaciones:obsVal});
-    if(r.success){addDatalistOption('list-limp-refri-obs',obsVal);showToast('✅ '+r.message);e.target.reset();document.getElementById('limp-refri-fecha').value=today();document.getElementById('limp-refri-tipo').value='Semanal (externa)';updateInfoLimpRefri();document.querySelectorAll('#limp-refri-chips .chip-item').forEach(c=>c.classList.remove('selected'));if(typeof closeMultiSelect==='function')closeMultiSelect('limp-refri-chips');if(typeof clearMultiSelectSearch==='function')clearMultiSelectSearch('limp-refri-chips');if(typeof updateMultiSelectUI==='function')updateMultiSelectUI('limp-refri-chips');prefetchDashboard();if(typeof loadRecentLimpRefri==='function')loadRecentLimpRefri();}
+    if(r.success){
+      addDatalistOption('list-limp-refri-obs',obsVal);showToast('✅ '+r.message);e.target.reset();document.getElementById('limp-refri-fecha').value=today();document.getElementById('limp-refri-tipo').value='Semanal (externa)';updateInfoLimpRefri();document.querySelectorAll('#limp-refri-chips .chip-item').forEach(c=>c.classList.remove('selected'));if(typeof closeMultiSelect==='function')closeMultiSelect('limp-refri-chips');if(typeof clearMultiSelectSearch==='function')clearMultiSelectSearch('limp-refri-chips');if(typeof updateMultiSelectUI==='function')updateMultiSelectUI('limp-refri-chips');prefetchDashboard();
+      if(r.recentRecords && Array.isArray(r.recentRecords)){recentLimpRefriCache=r.recentRecords;renderRecentLimpRefriTable(recentLimpRefriCache);}
+      else if(typeof loadRecentLimpRefri==='function')loadRecentLimpRefri();
+    }
     else showToast('❌ '+r.error,'error')
   }catch(err){showToast('❌ Error de conexión','error')}
   setLoading('btn-limp-refri-submit','spinner-limp-refri','btn-limp-refri-text',false)
@@ -149,7 +160,11 @@ document.getElementById('form-conductividad').addEventListener('submit',async e=
   setLoading('btn-conduct-submit','spinner-conduct','btn-conduct-text',true);
   try{
     const r=await apiPost({action:'saveConductividad',fecha:document.getElementById('conduct-fecha').value,ampm:state.ampmConduct,conductividad:document.getElementById('conduct-valor').value,responsable:document.getElementById('conduct-resp').value,observaciones:obsVal});
-    if(r.success){addDatalistOption('list-conduct-obs', obsVal);showToast('✅ '+r.message);e.target.reset();document.getElementById('conduct-fecha').value=today();resetRangoConductividad();autoSetAmPm();prefetchDashboard();if(typeof loadRecentConductividad==='function')loadRecentConductividad();}
+    if(r.success){
+      addDatalistOption('list-conduct-obs', obsVal);showToast('✅ '+r.message);e.target.reset();document.getElementById('conduct-fecha').value=today();resetRangoConductividad();autoSetAmPm();prefetchDashboard();
+      if(r.recentRecords && Array.isArray(r.recentRecords)){recentConductividadCache=r.recentRecords;renderRecentConductividadTable(recentConductividadCache);}
+      else if(typeof loadRecentConductividad==='function')loadRecentConductividad();
+    }
     else showToast('❌ '+r.error,'error');
   }catch(err){showToast('❌ Error de conexión','error')}
   setLoading('btn-conduct-submit','spinner-conduct','btn-conduct-text',false);
@@ -302,8 +317,12 @@ if (formCobas) {
         addDatalistOption('list-cobas-obs', obsVal);
         showToast('✅ ' + r.message);
         e.target.reset();
-        document.getElementById('cobas-fecha').value = today();
-        if (typeof loadRecentCobas === 'function') loadRecentCobas();
+        if (r.recentRecords && Array.isArray(r.recentRecords)) {
+          recentCobasCache = r.recentRecords;
+          renderRecentCobasTable(recentCobasCache);
+        } else if (typeof loadRecentCobas === 'function') {
+          loadRecentCobas();
+        }
         
         // Reset checklist selections
         document.querySelectorAll('#form-cobas .checklist-item.selected').forEach(c => c.classList.remove('selected'));
@@ -2917,25 +2936,64 @@ if (document.readyState === 'loading') {
   initDuplicateCheckListeners();
 }
 
+// ── Recent Records Helpers & State ─────────────────────────────
+const inFlightRecent = {};
+
+function setRecentRefreshBtnLoading(btnId, loading) {
+  const btn = document.getElementById(btnId);
+  if (!btn) return;
+  if (loading) {
+    btn.disabled = true;
+    if (!btn.getAttribute('data-orig-text')) {
+      btn.setAttribute('data-orig-text', btn.innerHTML);
+    }
+    btn.innerHTML = '<span class="spinner visible" style="display:inline-block; vertical-align:middle; width:13px; height:13px; margin-right:4px;"></span> Actualizando...';
+  } else {
+    btn.disabled = false;
+    btn.innerHTML = btn.getAttribute('data-orig-text') || '🔄 Actualizar Lista';
+  }
+}
+
 // ── Recent Termo Records (Últimos 20 Registros) ───────────────
 let recentTermoCache = [];
 
 async function loadRecentTermo() {
+  if (inFlightRecent['termo']) return inFlightRecent['termo'];
   const tbody = document.getElementById('tbody-recent-termo');
   if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 16px; color: #94a3b8;">🔄 Cargando registros recientes...</td></tr>';
-  try {
-    const res = await apiGet({ action: 'getRecentTermo', limit: 20 });
-    if (res && res.success && Array.isArray(res.records)) {
-      recentTermoCache = res.records;
-      renderRecentTermoTable(recentTermoCache);
-    } else {
-      tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${res.error || 'Error al cargar registros.'}</td></tr>`;
-    }
-  } catch (err) {
-    console.error('Error cargando últimos 20 termo:', err);
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 16px; color: #ef4444;">❌ Error de conexión al cargar registros.</td></tr>';
+  const hasCache = Array.isArray(recentTermoCache) && recentTermoCache.length > 0;
+  if (!hasCache) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 16px; color: #94a3b8;">🔄 Cargando registros recientes...</td></tr>';
   }
+  setRecentRefreshBtnLoading('btn-refresh-recent-termo', true);
+
+  inFlightRecent['termo'] = (async () => {
+    try {
+      const res = await apiGet({ action: 'getRecentTermo', limit: 20 });
+      if (res && res.success && Array.isArray(res.records)) {
+        recentTermoCache = res.records;
+        renderRecentTermoTable(recentTermoCache);
+      } else {
+        if (hasCache) {
+          showToast('⚠️ No se pudo sincronizar en este momento. Mostrando registros previos.', 'warning');
+        } else {
+          tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${res?.error || 'Error al cargar registros.'}</td></tr>`;
+        }
+      }
+    } catch (err) {
+      console.error('Error cargando últimos 20 termo:', err);
+      if (hasCache) {
+        showToast('⚠️ No se pudo sincronizar en este momento. Mostrando registros previos.', 'warning');
+      } else {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 16px; color: #ef4444;">❌ Error de conexión al cargar registros.</td></tr>';
+      }
+    } finally {
+      setRecentRefreshBtnLoading('btn-refresh-recent-termo', false);
+      delete inFlightRecent['termo'];
+    }
+  })();
+
+  return inFlightRecent['termo'];
 }
 
 function renderRecentTermoTable(records) {
@@ -3096,7 +3154,12 @@ async function submitEditTermo(e) {
       closeModal({ target: document.getElementById('modal-overlay') });
       if (typeof clearRecordsMonthCache === 'function') clearRecordsMonthCache();
       if (typeof prefetchDashboard === 'function') prefetchDashboard();
-      loadRecentTermo();
+      if (res.recentRecords && Array.isArray(res.recentRecords)) {
+        recentTermoCache = res.recentRecords;
+        renderRecentTermoTable(recentTermoCache);
+      } else {
+        loadRecentTermo();
+      }
     } else {
       showToast('❌ ' + (res.error || 'Error al actualizar registro'), 'error');
     }
@@ -3128,7 +3191,12 @@ async function confirmDeleteTermo(index) {
       showToast('✅ ' + res.message);
       if (typeof clearRecordsMonthCache === 'function') clearRecordsMonthCache();
       if (typeof prefetchDashboard === 'function') prefetchDashboard();
-      loadRecentTermo();
+      if (res.recentRecords && Array.isArray(res.recentRecords)) {
+        recentTermoCache = res.recentRecords;
+        renderRecentTermoTable(recentTermoCache);
+      } else {
+        loadRecentTermo();
+      }
     } else {
       showToast('❌ ' + (res.error || 'Error al eliminar registro'), 'error');
     }
@@ -3271,21 +3339,42 @@ async function deleteDiaNoHabilHRTAdmin(fechaStr) {
 let recentCentrifugasCache = [];
 
 async function loadRecentCentrifugas() {
+  if (inFlightRecent['centrifugas']) return inFlightRecent['centrifugas'];
   const tbody = document.getElementById('tbody-recent-centrifugas');
   if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 16px; color: #94a3b8;">🔄 Cargando registros recientes...</td></tr>';
-  try {
-    const res = await apiGet({ action: 'getRecentCentrifugas', limit: 20 });
-    if (res && res.success && Array.isArray(res.records)) {
-      recentCentrifugasCache = res.records;
-      renderRecentCentrifugasTable(recentCentrifugasCache);
-    } else {
-      tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${res.error || 'Error al cargar registros.'}</td></tr>`;
-    }
-  } catch (err) {
-    console.error('Error cargando últimos centrifugas:', err);
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 16px; color: #ef4444;">❌ Error de conexión al cargar registros.</td></tr>';
+  const hasCache = Array.isArray(recentCentrifugasCache) && recentCentrifugasCache.length > 0;
+  if (!hasCache) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 16px; color: #94a3b8;">🔄 Cargando registros recientes...</td></tr>';
   }
+  setRecentRefreshBtnLoading('btn-refresh-recent-centrifugas', true);
+
+  inFlightRecent['centrifugas'] = (async () => {
+    try {
+      const res = await apiGet({ action: 'getRecentCentrifugas', limit: 20 });
+      if (res && res.success && Array.isArray(res.records)) {
+        recentCentrifugasCache = res.records;
+        renderRecentCentrifugasTable(recentCentrifugasCache);
+      } else {
+        if (hasCache) {
+          showToast('⚠️ No se pudo sincronizar en este momento. Mostrando registros previos.', 'warning');
+        } else {
+          tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${res?.error || 'Error al cargar registros.'}</td></tr>`;
+        }
+      }
+    } catch (err) {
+      console.error('Error cargando últimos centrifugas:', err);
+      if (hasCache) {
+        showToast('⚠️ No se pudo sincronizar en este momento. Mostrando registros previos.', 'warning');
+      } else {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 16px; color: #ef4444;">❌ Error de conexión al cargar registros.</td></tr>';
+      }
+    } finally {
+      setRecentRefreshBtnLoading('btn-refresh-recent-centrifugas', false);
+      delete inFlightRecent['centrifugas'];
+    }
+  })();
+
+  return inFlightRecent['centrifugas'];
 }
 
 function renderRecentCentrifugasTable(records) {
@@ -3364,7 +3453,12 @@ async function submitEditCentrifuga(e) {
       closeModal({ target: document.getElementById('modal-overlay') });
       if (typeof clearRecordsMonthCache === 'function') clearRecordsMonthCache();
       if (typeof prefetchDashboard === 'function') prefetchDashboard();
-      loadRecentCentrifugas();
+      if (res.recentRecords && Array.isArray(res.recentRecords)) {
+        recentCentrifugasCache = res.recentRecords;
+        renderRecentCentrifugasTable(recentCentrifugasCache);
+      } else {
+        loadRecentCentrifugas();
+      }
     } else {
       showToast('❌ ' + (res.error || 'Error al actualizar registro'), 'error');
     }
@@ -3392,7 +3486,12 @@ async function confirmDeleteCentrifuga(idx) {
       showToast('✅ ' + res.message);
       if (typeof clearRecordsMonthCache === 'function') clearRecordsMonthCache();
       if (typeof prefetchDashboard === 'function') prefetchDashboard();
-      loadRecentCentrifugas();
+      if (res.recentRecords && Array.isArray(res.recentRecords)) {
+        recentCentrifugasCache = res.recentRecords;
+        renderRecentCentrifugasTable(recentCentrifugasCache);
+      } else {
+        loadRecentCentrifugas();
+      }
     } else {
       showToast('❌ ' + (res.error || 'Error al eliminar registro'), 'error');
     }
@@ -3405,21 +3504,42 @@ async function confirmDeleteCentrifuga(idx) {
 let recentMesonesCache = [];
 
 async function loadRecentMesones() {
+  if (inFlightRecent['mesones']) return inFlightRecent['mesones'];
   const tbody = document.getElementById('tbody-recent-mesones');
   if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 16px; color: #94a3b8;">🔄 Cargando registros recientes...</td></tr>';
-  try {
-    const res = await apiGet({ action: 'getRecentMesones', limit: 20 });
-    if (res && res.success && Array.isArray(res.records)) {
-      recentMesonesCache = res.records;
-      renderRecentMesonesTable(recentMesonesCache);
-    } else {
-      tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${res.error || 'Error al cargar registros.'}</td></tr>`;
-    }
-  } catch (err) {
-    console.error('Error cargando últimos mesones:', err);
-    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 16px; color: #ef4444;">❌ Error de conexión al cargar registros.</td></tr>';
+  const hasCache = Array.isArray(recentMesonesCache) && recentMesonesCache.length > 0;
+  if (!hasCache) {
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 16px; color: #94a3b8;">🔄 Cargando registros recientes...</td></tr>';
   }
+  setRecentRefreshBtnLoading('btn-refresh-recent-mesones', true);
+
+  inFlightRecent['mesones'] = (async () => {
+    try {
+      const res = await apiGet({ action: 'getRecentMesones', limit: 20 });
+      if (res && res.success && Array.isArray(res.records)) {
+        recentMesonesCache = res.records;
+        renderRecentMesonesTable(recentMesonesCache);
+      } else {
+        if (hasCache) {
+          showToast('⚠️ No se pudo sincronizar en este momento. Mostrando registros previos.', 'warning');
+        } else {
+          tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${res?.error || 'Error al cargar registros.'}</td></tr>`;
+        }
+      }
+    } catch (err) {
+      console.error('Error cargando últimos mesones:', err);
+      if (hasCache) {
+        showToast('⚠️ No se pudo sincronizar en este momento. Mostrando registros previos.', 'warning');
+      } else {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 16px; color: #ef4444;">❌ Error de conexión al cargar registros.</td></tr>';
+      }
+    } finally {
+      setRecentRefreshBtnLoading('btn-refresh-recent-mesones', false);
+      delete inFlightRecent['mesones'];
+    }
+  })();
+
+  return inFlightRecent['mesones'];
 }
 
 function renderRecentMesonesTable(records) {
@@ -3494,7 +3614,12 @@ async function submitEditMeson(e) {
       closeModal({ target: document.getElementById('modal-overlay') });
       if (typeof clearRecordsMonthCache === 'function') clearRecordsMonthCache();
       if (typeof prefetchDashboard === 'function') prefetchDashboard();
-      loadRecentMesones();
+      if (res.recentRecords && Array.isArray(res.recentRecords)) {
+        recentMesonesCache = res.recentRecords;
+        renderRecentMesonesTable(recentMesonesCache);
+      } else {
+        loadRecentMesones();
+      }
     } else {
       showToast('❌ ' + (res.error || 'Error al actualizar registro'), 'error');
     }
@@ -3522,7 +3647,12 @@ async function confirmDeleteMeson(idx) {
       showToast('✅ ' + res.message);
       if (typeof clearRecordsMonthCache === 'function') clearRecordsMonthCache();
       if (typeof prefetchDashboard === 'function') prefetchDashboard();
-      loadRecentMesones();
+      if (res.recentRecords && Array.isArray(res.recentRecords)) {
+        recentMesonesCache = res.recentRecords;
+        renderRecentMesonesTable(recentMesonesCache);
+      } else {
+        loadRecentMesones();
+      }
     } else {
       showToast('❌ ' + (res.error || 'Error al eliminar registro'), 'error');
     }
@@ -3535,21 +3665,42 @@ async function confirmDeleteMeson(idx) {
 let recentRefriTempCache = [];
 
 async function loadRecentRefriTemp() {
+  if (inFlightRecent['refriTemp']) return inFlightRecent['refriTemp'];
   const tbody = document.getElementById('tbody-recent-refri-temp');
   if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 16px; color: #94a3b8;">🔄 Cargando registros recientes...</td></tr>';
-  try {
-    const res = await apiGet({ action: 'getRecentRefriTemp', limit: 20 });
-    if (res && res.success && Array.isArray(res.records)) {
-      recentRefriTempCache = res.records;
-      renderRecentRefriTempTable(recentRefriTempCache);
-    } else {
-      tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${res.error || 'Error al cargar registros.'}</td></tr>`;
-    }
-  } catch (err) {
-    console.error('Error cargando últimos refri temp:', err);
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 16px; color: #ef4444;">❌ Error de conexión al cargar registros.</td></tr>';
+  const hasCache = Array.isArray(recentRefriTempCache) && recentRefriTempCache.length > 0;
+  if (!hasCache) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 16px; color: #94a3b8;">🔄 Cargando registros recientes...</td></tr>';
   }
+  setRecentRefreshBtnLoading('btn-refresh-recent-refri-temp', true);
+
+  inFlightRecent['refriTemp'] = (async () => {
+    try {
+      const res = await apiGet({ action: 'getRecentRefriTemp', limit: 20 });
+      if (res && res.success && Array.isArray(res.records)) {
+        recentRefriTempCache = res.records;
+        renderRecentRefriTempTable(recentRefriTempCache);
+      } else {
+        if (hasCache) {
+          showToast('⚠️ No se pudo sincronizar en este momento. Mostrando registros previos.', 'warning');
+        } else {
+          tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${res?.error || 'Error al cargar registros.'}</td></tr>`;
+        }
+      }
+    } catch (err) {
+      console.error('Error cargando últimos refri temp:', err);
+      if (hasCache) {
+        showToast('⚠️ No se pudo sincronizar en este momento. Mostrando registros previos.', 'warning');
+      } else {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 16px; color: #ef4444;">❌ Error de conexión al cargar registros.</td></tr>';
+      }
+    } finally {
+      setRecentRefreshBtnLoading('btn-refresh-recent-refri-temp', false);
+      delete inFlightRecent['refriTemp'];
+    }
+  })();
+
+  return inFlightRecent['refriTemp'];
 }
 
 function renderRecentRefriTempTable(records) {
@@ -3647,7 +3798,12 @@ async function submitEditRefriTemp(e) {
       closeModal({ target: document.getElementById('modal-overlay') });
       if (typeof clearRecordsMonthCache === 'function') clearRecordsMonthCache();
       if (typeof prefetchDashboard === 'function') prefetchDashboard();
-      loadRecentRefriTemp();
+      if (res.recentRecords && Array.isArray(res.recentRecords)) {
+        recentRefriTempCache = res.recentRecords;
+        renderRecentRefriTempTable(recentRefriTempCache);
+      } else {
+        loadRecentRefriTemp();
+      }
     } else {
       showToast('❌ ' + (res.error || 'Error al actualizar registro'), 'error');
     }
@@ -3675,7 +3831,12 @@ async function confirmDeleteRefriTemp(idx) {
       showToast('✅ ' + res.message);
       if (typeof clearRecordsMonthCache === 'function') clearRecordsMonthCache();
       if (typeof prefetchDashboard === 'function') prefetchDashboard();
-      loadRecentRefriTemp();
+      if (res.recentRecords && Array.isArray(res.recentRecords)) {
+        recentRefriTempCache = res.recentRecords;
+        renderRecentRefriTempTable(recentRefriTempCache);
+      } else {
+        loadRecentRefriTemp();
+      }
     } else {
       showToast('❌ ' + (res.error || 'Error al eliminar registro'), 'error');
     }
@@ -3688,21 +3849,42 @@ async function confirmDeleteRefriTemp(idx) {
 let recentLimpRefriCache = [];
 
 async function loadRecentLimpRefri() {
+  if (inFlightRecent['limpRefri']) return inFlightRecent['limpRefri'];
   const tbody = document.getElementById('tbody-recent-limp-refri');
   if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 16px; color: #94a3b8;">🔄 Cargando registros recientes...</td></tr>';
-  try {
-    const res = await apiGet({ action: 'getRecentLimpRefri', limit: 20 });
-    if (res && res.success && Array.isArray(res.records)) {
-      recentLimpRefriCache = res.records;
-      renderRecentLimpRefriTable(recentLimpRefriCache);
-    } else {
-      tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${res.error || 'Error al cargar registros.'}</td></tr>`;
-    }
-  } catch (err) {
-    console.error('Error cargando últimos limpieza refri:', err);
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 16px; color: #ef4444;">❌ Error de conexión al cargar registros.</td></tr>';
+  const hasCache = Array.isArray(recentLimpRefriCache) && recentLimpRefriCache.length > 0;
+  if (!hasCache) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 16px; color: #94a3b8;">🔄 Cargando registros recientes...</td></tr>';
   }
+  setRecentRefreshBtnLoading('btn-refresh-recent-limp-refri', true);
+
+  inFlightRecent['limpRefri'] = (async () => {
+    try {
+      const res = await apiGet({ action: 'getRecentLimpRefri', limit: 20 });
+      if (res && res.success && Array.isArray(res.records)) {
+        recentLimpRefriCache = res.records;
+        renderRecentLimpRefriTable(recentLimpRefriCache);
+      } else {
+        if (hasCache) {
+          showToast('⚠️ No se pudo sincronizar en este momento. Mostrando registros previos.', 'warning');
+        } else {
+          tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${res?.error || 'Error al cargar registros.'}</td></tr>`;
+        }
+      }
+    } catch (err) {
+      console.error('Error cargando últimos limpieza refri:', err);
+      if (hasCache) {
+        showToast('⚠️ No se pudo sincronizar en este momento. Mostrando registros previos.', 'warning');
+      } else {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 16px; color: #ef4444;">❌ Error de conexión al cargar registros.</td></tr>';
+      }
+    } finally {
+      setRecentRefreshBtnLoading('btn-refresh-recent-limp-refri', false);
+      delete inFlightRecent['limpRefri'];
+    }
+  })();
+
+  return inFlightRecent['limpRefri'];
 }
 
 function renderRecentLimpRefriTable(records) {
@@ -3782,7 +3964,12 @@ async function submitEditLimpRefri(e) {
       closeModal({ target: document.getElementById('modal-overlay') });
       if (typeof clearRecordsMonthCache === 'function') clearRecordsMonthCache();
       if (typeof prefetchDashboard === 'function') prefetchDashboard();
-      loadRecentLimpRefri();
+      if (res.recentRecords && Array.isArray(res.recentRecords)) {
+        recentLimpRefriCache = res.recentRecords;
+        renderRecentLimpRefriTable(recentLimpRefriCache);
+      } else {
+        loadRecentLimpRefri();
+      }
     } else {
       showToast('❌ ' + (res.error || 'Error al actualizar registro'), 'error');
     }
@@ -3810,7 +3997,12 @@ async function confirmDeleteLimpRefri(idx) {
       showToast('✅ ' + res.message);
       if (typeof clearRecordsMonthCache === 'function') clearRecordsMonthCache();
       if (typeof prefetchDashboard === 'function') prefetchDashboard();
-      loadRecentLimpRefri();
+      if (res.recentRecords && Array.isArray(res.recentRecords)) {
+        recentLimpRefriCache = res.recentRecords;
+        renderRecentLimpRefriTable(recentLimpRefriCache);
+      } else {
+        loadRecentLimpRefri();
+      }
     } else {
       showToast('❌ ' + (res.error || 'Error al eliminar registro'), 'error');
     }
@@ -3823,21 +4015,42 @@ async function confirmDeleteLimpRefri(idx) {
 let recentConductividadCache = [];
 
 async function loadRecentConductividad() {
+  if (inFlightRecent['conductividad']) return inFlightRecent['conductividad'];
   const tbody = document.getElementById('tbody-recent-conductividad');
   if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 16px; color: #94a3b8;">🔄 Cargando registros recientes...</td></tr>';
-  try {
-    const res = await apiGet({ action: 'getRecentConductividad', limit: 20 });
-    if (res && res.success && Array.isArray(res.records)) {
-      recentConductividadCache = res.records;
-      renderRecentConductividadTable(recentConductividadCache);
-    } else {
-      tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${res.error || 'Error al cargar registros.'}</td></tr>`;
-    }
-  } catch (err) {
-    console.error('Error cargando últimos conductividad:', err);
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 16px; color: #ef4444;">❌ Error de conexión al cargar registros.</td></tr>';
+  const hasCache = Array.isArray(recentConductividadCache) && recentConductividadCache.length > 0;
+  if (!hasCache) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 16px; color: #94a3b8;">🔄 Cargando registros recientes...</td></tr>';
   }
+  setRecentRefreshBtnLoading('btn-refresh-recent-conductividad', true);
+
+  inFlightRecent['conductividad'] = (async () => {
+    try {
+      const res = await apiGet({ action: 'getRecentConductividad', limit: 20 });
+      if (res && res.success && Array.isArray(res.records)) {
+        recentConductividadCache = res.records;
+        renderRecentConductividadTable(recentConductividadCache);
+      } else {
+        if (hasCache) {
+          showToast('⚠️ No se pudo sincronizar en este momento. Mostrando registros previos.', 'warning');
+        } else {
+          tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${res?.error || 'Error al cargar registros.'}</td></tr>`;
+        }
+      }
+    } catch (err) {
+      console.error('Error cargando últimos conductividad:', err);
+      if (hasCache) {
+        showToast('⚠️ No se pudo sincronizar en este momento. Mostrando registros previos.', 'warning');
+      } else {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 16px; color: #ef4444;">❌ Error de conexión al cargar registros.</td></tr>';
+      }
+    } finally {
+      setRecentRefreshBtnLoading('btn-refresh-recent-conductividad', false);
+      delete inFlightRecent['conductividad'];
+    }
+  })();
+
+  return inFlightRecent['conductividad'];
 }
 
 function renderRecentConductividadTable(records) {
@@ -3924,7 +4137,12 @@ async function submitEditConductividad(e) {
       closeModal({ target: document.getElementById('modal-overlay') });
       if (typeof clearRecordsMonthCache === 'function') clearRecordsMonthCache();
       if (typeof prefetchDashboard === 'function') prefetchDashboard();
-      loadRecentConductividad();
+      if (res.recentRecords && Array.isArray(res.recentRecords)) {
+        recentConductividadCache = res.recentRecords;
+        renderRecentConductividadTable(recentConductividadCache);
+      } else {
+        loadRecentConductividad();
+      }
     } else {
       showToast('❌ ' + (res.error || 'Error al actualizar registro'), 'error');
     }
@@ -3952,7 +4170,12 @@ async function confirmDeleteConductividad(idx) {
       showToast('✅ ' + res.message);
       if (typeof clearRecordsMonthCache === 'function') clearRecordsMonthCache();
       if (typeof prefetchDashboard === 'function') prefetchDashboard();
-      loadRecentConductividad();
+      if (res.recentRecords && Array.isArray(res.recentRecords)) {
+        recentConductividadCache = res.recentRecords;
+        renderRecentConductividadTable(recentConductividadCache);
+      } else {
+        loadRecentConductividad();
+      }
     } else {
       showToast('❌ ' + (res.error || 'Error al eliminar registro'), 'error');
     }
@@ -3965,21 +4188,42 @@ async function confirmDeleteConductividad(idx) {
 let recentCobasCache = [];
 
 async function loadRecentCobas() {
+  if (inFlightRecent['cobas']) return inFlightRecent['cobas'];
   const tbody = document.getElementById('tbody-recent-cobas');
   if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 16px; color: #94a3b8;">🔄 Cargando registros recientes...</td></tr>';
-  try {
-    const res = await apiGet({ action: 'getRecentCobas', limit: 20 });
-    if (res && res.success && Array.isArray(res.records)) {
-      recentCobasCache = res.records;
-      renderRecentCobasTable(recentCobasCache);
-    } else {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${res.error || 'Error al cargar registros.'}</td></tr>`;
-    }
-  } catch (err) {
-    console.error('Error cargando últimos cobas:', err);
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 16px; color: #ef4444;">❌ Error de conexión al cargar registros.</td></tr>';
+  const hasCache = Array.isArray(recentCobasCache) && recentCobasCache.length > 0;
+  if (!hasCache) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 16px; color: #94a3b8;">🔄 Cargando registros recientes...</td></tr>';
   }
+  setRecentRefreshBtnLoading('btn-refresh-recent-cobas', true);
+
+  inFlightRecent['cobas'] = (async () => {
+    try {
+      const res = await apiGet({ action: 'getRecentCobas', limit: 20 });
+      if (res && res.success && Array.isArray(res.records)) {
+        recentCobasCache = res.records;
+        renderRecentCobasTable(recentCobasCache);
+      } else {
+        if (hasCache) {
+          showToast('⚠️ No se pudo sincronizar en este momento. Mostrando registros previos.', 'warning');
+        } else {
+          tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 16px; color: #ef4444;">❌ ${res?.error || 'Error al cargar registros.'}</td></tr>`;
+        }
+      }
+    } catch (err) {
+      console.error('Error cargando últimos cobas:', err);
+      if (hasCache) {
+        showToast('⚠️ No se pudo sincronizar en este momento. Mostrando registros previos.', 'warning');
+      } else {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 16px; color: #ef4444;">❌ Error de conexión al cargar registros.</td></tr>';
+      }
+    } finally {
+      setRecentRefreshBtnLoading('btn-refresh-recent-cobas', false);
+      delete inFlightRecent['cobas'];
+    }
+  })();
+
+  return inFlightRecent['cobas'];
 }
 
 function renderRecentCobasTable(records) {
@@ -4059,7 +4303,12 @@ async function submitEditCobas(e) {
       closeModal({ target: document.getElementById('modal-overlay') });
       if (typeof clearRecordsMonthCache === 'function') clearRecordsMonthCache();
       if (typeof prefetchDashboard === 'function') prefetchDashboard();
-      loadRecentCobas();
+      if (res.recentRecords && Array.isArray(res.recentRecords)) {
+        recentCobasCache = res.recentRecords;
+        renderRecentCobasTable(recentCobasCache);
+      } else {
+        loadRecentCobas();
+      }
     } else {
       showToast('❌ ' + (res.error || 'Error al actualizar registro'), 'error');
     }
@@ -4087,7 +4336,12 @@ async function confirmDeleteCobas(idx) {
       showToast('✅ ' + res.message);
       if (typeof clearRecordsMonthCache === 'function') clearRecordsMonthCache();
       if (typeof prefetchDashboard === 'function') prefetchDashboard();
-      loadRecentCobas();
+      if (res.recentRecords && Array.isArray(res.recentRecords)) {
+        recentCobasCache = res.recentRecords;
+        renderRecentCobasTable(recentCobasCache);
+      } else {
+        loadRecentCobas();
+      }
     } else {
       showToast('❌ ' + (res.error || 'Error al eliminar registro'), 'error');
     }

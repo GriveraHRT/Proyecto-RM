@@ -144,7 +144,8 @@ const COBAS_PERIODIC_TASKS = {
 // Caching settings
 const CACHE_TTL_MAESTROS = 1800; // 30 minutes
 const CACHE_TTL_REGISTROS = 21600; // 6 hours
-const CACHE_TTL_RECENT = 300; // 5 minutes
+const CACHE_TTL_RECENT = 21600; // 6 hours (synced with edits/saves)
+const CACHE_CHUNK_SIZE = 90000; // Safe threshold for CacheService 100KB limit
 
 // Execution-level memoization to avoid reopening sheets in the same request
 let _execSpreadsheet = null;
@@ -157,10 +158,32 @@ function getCacheKey(prefix, ...parts) {
 
 function getCachedJson(key) {
   try {
-    const val = CacheService.getScriptCache().get(key);
-    if (val) {
-      return JSON.parse(val);
+    const cache = CacheService.getScriptCache();
+    let val = cache.get(key);
+    if (!val) {
+      val = cache.get(key + '_meta');
     }
+    if (!val) return null;
+
+    if (val.indexOf('{"__chunked__":true') === 0) {
+      const meta = JSON.parse(val);
+      const chunkKeys = [];
+      for (let i = 0; i < meta.chunks; i++) {
+        chunkKeys.push(key + '_part_' + i);
+      }
+      const parts = cache.getAll(chunkKeys);
+      let fullStr = '';
+      for (let i = 0; i < meta.chunks; i++) {
+        const part = parts[key + '_part_' + i];
+        if (part === undefined || part === null) {
+          Logger.log('Chunk faltante para ' + key + ' en parte ' + i);
+          return null;
+        }
+        fullStr += part;
+      }
+      return JSON.parse(fullStr);
+    }
+    return JSON.parse(val);
   } catch (e) {
     Logger.log('Error leyendo caché para ' + key + ': ' + e.toString());
   }
@@ -170,10 +193,23 @@ function getCachedJson(key) {
 function setCachedJson(key, data, ttl) {
   try {
     const str = JSON.stringify(data);
-    if (str.length < 100000) { // Limit defined by CacheService (100KB)
-      CacheService.getScriptCache().put(key, str, ttl);
+    const effectiveTtl = Math.min(ttl || CACHE_TTL_REGISTROS, 21600);
+    const cache = CacheService.getScriptCache();
+
+    if (str.length <= CACHE_CHUNK_SIZE) {
+      cache.put(key, str, effectiveTtl);
+      try { cache.remove(key + '_meta'); } catch(e) {}
     } else {
-      Logger.log('Caché omitida para ' + key + ' por exceder límite de tamaño (' + str.length + ' bytes)');
+      const numChunks = Math.ceil(str.length / CACHE_CHUNK_SIZE);
+      const chunkMap = {};
+      for (let i = 0; i < numChunks; i++) {
+        chunkMap[key + '_part_' + i] = str.substring(i * CACHE_CHUNK_SIZE, (i + 1) * CACHE_CHUNK_SIZE);
+      }
+      const metaPayload = JSON.stringify({ __chunked__: true, chunks: numChunks, size: str.length });
+      chunkMap[key] = metaPayload;
+      chunkMap[key + '_meta'] = metaPayload;
+      cache.putAll(chunkMap, effectiveTtl);
+      Logger.log('Caché fragmentada para ' + key + ' en ' + numChunks + ' partes (' + str.length + ' bytes)');
     }
   } catch (e) {
     Logger.log('Error escribiendo caché para ' + key + ': ' + e.toString());
@@ -182,7 +218,18 @@ function setCachedJson(key, data, ttl) {
 
 function clearCacheKeys(keys) {
   try {
-    CacheService.getScriptCache().removeAll(keys);
+    const allKeys = [];
+    keys.forEach(k => {
+      allKeys.push(k);
+      allKeys.push(k + '_meta');
+      for (let i = 0; i < 15; i++) {
+        allKeys.push(k + '_part_' + i);
+      }
+    });
+    const cache = CacheService.getScriptCache();
+    for (let i = 0; i < allKeys.length; i += 50) {
+      cache.removeAll(allKeys.slice(i, i + 50));
+    }
   } catch (e) {
     Logger.log('Error limpiando claves de caché: ' + e.toString());
   }
@@ -194,6 +241,16 @@ function clearSheetCache(keyPrefix, mes, anio) {
     getCacheKey('recent', keyPrefix)
   ];
   clearCacheKeys(keys);
+}
+
+function _getRecentRecordsSafely(getRecentFn, limit) {
+  try {
+    const res = getRecentFn(limit || 20);
+    return (res && Array.isArray(res.records)) ? res.records : [];
+  } catch (e) {
+    Logger.log('Error obteniendo registros recientes: ' + e.toString());
+    return [];
+  }
 }
 
 function clearAllCaches() {
@@ -244,9 +301,8 @@ function getSpreadsheet() {
     _execSpreadsheet = SpreadsheetApp.openById(id);
     return _execSpreadsheet;
   } catch (e) {
-    Logger.log('Error abriendo spreadsheet con ID (' + id + '), utilizando ID por defecto: ' + e.toString());
-    _execSpreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID_DEFAULT);
-    return _execSpreadsheet;
+    Logger.log('Error abriendo spreadsheet con ID (' + id + '): ' + e.toString());
+    throw e;
   }
 }
 
@@ -1132,7 +1188,11 @@ function saveTermo(data) {
 
   // Las alertas de temperatura/humedad fuera de rango ahora se envían consolidadas a las 08:30 mediante triggerAlertaConsolidadaTermo.
 
-  return { success: true, message: 'Registro de Temperatura/Humedad guardado.' };
+  return {
+    success: true,
+    message: 'Registro de Temperatura/Humedad guardado.',
+    recentRecords: _getRecentRecordsSafely(getRecentTermo, 20)
+  };
 }
 
 function getRecentTermo(limit) {
@@ -1425,7 +1485,11 @@ function updateCentrifuga(data) {
     data.observaciones || ''
   ]]);
   clearSheetCache('centrifugas', f.mes, f.anio);
-  return { success: true, message: 'Registro de Centrífuga actualizado.' };
+  return {
+    success: true,
+    message: 'Registro de Centrífuga actualizado.',
+    recentRecords: _getRecentRecordsSafely(getRecentCentrifugas, 20)
+  };
 }
 
 function deleteCentrifuga(data) {
@@ -1438,7 +1502,12 @@ function deleteCentrifuga(data) {
   const anio = data.anio || sheet.getRange(targetRow, 4).getValue();
   sheet.deleteRow(targetRow);
   if (mes && anio) clearSheetCache('centrifugas', mes, anio);
-  return { success: true, message: 'Registro de Centrífuga eliminado.' };
+  else clearCacheKeys([getCacheKey('recent', 'centrifugas')]);
+  return {
+    success: true,
+    message: 'Registro de Centrífuga eliminado.',
+    recentRecords: _getRecentRecordsSafely(getRecentCentrifugas, 20)
+  };
 }
 
 // ── Update / Delete — Mesones ──────────────────────────────────
@@ -1460,7 +1529,11 @@ function updateMeson(data) {
     data.observaciones || ''
   ]]);
   clearSheetCache('mesones', f.mes, f.anio);
-  return { success: true, message: 'Registro de Mesón actualizado.' };
+  return {
+    success: true,
+    message: 'Registro de Mesón actualizado.',
+    recentRecords: _getRecentRecordsSafely(getRecentMesones, 20)
+  };
 }
 
 function deleteMeson(data) {
@@ -1473,7 +1546,12 @@ function deleteMeson(data) {
   const anio = data.anio || sheet.getRange(targetRow, 4).getValue();
   sheet.deleteRow(targetRow);
   if (mes && anio) clearSheetCache('mesones', mes, anio);
-  return { success: true, message: 'Registro de Mesón eliminado.' };
+  else clearCacheKeys([getCacheKey('recent', 'mesones')]);
+  return {
+    success: true,
+    message: 'Registro de Mesón eliminado.',
+    recentRecords: _getRecentRecordsSafely(getRecentMesones, 20)
+  };
 }
 
 // ── Update / Delete — Temp. Refrigeradores ─────────────────────
@@ -1500,7 +1578,11 @@ function updateRefriTemp(data) {
     data.observaciones || ''
   ]]);
   clearSheetCache('refriTemp', f.mes, f.anio);
-  return { success: true, message: 'Registro de Temp. Refrigerador actualizado.' };
+  return {
+    success: true,
+    message: 'Registro de Temp. Refrigerador actualizado.',
+    recentRecords: _getRecentRecordsSafely(getRecentRefriTemp, 20)
+  };
 }
 
 function deleteRefriTemp(data) {
@@ -1513,7 +1595,12 @@ function deleteRefriTemp(data) {
   const anio = data.anio || sheet.getRange(targetRow, 4).getValue();
   sheet.deleteRow(targetRow);
   if (mes && anio) clearSheetCache('refriTemp', mes, anio);
-  return { success: true, message: 'Registro de Temp. Refrigerador eliminado.' };
+  else clearCacheKeys([getCacheKey('recent', 'refriTemp')]);
+  return {
+    success: true,
+    message: 'Registro de Temp. Refrigerador eliminado.',
+    recentRecords: _getRecentRecordsSafely(getRecentRefriTemp, 20)
+  };
 }
 
 // ── Update / Delete — Limpieza Refrigeradores ──────────────────
@@ -1536,7 +1623,11 @@ function updateLimpRefri(data) {
     data.observaciones || ''
   ]]);
   clearSheetCache('limpiezaRefri', f.mes, f.anio);
-  return { success: true, message: 'Registro de Limpieza Refrigerador actualizado.' };
+  return {
+    success: true,
+    message: 'Registro de Limpieza Refrigerador actualizado.',
+    recentRecords: _getRecentRecordsSafely(getRecentLimpRefri, 20)
+  };
 }
 
 function deleteLimpRefri(data) {
@@ -1549,7 +1640,12 @@ function deleteLimpRefri(data) {
   const anio = data.anio || sheet.getRange(targetRow, 4).getValue();
   sheet.deleteRow(targetRow);
   if (mes && anio) clearSheetCache('limpiezaRefri', mes, anio);
-  return { success: true, message: 'Registro de Limpieza Refrigerador eliminado.' };
+  else clearCacheKeys([getCacheKey('recent', 'limpiezaRefri')]);
+  return {
+    success: true,
+    message: 'Registro de Limpieza Refrigerador eliminado.',
+    recentRecords: _getRecentRecordsSafely(getRecentLimpRefri, 20)
+  };
 }
 
 // ── Update / Delete — Conductividad ────────────────────────────
@@ -1573,7 +1669,11 @@ function updateConductividad(data) {
     data.observaciones || ''
   ]]);
   clearSheetCache('conductividad', f.mes, f.anio);
-  return { success: true, message: 'Registro de Conductividad actualizado.' };
+  return {
+    success: true,
+    message: 'Registro de Conductividad actualizado.',
+    recentRecords: _getRecentRecordsSafely(getRecentConductividad, 20)
+  };
 }
 
 function deleteConductividad(data) {
@@ -1586,7 +1686,12 @@ function deleteConductividad(data) {
   const anio = data.anio || sheet.getRange(targetRow, 4).getValue();
   sheet.deleteRow(targetRow);
   if (mes && anio) clearSheetCache('conductividad', mes, anio);
-  return { success: true, message: 'Registro de Conductividad eliminado.' };
+  else clearCacheKeys([getCacheKey('recent', 'conductividad')]);
+  return {
+    success: true,
+    message: 'Registro de Conductividad eliminado.',
+    recentRecords: _getRecentRecordsSafely(getRecentConductividad, 20)
+  };
 }
 
 // ── Update / Delete — Cobas ──────────────────────────────────
@@ -1610,7 +1715,11 @@ function updateCobas(data) {
     data.observaciones || ''
   ]]);
   clearSheetCache('cobas', f.mes, f.anio);
-  return { success: true, message: 'Registro de Cobas actualizado.' };
+  return {
+    success: true,
+    message: 'Registro de Cobas actualizado.',
+    recentRecords: _getRecentRecordsSafely(getRecentCobas, 20)
+  };
 }
 
 function deleteCobas(data) {
@@ -1623,7 +1732,12 @@ function deleteCobas(data) {
   const anio = data.anio || sheet.getRange(targetRow, 4).getValue();
   sheet.deleteRow(targetRow);
   if (mes && anio) clearSheetCache('cobas', mes, anio);
-  return { success: true, message: 'Registro de Cobas eliminado.' };
+  else clearCacheKeys([getCacheKey('recent', 'cobas')]);
+  return {
+    success: true,
+    message: 'Registro de Cobas eliminado.',
+    recentRecords: _getRecentRecordsSafely(getRecentCobas, 20)
+  };
 }
 
 function findTermoRowIndex(rowIndex, fechaRegistro) {
@@ -1693,7 +1807,11 @@ function updateTermo(data) {
     clearSheetCache('termo', oldMes, oldAnio);
   }
 
-  return { success: true, message: 'Registro de Temperatura/Humedad actualizado.' };
+  return {
+    success: true,
+    message: 'Registro de Temperatura/Humedad actualizado.',
+    recentRecords: _getRecentRecordsSafely(getRecentTermo, 20)
+  };
 }
 
 function deleteTermo(data) {
@@ -1714,9 +1832,15 @@ function deleteTermo(data) {
 
   if (mes && anio) {
     clearSheetCache('termo', mes, anio);
+  } else {
+    clearCacheKeys([getCacheKey('recent', 'termo')]);
   }
 
-  return { success: true, message: 'Registro de Temperatura/Humedad eliminado.' };
+  return {
+    success: true,
+    message: 'Registro de Temperatura/Humedad eliminado.',
+    recentRecords: _getRecentRecordsSafely(getRecentTermo, 20)
+  };
 }
 
 // Centrifugas: Fecha | Día | Mes | Año | Centrifuga | Responsable | Tipo_Mantencion | Observaciones | Fecha de registro | Revisado_Por | Fecha_Revisión
@@ -1749,7 +1873,11 @@ function saveCentrifuga(data) {
   insertRowsAtTopBatch(sheet, rows);
 
   clearSheetCache('centrifugas', f.mes, f.anio);
-  return { success: true, message: centrifugas.length + ' registro(s) de Centrífuga guardado(s).' };
+  return {
+    success: true,
+    message: centrifugas.length + ' registro(s) de Centrífuga guardado(s).',
+    recentRecords: _getRecentRecordsSafely(getRecentCentrifugas, 20)
+  };
 }
 
 // Mesones: Fecha | Día | Mes | Año | Sala | Responsable | Observaciones | Fecha de registro | Revisado_Por | Fecha_Revisión
@@ -1781,7 +1909,11 @@ function saveMesones(data) {
   insertRowsAtTopBatch(sheet, rows);
 
   clearSheetCache('mesones', f.mes, f.anio);
-  return { success: true, message: salas.length + ' registro(s) de Mesones guardado(s).' };
+  return {
+    success: true,
+    message: salas.length + ' registro(s) de Mesones guardado(s).',
+    recentRecords: _getRecentRecordsSafely(getRecentMesones, 20)
+  };
 }
 
 // RefriTemp: Responsable | Temperatura (°C) | Fecha | Día | Mes | Año | Turno | Equipo | Tipo | Acción Correctiva | Observaciones | Fecha de registro | Revisado_Por | Fecha_Revisión
@@ -1839,7 +1971,11 @@ function saveRefriTemp(data) {
     }
   }
 
-  return { success: true, message: 'Registro de Temperatura de ' + (tipo || 'Equipo') + ' guardado.' };
+  return {
+    success: true,
+    message: 'Registro de Temperatura de ' + (tipo || 'Equipo') + ' guardado.',
+    recentRecords: _getRecentRecordsSafely(getRecentRefriTemp, 20)
+  };
 }
 
 // LimpiezaRefri: Fecha | Día | Mes | Año | Tipo Mantención | Equipos | Responsable | Observaciones | Fecha de registro | Revisado_Por | Fecha_Revisión
@@ -1872,7 +2008,11 @@ function saveLimpiezaRefri(data) {
   insertRowsAtTopBatch(sheet, rows);
 
   clearSheetCache('limpiezaRefri', f.mes, f.anio);
-  return { success: true, message: equipos.length + ' registro(s) de Limpieza Refrigeradores guardado(s).' };
+  return {
+    success: true,
+    message: equipos.length + ' registro(s) de Limpieza Refrigeradores guardado(s).',
+    recentRecords: _getRecentRecordsSafely(getRecentLimpRefri, 20)
+  };
 }
 
 // Conductividad: Responsable | Conductividad (µS/cm) | Fecha | Día | Mes | Año | Turno | Observaciones | Fecha de registro | Revisado_Por | Fecha_Revisión
@@ -1919,7 +2059,11 @@ function saveConductividad(data) {
     }
   }
 
-  return { success: true, message: 'Registro de Conductividad guardado.' };
+  return {
+    success: true,
+    message: 'Registro de Conductividad guardado.',
+    recentRecords: _getRecentRecordsSafely(getRecentConductividad, 20)
+  };
 }
 
 // Cobas: Fecha | Día | Mes | Año | Equipo | Responsable | Frecuencia | Actividad | Observaciones | Fecha de registro | Revisado_Por | Fecha_Revisión
@@ -1949,7 +2093,11 @@ function saveCobas(data) {
   });
   
   clearSheetCache('cobas', f.mes, f.anio);
-  return { success: true, message: data.actividades.length + ' tarea(s) de Cobas guardada(s).' };
+  return {
+    success: true,
+    message: data.actividades.length + ' tarea(s) de Cobas guardada(s).',
+    recentRecords: _getRecentRecordsSafely(getRecentCobas, 20)
+  };
 }
 
 // ── Dashboard / Consultas ─────────────────────────────────────
