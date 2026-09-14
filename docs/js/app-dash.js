@@ -403,6 +403,7 @@ async function loadDashboard(forceReload){
     applyDashData(reg);
   }catch(err){
     console.warn('Error cargando dashboard, cargando mock local...', err);
+    if(typeof showToast === 'function') showToast('⚠️ La red demoró en responder. Presione 🔄 para reintentar.', 'warning');
     const mockReg={termo:[],centrifugas:[],mesones:[],refriTemp:[],limpiezaRefri:[],conductividad:[],cobas:[]};
     state.dashData=mockReg;
     applyDashData(mockReg);
@@ -2125,11 +2126,9 @@ async function init(){
   try { initCobasChecklist(); } catch(e){}
   try { initDashSelectors(); } catch(e){}
 
-  // Load maestros and dashboard in parallel to improve load times
-  const maestrosPromise = loadMaestros();
-  const dashboardPromise = loadDashboard();
-  
-  await Promise.all([maestrosPromise, dashboardPromise]);
+  // Load maestros first, then dashboard to avoid sheet contention on initial boot
+  await loadMaestros();
+  await loadDashboard();
   enforceMaxDateInputs();
   checkUrlParams();
   if (typeof loadRecentTermo === 'function') loadRecentTermo();

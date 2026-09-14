@@ -167,7 +167,7 @@ function formatDDMMYYYY(val) {
 }
 function showToast(m,t='success'){const el=document.getElementById('toast');if(el){el.textContent=m;el.className=`show toast-${t}`;setTimeout(()=>{el.className=''},3200)}}
 function setLoading(b,s,t,l){const btn=document.getElementById(b);if(btn)btn.disabled=l;const spin=document.getElementById(s);if(spin)spin.classList.toggle('visible',l);const txt=document.getElementById(t);if(txt)txt.style.display=l?'none':''}
-async function fetchWithTimeout(url, options = {}, timeout = 25000, maxRetries = 1) {
+async function fetchWithTimeout(url, options = {}, timeout = 45000, maxRetries = 1) {
   let lastError;
   const isPost = (options.method || 'GET').toUpperCase() === 'POST';
   const retries = isPost ? 0 : maxRetries;
