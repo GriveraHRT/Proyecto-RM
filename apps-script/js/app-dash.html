@@ -668,7 +668,6 @@ function renderTables(reg){
   const c=document.getElementById('dash-tables');
   if(!c||!reg) return;
   let html='';
-  if(isModuloActivo('termo'))html+=renderTableCard('🌡️ Temp. Ambiental',reg.termo||[],['Día','Turno','Área','Temp°','Hum%','Resp','Acción','Obs','Obs. Rev.'],r=>[r.dia,r.turno,r.area,r.temperatura,r.humedad,getInicialesResponsable(r.responsable),r.accion_correctiva||'',r.observaciones,r.obs_revision||'']);
   if(isModuloActivo('centrifugas'))html+=renderTableCard('⚙️ Centrífugas',reg.centrifugas||[],['Día','Centrífuga','Resp','Tipo','Obs','Obs. Rev.'],r=>[r.dia,r.centrifuga,getInicialesResponsable(r.responsable),r.tipo_mantencion,r.observaciones,r.obs_revision||'']);
   if(isModuloActivo('mesones'))html+=renderTableCard('🧽 Mesones',reg.mesones||[],['Día','Sala','Resp','Obs','Obs. Rev.'],r=>[r.dia,r.sala,getInicialesResponsable(r.responsable),r.observaciones,r.obs_revision||'']);
   if(isModuloActivo('refri-temp'))html+=renderTableCard('🧊 Temp. Refrigeradores',reg.refriTemp||[],['Día','Turno','Equipo','Temp°','Resp','Obs','Obs. Rev.'],r=>[r.dia,r.turno,r.equipo,r.temperatura,getInicialesResponsable(r.responsable),r.observaciones,r.obs_revision||'']);

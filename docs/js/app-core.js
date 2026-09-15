@@ -214,10 +214,53 @@ function toggleTheme(){const d=document.documentElement,dark=d.getAttribute('dat
 
 // Modulos Activos Control
 function isModuloActivo(k){if(!state.modulosActivos)return true;return state.modulosActivos[k]!==false}
-function applyModulosVisibilidad(){if(!state.modulosActivos)return;try{localStorage.setItem('modulosActivos',JSON.stringify(state.modulosActivos))}catch(e){};document.querySelectorAll('.nav-item[data-section]').forEach(el=>{const s=el.getAttribute('data-section');if(s==='dashboard'||s==='admin'){el.style.display=''}else{el.style.display=isModuloActivo(s)?'':'none'}});const statMap={'termo':'stat-termo','centrifugas':'stat-cent','mesones':'stat-limp','refri-temp':'stat-refri','limp-refri':'stat-limp-refri','conductividad':'stat-conduct','cobas':'stat-cobas'};Object.entries(statMap).forEach(([k,id])=>{const el=document.getElementById(id);if(el){const c=el.closest('.stat-card');if(c)c.style.display=isModuloActivo(k)?'':'none'}});document.querySelectorAll('.stats-row').forEach(row=>{const vis=Array.from(row.querySelectorAll('.stat-card')).filter(c=>c.style.display!=='none');row.style.display=vis.length>0?'':'none'});if(state.dashData&&typeof renderDashContent==='function'){renderDashContent(state.dashData)}if(state.dashData&&typeof renderTables==='function'){renderTables(state.dashData)}}
+function applyModulosVisibilidad(){
+  if(!state.modulosActivos)return;
+  try{localStorage.setItem('modulosActivos',JSON.stringify(state.modulosActivos))}catch(e){};
+  document.querySelectorAll('.nav-item[data-section]').forEach(function(el){
+    var s=el.getAttribute('data-section');
+    if(s==='dashboard'||s==='admin'){
+      el.style.removeProperty('display');
+    }else if(isModuloActivo(s)){
+      el.style.removeProperty('display');
+    }else{
+      el.style.setProperty('display','none','important');
+    }
+  });
+  var statMap={'termo':'stat-termo','centrifugas':'stat-cent','mesones':'stat-limp','refri-temp':'stat-refri','limp-refri':'stat-limp-refri','conductividad':'stat-conduct','cobas':'stat-cobas'};
+  Object.keys(statMap).forEach(function(k){
+    var id=statMap[k];
+    var el=document.getElementById(id);
+    if(el){
+      var c=el.closest('.stat-card');
+      if(c)c.style.display=isModuloActivo(k)?'':'none';
+    }
+  });
+  document.querySelectorAll('.stats-row').forEach(function(row){
+    var vis=Array.from(row.querySelectorAll('.stat-card')).filter(function(c){return c.style.display!=='none';});
+    row.style.display=vis.length>0?'':'none';
+  });
+  document.querySelectorAll('.drawer-category').forEach(function(cat){
+    var vis=Array.from(cat.querySelectorAll('.drawer-item')).filter(function(c){return c.style.display!=='none';});
+    cat.style.display=vis.length>0?'':'none';
+  });
+  var activeSec=document.querySelector('.section.active');
+  if(activeSec){
+    var cur=activeSec.id.replace('section-','');
+    if(cur!=='dashboard'&&cur!=='admin'&&!isModuloActivo(cur)){
+      navigateTo('dashboard');
+    }
+  }
+  if(state.dashData&&typeof renderDashContent==='function'){renderDashContent(state.dashData)}
+  if(state.dashData&&typeof renderTables==='function'){renderTables(state.dashData)}
+}
 
 // Navigation
 function navigateTo(s){
+  if(s!=='dashboard'&&s!=='admin'&&!isModuloActivo(s)){
+    navigateTo('dashboard');
+    return;
+  }
   document.querySelectorAll('.section').forEach(el=>el.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const sec=document.getElementById('section-'+s);
