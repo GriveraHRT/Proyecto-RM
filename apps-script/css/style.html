@@ -161,6 +161,10 @@ body {
   display: flex;
   align-items: center;
   gap: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 [data-theme="dark"] .header-hospital-pill {
   color: #94A3B8;
@@ -299,6 +303,11 @@ body {
   background: #0284c7;
   color: #ffffff;
 }
+@media (max-width: 767px) {
+  .header-models-badge {
+    display: none !important;
+  }
+}
 @media (max-width: 600px) {
   .banner-text span.banner-desc-full {
     display: none;
@@ -366,7 +375,39 @@ body {
 }
 
 /* ── Header Responsive (Tablet & Desktop >= 600px) ────────── */
-@media (min-width: 600px) {
+@media (min-width: 600px) and (max-width: 767px) {
+  #app-header {
+    padding: 0 16px;
+  }
+  .header-logo {
+    gap: 10px;
+  }
+  .logo-img-wrapper {
+    height: 40px;
+  }
+  .header-logo-img {
+    height: 38px;
+    max-width: 140px;
+  }
+  .header-title-group {
+    padding-left: 10px;
+    height: auto;
+    min-height: 36px;
+    justify-content: center;
+  }
+  .logo-text {
+    font-size: 13.5px;
+    font-weight: 700;
+    line-height: 1.25;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: visible;
+    white-space: normal;
+    padding-bottom: 2px;
+  }
+}
+@media (min-width: 768px) {
   #app-header {
     padding: 0 20px;
   }
@@ -387,7 +428,7 @@ body {
     justify-content: center;
   }
   .logo-text {
-    font-size: 19px;
+    font-size: clamp(15px, 1.7vw, 19px);
     font-weight: 800;
     line-height: 1.25;
     display: block;
@@ -395,6 +436,8 @@ body {
     overflow: visible;
     padding-bottom: 2px;
   }
+}
+@media (min-width: 600px) {
   .header-right {
     gap: 12px;
     margin-left: 10px;
