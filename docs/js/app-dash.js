@@ -368,20 +368,45 @@ function getDiasHasta(m,a){const h=new Date();const d=new Date(a,m,0).getDate();
 
 async function loadDashboard(forceReload){
   if(forceReload){ state.dashMaestros = null; state.maestrosPromise = null; }
-  state.dashMes=parseInt(document.getElementById('dash-mes').value);
-  state.dashAnio=parseInt(document.getElementById('dash-anio').value);
-  const cacheKey=state.dashMes+'-'+state.dashAnio;
-  // Use cache if valid (<5min) and same month, unless forced
-  if(!forceReload&&state.dashCache&&state.dashCache.key===cacheKey&&getCacheAge()<5){
-    const reg=state.dashCache.data;state.dashData=reg;
-    if(!state.dashMaestros)state.dashMaestros={areas:state.areas,centrifugas:state.centrifugas,salas:state.salas,refrigeradores:state.refrigeradores,refriLimpieza:state.refriLimpieza};
-    applyDashData(reg);updateCacheIndicator();return;
+  const elMes = document.getElementById('dash-mes');
+  const elAnio = document.getElementById('dash-anio');
+  state.dashMes = elMes ? parseInt(elMes.value, 10) : (new Date().getMonth() + 1);
+  state.dashAnio = elAnio ? parseInt(elAnio.value, 10) : new Date().getFullYear();
+  const cacheKey = state.dashMes + '-' + state.dashAnio;
+
+  // Stale-While-Revalidate: Hidratación instantánea desde sessionStorage
+  if(!forceReload && !state.dashCache){
+    try{
+      const sessStr = sessionStorage.getItem('dashCache_' + cacheKey);
+      if(sessStr){
+        const parsed = JSON.parse(sessStr);
+        if(parsed && parsed.data){
+          state.dashCache = parsed;
+          state.dashData = parsed.data;
+          applyDashData(parsed.data);
+        }
+      }
+    }catch(e){}
   }
-  const dl=document.getElementById('dash-loading');if(dl)dl.style.display='block';
-  const dt=document.getElementById('dash-tables');if(dt)dt.innerHTML='';
-  const dac=document.getElementById('dash-alerts-container');if(dac)dac.innerHTML='';
-  const ddv=document.getElementById('dash-daily-view');if(ddv)ddv.innerHTML='';
-  const dmv=document.getElementById('dash-monthly-view');if(dmv)dmv.innerHTML='';
+
+  // Usar caché en memoria si tiene menos de 5 minutos y no se forzó recarga
+  if(!forceReload && state.dashCache && state.dashCache.key === cacheKey && getCacheAge() < 5){
+    const reg = state.dashCache.data;
+    state.dashData = reg;
+    if(!state.dashMaestros) state.dashMaestros = {areas:state.areas,centrifugas:state.centrifugas,salas:state.salas,refrigeradores:state.refrigeradores,refriLimpieza:state.refriLimpieza};
+    applyDashData(reg);
+    updateCacheIndicator();
+    return;
+  }
+
+  const hasExistingData = !!state.dashData;
+  const dl = document.getElementById('dash-loading');
+  if(dl && !hasExistingData) dl.style.display = 'block';
+  const dt = document.getElementById('dash-tables'); if(dt) dt.innerHTML = '';
+  const dac = document.getElementById('dash-alerts-container'); if(dac && !hasExistingData) dac.innerHTML = '';
+  const ddv = document.getElementById('dash-daily-view'); if(ddv && !hasExistingData) ddv.innerHTML = '';
+  const dmv = document.getElementById('dash-monthly-view'); if(dmv && !hasExistingData) dmv.innerHTML = '';
+
   try{
     const reg = await apiGet({action:'getRegistros',mes:state.dashMes,anio:state.dashAnio});
     let rev = reg.revisiones;
@@ -392,34 +417,44 @@ async function loadDashboard(forceReload){
     }
     if(!state.dashMaestros || !state.dashMaestros.centrifugasDetailed){
       if(state.maestrosPromise){
-        await state.maestrosPromise;
-      }
-      if(!state.dashMaestros || !state.dashMaestros.centrifugasDetailed){
-        try{state.dashMaestros=await apiGet({action:'getMaestros'})}catch(e){}
+        try { await state.maestrosPromise; } catch(e){}
       }
     }
-    state.dashData=reg;
-    state.dashCache={key:cacheKey,data:reg,rev:rev,timestamp:Date.now()};
+    state.dashData = reg;
+    state.dashCache = {key:cacheKey,data:reg,rev:rev,timestamp:Date.now()};
+    try {
+      sessionStorage.setItem('dashCache_' + cacheKey, JSON.stringify(state.dashCache));
+    } catch(e) {}
     applyDashData(reg);
   }catch(err){
     console.warn('Error cargando dashboard, cargando mock local...', err);
+    if (!state.dashData) {
+      const mockReg={termo:[],centrifugas:[],mesones:[],refriTemp:[],limpiezaRefri:[],conductividad:[],cobas:[]};
+      state.dashData=mockReg;
+      applyDashData(mockReg);
+    }
     if(typeof showToast === 'function') showToast('⚠️ La red demoró en responder. Presione 🔄 para reintentar.', 'warning');
-    const mockReg={termo:[],centrifugas:[],mesones:[],refriTemp:[],limpiezaRefri:[],conductividad:[],cobas:[]};
-    state.dashData=mockReg;
-    applyDashData(mockReg);
+  }finally{
+    const dlFin = document.getElementById('dash-loading');
+    if(dlFin) dlFin.style.display = 'none';
+    updateCacheIndicator();
   }
-  if(dl)dl.style.display='none';updateCacheIndicator();
 }
 function applyDashData(reg){
   if(!reg) return;
-  if(document.getElementById('stat-termo')) document.getElementById('stat-termo').textContent=(reg.termo||[]).length;
-  if(document.getElementById('stat-cent')) document.getElementById('stat-cent').textContent=(reg.centrifugas||[]).length;
-  if(document.getElementById('stat-limp')) document.getElementById('stat-limp').textContent=(reg.mesones||[]).length;
-  if(document.getElementById('stat-refri')) document.getElementById('stat-refri').textContent=(reg.refriTemp||[]).length;
-  if(document.getElementById('stat-limp-refri')) document.getElementById('stat-limp-refri').textContent=(reg.limpiezaRefri||[]).length;
-  if(document.getElementById('stat-conduct')) document.getElementById('stat-conduct').textContent=(reg.conductividad||[]).length;
-  if(document.getElementById('stat-cobas')) document.getElementById('stat-cobas').textContent=(reg.cobas||[]).length;
-  renderDashContent(reg);renderTables(reg);
+  try {
+    if(document.getElementById('stat-termo')) document.getElementById('stat-termo').textContent=(reg.termo||[]).length;
+    if(document.getElementById('stat-cent')) document.getElementById('stat-cent').textContent=(reg.centrifugas||[]).length;
+    if(document.getElementById('stat-limp')) document.getElementById('stat-limp').textContent=(reg.mesones||[]).length;
+    if(document.getElementById('stat-refri')) document.getElementById('stat-refri').textContent=(reg.refriTemp||[]).length;
+    if(document.getElementById('stat-limp-refri')) document.getElementById('stat-limp-refri').textContent=(reg.limpiezaRefri||[]).length;
+    if(document.getElementById('stat-conduct')) document.getElementById('stat-conduct').textContent=(reg.conductividad||[]).length;
+    if(document.getElementById('stat-cobas')) document.getElementById('stat-cobas').textContent=(reg.cobas||[]).length;
+    renderDashContent(reg);
+    renderTables(reg);
+  } catch(e) {
+    console.error('Error aplicando datos en dashboard:', e);
+  }
 }
 
 function renderDashContent(reg){if(state.dashTab==='diario')renderDailyView(reg);else renderMonthlyView(reg)}
@@ -2117,9 +2152,12 @@ async function init(){
   try { initCobasChecklist(); } catch(e){}
   try { initDashSelectors(); } catch(e){}
 
-  // Load maestros first, then dashboard to avoid sheet contention on initial boot
-  await loadMaestros();
-  await loadDashboard();
+  // Carga concurrente resiliente para máxima velocidad en desktop y móvil
+  const pMaestros = loadMaestros();
+  const pDash = loadDashboard();
+  try {
+    await Promise.allSettled([pMaestros, pDash]);
+  } catch(e) {}
   enforceMaxDateInputs();
   checkUrlParams();
   if (typeof loadRecentTermo === 'function') loadRecentTermo();
