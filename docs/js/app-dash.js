@@ -2152,15 +2152,17 @@ async function init(){
   try { initCobasChecklist(); } catch(e){}
   try { initDashSelectors(); } catch(e){}
 
-  // Carga concurrente resiliente para máxima velocidad en desktop y móvil
-  const pMaestros = loadMaestros();
-  const pDash = loadDashboard();
-  try {
-    await Promise.allSettled([pMaestros, pDash]);
-  } catch(e) {}
+  // 1. Cargar maestros (0 ms instantáneo si viene inyectado del servidor)
+  await loadMaestros();
   enforceMaxDateInputs();
+  // 2. Procesar parámetros de URL / QR
   checkUrlParams();
-  if (typeof loadRecentTermo === 'function') loadRecentTermo();
+  // 3. Cargar Dashboard solo si el usuario permanece en dashboard (no fue redirigido por QR)
+  const activeSecEl = document.querySelector('.section.active');
+  const isDashboard = !activeSecEl || activeSecEl.id === 'section-dashboard';
+  if (isDashboard) {
+    loadDashboard();
+  }
 }
 init();
 
@@ -2437,9 +2439,16 @@ async function loadElimMuestrasHistorialForm() {
   try {
     const mes = state.dashMes || (new Date().getMonth() + 1);
     const anio = state.dashAnio || new Date().getFullYear();
-    const regs = await apiGet({ action: 'getRegistros', mes: mes, anio: anio });
+    let regs = state.dashData;
+    if (!regs || !regs.elimMuestras) {
+      if (typeof fetchRegistrosForMonth === 'function') {
+        regs = await fetchRegistrosForMonth(mes, anio);
+      } else {
+        regs = await apiGet({ action: 'getRegistros', mes: mes, anio: anio });
+      }
+    }
     loading.style.display = 'none';
-    const data = regs.elimMuestras || [];
+    const data = (regs && regs.elimMuestras) ? regs.elimMuestras : [];
     if (!data || data.length === 0) {
       empty.style.display = 'block';
     } else {
@@ -2992,8 +3001,21 @@ async function loadRecentTermo() {
   if (inFlightRecent['termo']) return inFlightRecent['termo'];
   const tbody = document.getElementById('tbody-recent-termo');
   if (!tbody) return;
+
+  if (!recentTermoCache || recentTermoCache.length === 0) {
+    try {
+      const sess = sessionStorage.getItem('recent_termo');
+      if (sess) {
+        const parsed = JSON.parse(sess);
+        if (Array.isArray(parsed) && parsed.length > 0) recentTermoCache = parsed;
+      }
+    } catch (e) {}
+  }
+
   const hasCache = Array.isArray(recentTermoCache) && recentTermoCache.length > 0;
-  if (!hasCache) {
+  if (hasCache) {
+    renderRecentTermoTable(recentTermoCache);
+  } else {
     tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 16px; color: #94a3b8;">🔄 Cargando registros recientes...</td></tr>';
   }
   setRecentRefreshBtnLoading('btn-refresh-recent-termo', true);
@@ -3003,6 +3025,7 @@ async function loadRecentTermo() {
       const res = await apiGet({ action: 'getRecentTermo', limit: 20 });
       if (res && res.success && Array.isArray(res.records)) {
         recentTermoCache = res.records;
+        try { sessionStorage.setItem('recent_termo', JSON.stringify(res.records)); } catch (e) {}
         renderRecentTermoTable(recentTermoCache);
       } else {
         if (hasCache) {
@@ -3012,7 +3035,7 @@ async function loadRecentTermo() {
         }
       }
     } catch (err) {
-      console.error('Error cargando últimos 20 termo:', err);
+      console.warn('Aviso: problema al cargar últimos termo:', err);
       if (hasCache) {
         showToast('⚠️ No se pudo sincronizar en este momento. Mostrando registros previos.', 'warning');
       } else {
@@ -3376,8 +3399,21 @@ async function loadRecentCentrifugas() {
   if (inFlightRecent['centrifugas']) return inFlightRecent['centrifugas'];
   const tbody = document.getElementById('tbody-recent-centrifugas');
   if (!tbody) return;
+
+  if (!recentCentrifugasCache || recentCentrifugasCache.length === 0) {
+    try {
+      const sess = sessionStorage.getItem('recent_centrifugas');
+      if (sess) {
+        const parsed = JSON.parse(sess);
+        if (Array.isArray(parsed) && parsed.length > 0) recentCentrifugasCache = parsed;
+      }
+    } catch (e) {}
+  }
+
   const hasCache = Array.isArray(recentCentrifugasCache) && recentCentrifugasCache.length > 0;
-  if (!hasCache) {
+  if (hasCache) {
+    renderRecentCentrifugasTable(recentCentrifugasCache);
+  } else {
     tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 16px; color: #94a3b8;">🔄 Cargando registros recientes...</td></tr>';
   }
   setRecentRefreshBtnLoading('btn-refresh-recent-centrifugas', true);
@@ -3387,6 +3423,7 @@ async function loadRecentCentrifugas() {
       const res = await apiGet({ action: 'getRecentCentrifugas', limit: 20 });
       if (res && res.success && Array.isArray(res.records)) {
         recentCentrifugasCache = res.records;
+        try { sessionStorage.setItem('recent_centrifugas', JSON.stringify(res.records)); } catch (e) {}
         renderRecentCentrifugasTable(recentCentrifugasCache);
       } else {
         if (hasCache) {
@@ -3396,7 +3433,7 @@ async function loadRecentCentrifugas() {
         }
       }
     } catch (err) {
-      console.error('Error cargando últimos centrifugas:', err);
+      console.warn('Aviso: problema al cargar últimos centrífugas:', err);
       if (hasCache) {
         showToast('⚠️ No se pudo sincronizar en este momento. Mostrando registros previos.', 'warning');
       } else {

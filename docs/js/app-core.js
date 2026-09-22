@@ -166,20 +166,26 @@ function formatDDMMYYYY(val) {
 }
 function showToast(m,t='success'){const el=document.getElementById('toast');if(el){el.textContent=m;el.className=`show toast-${t}`;setTimeout(()=>{el.className=''},3200)}}
 function setLoading(b,s,t,l){const btn=document.getElementById(b);if(btn)btn.disabled=l;const spin=document.getElementById(s);if(spin)spin.classList.toggle('visible',l);const txt=document.getElementById(t);if(txt)txt.style.display=l?'none':''}
-async function fetchWithTimeout(url, options = {}, timeout = 15000, maxRetries = 1) {
+async function fetchWithTimeout(url, options = {}, timeout = 45000, maxRetries = 2) {
   let lastError;
   const isPost = (options.method || 'GET').toUpperCase() === 'POST';
   const retries = isPost ? 0 : maxRetries;
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), timeout);
+    const id = setTimeout(() => {
+      try {
+        controller.abort(new Error(`Timeout de red (${Math.round(timeout / 1000)}s)`));
+      } catch (e) {
+        controller.abort();
+      }
+    }, timeout);
     try {
       const response = await fetch(url, { ...options, signal: controller.signal });
       clearTimeout(id);
       if (response.ok) return response;
       if (!isPost && attempt < retries && (response.status >= 500 || response.status === 404)) {
-        await new Promise(res => setTimeout(res, 800 * (attempt + 1)));
+        await new Promise(res => setTimeout(res, 1000 * (attempt + 1)));
         continue;
       }
       return response;
@@ -187,7 +193,7 @@ async function fetchWithTimeout(url, options = {}, timeout = 15000, maxRetries =
       clearTimeout(id);
       lastError = error;
       if (attempt < retries) {
-        await new Promise(res => setTimeout(res, 800 * (attempt + 1)));
+        await new Promise(res => setTimeout(res, 1200 * (attempt + 1)));
         continue;
       }
       throw error;
@@ -195,8 +201,43 @@ async function fetchWithTimeout(url, options = {}, timeout = 15000, maxRetries =
   }
   throw lastError;
 }
-async function apiGet(p){const u=new URL(API_URL);Object.entries(p).forEach(([k,v])=>u.searchParams.set(k,v));u.searchParams.set('_t',Date.now());const r=await fetchWithTimeout(u.toString(),{redirect:'follow'});if(!r.ok)throw new Error(`HTTP ${r.status}`);return r.json()}
-async function apiPost(b){const r=await fetchWithTimeout(API_URL,{method:'POST',redirect:'follow',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(b)});if(!r.ok)throw new Error(`HTTP ${r.status}`);return r.json()}
+
+const inFlightApiGets = new Map();
+
+async function apiGet(p) {
+  const u = new URL(API_URL);
+  Object.entries(p).forEach(([k, v]) => u.searchParams.set(k, v));
+  // Clave de deduplicación en vuelo (sin timestamp aleatorio)
+  const dedupeKey = u.search;
+  if (inFlightApiGets.has(dedupeKey)) {
+    return inFlightApiGets.get(dedupeKey);
+  }
+
+  u.searchParams.set('_t', Date.now());
+  const promise = (async () => {
+    try {
+      const r = await fetchWithTimeout(u.toString(), { redirect: 'follow' }, 45000, 2);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return await r.json();
+    } finally {
+      inFlightApiGets.delete(dedupeKey);
+    }
+  })();
+
+  inFlightApiGets.set(dedupeKey, promise);
+  return promise;
+}
+
+async function apiPost(b) {
+  const r = await fetchWithTimeout(API_URL, {
+    method: 'POST',
+    redirect: 'follow',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(b)
+  }, 45000, 0);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
 
 // Clock
 function updateClock(){
@@ -542,14 +583,27 @@ function applyMaestrosData(data) {
   setTimeout(bindResponsableLiveFeedback, 50);
 }
 
-// Load masters with instant sessionStorage hydration
+// Load masters with instant server injection, sessionStorage hydration or resilient API fetch
 async function loadMaestros() {
+  // 1. Si los datos fueron inyectados directamente por el servidor Apps Script en doGet, usarlos de inmediato (0 ms)
+  if (window.INITIAL_MAESTROS && window.INITIAL_MAESTROS.areas && !state.dashMaestros) {
+    applyMaestrosData(window.INITIAL_MAESTROS);
+    try {
+      sessionStorage.setItem('dashMaestros', JSON.stringify(window.INITIAL_MAESTROS));
+    } catch (e) {}
+    state.maestrosPromise = Promise.resolve(window.INITIAL_MAESTROS);
+    return window.INITIAL_MAESTROS;
+  }
+
+  // 2. Si hay caché en sessionStorage (visitas previas en la misma sesión), hidratar de inmediato
   if (!state.dashMaestros) {
     try {
       const cachedStr = sessionStorage.getItem('dashMaestros');
       if (cachedStr) {
         const cached = JSON.parse(cachedStr);
-        applyMaestrosData(cached);
+        if (cached && cached.areas) {
+          applyMaestrosData(cached);
+        }
       }
     } catch (e) {}
   }
@@ -561,47 +615,23 @@ async function loadMaestros() {
   state.maestrosPromise = (async () => {
     try {
       const data = await apiGet({ action: 'getMaestros' });
-      try {
-        sessionStorage.setItem('dashMaestros', JSON.stringify(data));
-      } catch (e) {}
-      applyMaestrosData(data);
+      if (data && data.areas) {
+        try {
+          sessionStorage.setItem('dashMaestros', JSON.stringify(data));
+        } catch (e) {}
+        applyMaestrosData(data);
+        return data;
+      }
+      throw new Error('Respuesta de maestros no contiene estructura válida');
     } catch (e) {
+      console.warn('Aviso: problema al cargar maestros de la API:', e);
       if (!state.dashMaestros) {
-        console.warn('Error cargando maestros de la API, cargando datos locales de prueba...', e);
-        showToast('⚠️ Usando datos de prueba locales (Modo Offline/Pruebas)', 'info');
-        const fallbackMaestros = {
-          areas: ["Área Química", "Área Hematología", "Área Preanálisis", "Área Microbiología"],
-          centrifugas: ["Centrífuga 1", "Centrífuga 2", "Centrífuga 3", "Centrífuga 4", "Centrífuga 5", "Centrífuga 18", "Centrífuga 19"],
-          salas: ["Sala Procesos", "Sala Recepción", "Sala Toma Muestras"],
-          acciones: ["Avisar a Coordinador", "Llamar a Soporte", "Reiniciar Equipo"],
-          refrigeradores: [
-            {equipo: "Refri 1 (2-8°C)", tempMin: 2, tempMax: 8, tipo: "Refrigerador"},
-            {equipo: "Refri 2 (2-8°C)", tempMin: 2, tempMax: 8, tipo: "Refrigerador"},
-            {equipo: "Congelador 1 (-20°C)", tempMin: -25, tempMax: -15, tipo: "Congelador"}
-          ],
-          refriLimpieza: ["Refri 1 (2-8°C)", "Refri 2 (2-8°C)", "Congelador 1 (-20°C)"],
-          etiquetadoras: [
-            {id: "ZD420-111", nombreReal: "ZD420-1", nombrePractico: "Rotuladora Preanálisis", modelo: "ZD420", tipoConexion: "USB", direccionIp: "No aplica", piso: "Piso 1", ubicacion: "Preanálisis", comentario: "Zebra ZD420 USB"},
-            {id: "ZD421-222", nombreReal: "ZD421-1", nombrePractico: "Rotuladora Hematología", modelo: "ZD421", tipoConexion: "Ethernet", direccionIp: "10.10.1.50", piso: "Piso 1", ubicacion: "Hematología", comentario: "Zebra ZD421 Red"},
-            {id: "ZD220-333", nombreReal: "ZD220-1", nombrePractico: "Rotuladora Microbiología", modelo: "ZD220", tipoConexion: "USB", direccionIp: "No aplica", piso: "Piso 2", ubicacion: "Microbiología", comentario: "Zebra ZD220 USB"}
-          ],
-          areasDetailed: ["Área Química", "Área Hematología", "Área Preanálisis", "Área Microbiología"].map(a => ({nombre: a, horarioTurno: 'si'})),
-          centrifugasDetailed: ["Centrífuga 1", "Centrífuga 2", "Centrífuga 3", "Centrífuga 4", "Centrífuga 5", "Centrífuga 18", "Centrífuga 19"].map(c => ({nombre: c, horarioTurno: ['Centrífuga 18','Centrífuga 14','Centrífuga 9','Centrífuga 6','Centrífuga 8','Centrífuga 12','Centrífuga 11'].includes(c) ? 'no' : 'si'})),
-          salasDetailed: ["Sala Procesos", "Sala Recepción", "Sala Toma Muestras"].map(s => ({nombre: s, horarioTurno: 'si'})),
-          elimSectores: ELIM_SECTORES_DEF,
-          sugerencias: {
-            termoObs: ["Temperatura estable", "Se activa aire acondicionado", "Puerta abierta temporalmente"],
-            centObs: ["Limpieza diaria conforme", "Rotor lubricado", "Capachos lavados"],
-            mesonObs: ["Desinfección con alcohol 70%", "Mesón limpio"],
-            refriObs: ["Temperatura dentro de rangos", "Control diario realizado"],
-            limpRefriObs: ["Limpieza externa semanal realizada", "Bandejas organizadas"],
-            conductObs: ["Medición conforme", "Filtro purgado"],
-            etComentario: ["Zebra USB OK", "Zebra Ethernet configurada"],
-            etBitacoraDesc: ["Limpieza de cabezal térmico", "Calibración de sensor", "Cambio de rollo de etiquetas Zebra"],
-            cobasObs: ["Mantenimiento diario realizado", "Limpieza conforme", "Servicio técnico preventivo realizado"]
-          }
-        };
-        applyMaestrosData(fallbackMaestros);
+        showToast('⚠️ Conexión lenta al servidor. Reintentando maestros en segundo plano...', 'warning');
+        // Reintentar automáticamente en 3.5 segundos sin envenenar el estado con datos ficticios
+        setTimeout(() => {
+          state.maestrosPromise = null;
+          loadMaestros();
+        }, 3500);
       }
     }
   })();

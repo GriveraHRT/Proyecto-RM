@@ -466,12 +466,28 @@ function insertRowsAtTopBatch(sheet, rowsArray) {
 // ── Router ───────────────────────────────────────────────────
 
 function doGet(e) {
-  const action = e.parameter.action;
+  const action = (e && e.parameter) ? e.parameter.action : null;
   
   // Si no hay acción específica en la URL, servimos la interfaz de usuario (frontend)
   if (!action) {
     const tmp = HtmlService.createTemplateFromFile('index');
-    tmp.parameter = e.parameter || {};
+    tmp.parameter = (e && e.parameter) ? e.parameter : {};
+
+    // Inyectar URL del servicio actual (resuelve discrepancias entre /macros/s/ y /a/hospitaldetalca.cl/s/)
+    try {
+      tmp.serviceUrl = ScriptApp.getService().getUrl() || APP_URL;
+    } catch (errUrl) {
+      tmp.serviceUrl = APP_URL;
+    }
+
+    // Inyectar maestros directamente en el HTML inicial para carga instantánea 0ms sin peticiones de red
+    try {
+      tmp.initialMaestros = getMaestros();
+    } catch (errMaestros) {
+      Logger.log('Error inyectando initialMaestros en doGet: ' + errMaestros.toString());
+      tmp.initialMaestros = null;
+    }
+
     return tmp.evaluate()
       .setTitle('Registros Unidad de Laboratorio — HRT LAB')
       .setFaviconUrl('https://griverahrt.github.io/Proyecto-RM/img/favicon.png')
@@ -810,7 +826,7 @@ function saveDiaNoHabilHRT(data) {
     sheet.getRange(sheet.getLastRow(), 1).setNumberFormat('@');
   } catch (e) {}
 
-  clearCacheKeys(['maestros_all', 'maestros_all_v3', 'dias_no_habiles_hrt_list']);
+  clearCacheKeys(['maestros_all', 'maestros_all_v3', 'maestros_all_v4', 'dias_no_habiles_hrt_list']);
   return { success: true, message: 'Día no hábil agregado correctamente.' };
 }
 
@@ -832,7 +848,7 @@ function deleteDiaNoHabilHRT(data) {
 
   if (targetIndex !== -1) {
     sheet.deleteRow(targetIndex);
-    clearCacheKeys(['maestros_all', 'maestros_all_v3', 'dias_no_habiles_hrt_list']);
+    clearCacheKeys(['maestros_all', 'maestros_all_v3', 'maestros_all_v4', 'dias_no_habiles_hrt_list']);
     return { success: true, message: 'Día no hábil eliminado correctamente.' };
   }
   return { success: false, error: 'No se encontró la fecha especificada.' };
@@ -973,7 +989,7 @@ function savePersonal(data) {
     } catch (e) {}
   }
 
-  clearCacheKeys(['personal_all_v2', 'maestros_all_v3', 'maestros_all']);
+  clearCacheKeys(['personal_all_v2', 'maestros_all_v3', 'maestros_all_v4', 'maestros_all']);
   _execPersonalCache = null;
   return {
     success: true,
@@ -991,7 +1007,7 @@ function deletePersonal(data) {
   for (let i = 1; i < rows.length; i++) {
     if (String(rows[i][0]).trim().toUpperCase() === iniciales) {
       sheet.deleteRow(i + 1);
-      clearCacheKeys(['personal_all_v2', 'maestros_all_v3', 'maestros_all']);
+      clearCacheKeys(['personal_all_v2', 'maestros_all_v3', 'maestros_all_v4', 'maestros_all']);
       _execPersonalCache = null;
       return { success: true, message: `Funcionario (${iniciales}) eliminado de Maestro Personal.`, personal: getPersonal() };
     }
