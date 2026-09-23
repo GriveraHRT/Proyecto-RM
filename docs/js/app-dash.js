@@ -29,7 +29,7 @@ document.getElementById('form-termo').addEventListener('submit',async e=>{
       else if(typeof loadRecentTermo==='function')loadRecentTermo();
     }
     else showToast('❌ '+r.error,'error');
-  }catch(err){showToast('❌ Error de conexión','error')}
+  }catch(err){showToast('❌ Error al guardar: ' + (err.message || 'Error de conexión'),'error')}
   setLoading('btn-termo-submit','spinner-termo','btn-termo-text',false);
 });
 
@@ -60,7 +60,7 @@ document.getElementById('form-centrifugas').addEventListener('submit',async e=>{
       else if(typeof loadRecentCentrifugas==='function')loadRecentCentrifugas();
     }
     else showToast('❌ '+r.error,'error')
-  }catch(err){showToast('❌ Error de conexión','error')}
+  }catch(err){showToast('❌ Error al guardar: ' + (err.message || 'Error de conexión'),'error')}
   setLoading('btn-cent-submit','spinner-cent','btn-cent-text',false)
 });
 
@@ -91,7 +91,7 @@ document.getElementById('form-mesones').addEventListener('submit',async e=>{
       else if(typeof loadRecentMesones==='function')loadRecentMesones();
     }
     else showToast('❌ '+r.error,'error')
-  }catch(err){showToast('❌ Error de conexión','error')}
+  }catch(err){showToast('❌ Error al guardar: ' + (err.message || 'Error de conexión'),'error')}
   setLoading('btn-meson-submit','spinner-meson','btn-meson-text',false)
 });
 
@@ -118,7 +118,7 @@ document.getElementById('form-refri-temp').addEventListener('submit',async e=>{
       else if(typeof loadRecentRefriTemp==='function')loadRecentRefriTemp();
     }
     else showToast('❌ '+r.error,'error');
-  }catch(err){showToast('❌ Error de conexión','error')}
+  }catch(err){showToast('❌ Error al guardar: ' + (err.message || 'Error de conexión'),'error')}
   setLoading('btn-refri-submit','spinner-refri','btn-refri-text',false);
 });
 
@@ -141,7 +141,7 @@ document.getElementById('form-limp-refri').addEventListener('submit',async e=>{
       else if(typeof loadRecentLimpRefri==='function')loadRecentLimpRefri();
     }
     else showToast('❌ '+r.error,'error')
-  }catch(err){showToast('❌ Error de conexión','error')}
+  }catch(err){showToast('❌ Error al guardar: ' + (err.message || 'Error de conexión'),'error')}
   setLoading('btn-limp-refri-submit','spinner-limp-refri','btn-limp-refri-text',false)
 });
 
@@ -166,7 +166,7 @@ document.getElementById('form-conductividad').addEventListener('submit',async e=
       else if(typeof loadRecentConductividad==='function')loadRecentConductividad();
     }
     else showToast('❌ '+r.error,'error');
-  }catch(err){showToast('❌ Error de conexión','error')}
+  }catch(err){showToast('❌ Error al guardar: ' + (err.message || 'Error de conexión'),'error')}
   setLoading('btn-conduct-submit','spinner-conduct','btn-conduct-text',false);
 });
 
@@ -354,7 +354,7 @@ if (formCobas) {
         showToast('❌ ' + r.error, 'error');
       }
     } catch (err) {
-      showToast('❌ Error de conexión', 'error');
+      showToast('❌ Error al guardar: ' + (err.message || 'Error de conexión'), 'error');
     }
     setLoading('btn-cobas-submit', 'spinner-cobas', 'btn-cobas-text', false);
   });
@@ -1233,7 +1233,7 @@ function switchQrTab(tab){
 }
 
 function generateQR(){
-  let base = API_URL;
+  let base = (typeof getCanonicalApiUrl === 'function') ? getCanonicalApiUrl(API_URL) : API_URL;
   if (!base || base.includes('googleusercontent.com') || base.includes('userCodeAppPanel')) {
     base = 'https://script.google.com/macros/s/AKfycbxuqcui0-hjJ721uMWZk3w-4l2fVCaBWQgdMJqVMb5Pno339Jqetq4r62p3-1gGBUvFOg/exec';
   }
@@ -1570,7 +1570,7 @@ function printLabel50x30() {
 }
 
 function printAllElimLabels50x30() {
-  let base = API_URL;
+  let base = (typeof getCanonicalApiUrl === 'function') ? getCanonicalApiUrl(API_URL) : API_URL;
   if (!base || base.includes('googleusercontent.com') || base.includes('userCodeAppPanel')) {
     base = 'https://script.google.com/macros/s/AKfycbxuqcui0-hjJ721uMWZk3w-4l2fVCaBWQgdMJqVMb5Pno339Jqetq4r62p3-1gGBUvFOg/exec';
   }

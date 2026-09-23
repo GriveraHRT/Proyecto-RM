@@ -1,5 +1,12 @@
-if (typeof API_URL === 'undefined') {
+function getCanonicalApiUrl(url) {
+  const fallback = 'https://script.google.com/macros/s/AKfycbxuqcui0-hjJ721uMWZk3w-4l2fVCaBWQgdMJqVMb5Pno339Jqetq4r62p3-1gGBUvFOg/exec';
+  const target = url || (typeof API_URL !== 'undefined' ? API_URL : '') || fallback;
+  return target.replace(/script\.google\.com\/a\/[^\/]+\/macros\/s\//i, 'script.google.com/macros/s/');
+}
+if (typeof API_URL === 'undefined' || !API_URL || API_URL.includes('/a/')) {
   var API_URL = 'https://script.google.com/macros/s/AKfycbxuqcui0-hjJ721uMWZk3w-4l2fVCaBWQgdMJqVMb5Pno339Jqetq4r62p3-1gGBUvFOg/exec';
+} else {
+  API_URL = getCanonicalApiUrl(API_URL);
 }
 const PREANALISIS=[1,2,3,4,5,18,19];
 const ALL_REV_TYPES = [
@@ -202,20 +209,77 @@ async function fetchWithTimeout(url, options = {}, timeout = 45000, maxRetries =
   throw lastError;
 }
 
+function canUseGoogleScriptRun() {
+  return typeof google !== 'undefined' &&
+         typeof google.script !== 'undefined' &&
+         typeof google.script.run !== 'undefined';
+}
+
+function callGoogleScriptRun(action, payload) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        reject(new Error(`Timeout RPC google.script.run para '${action}'`));
+      }
+    }, 35000);
+
+    try {
+      google.script.run
+        .withSuccessHandler(res => {
+          if (!settled) {
+            settled = true;
+            clearTimeout(timer);
+            resolve(res);
+          }
+        })
+        .withFailureHandler(err => {
+          if (!settled) {
+            settled = true;
+            clearTimeout(timer);
+            const msg = (err && err.message) ? err.message : String(err);
+            reject(new Error(msg));
+          }
+        })
+        .apiRun(action, payload);
+    } catch (e) {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        reject(e);
+      }
+    }
+  });
+}
+
 const inFlightApiGets = new Map();
 
 async function apiGet(p) {
-  const u = new URL(API_URL);
-  Object.entries(p).forEach(([k, v]) => u.searchParams.set(k, v));
-  // Clave de deduplicación en vuelo (sin timestamp aleatorio)
-  const dedupeKey = u.search;
+  const action = p && p.action ? p.action : 'unknown';
+  const dedupeKey = JSON.stringify(p);
   if (inFlightApiGets.has(dedupeKey)) {
     return inFlightApiGets.get(dedupeKey);
   }
 
-  u.searchParams.set('_t', Date.now());
   const promise = (async () => {
     try {
+      // 1. Si estamos dentro de Google Apps Script iframe, intentar vía google.script.run (sin HTTP, sin CORS)
+      if (canUseGoogleScriptRun()) {
+        try {
+          const res = await callGoogleScriptRun(action, p);
+          if (res !== undefined && res !== null) return res;
+        } catch (rpcErr) {
+          console.warn(`google.script.run (${action}) falló, reintentando vía fetch canónico:`, rpcErr);
+        }
+      }
+
+      // 2. Fallback resiliente HTTP GET con URL universal limpia
+      const cleanUrl = getCanonicalApiUrl(API_URL);
+      const u = new URL(cleanUrl);
+      Object.entries(p).forEach(([k, v]) => u.searchParams.set(k, v));
+      u.searchParams.set('_t', Date.now());
+
       const r = await fetchWithTimeout(u.toString(), { redirect: 'follow' }, 45000, 2);
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       return await r.json();
@@ -233,11 +297,12 @@ let lastSubmitPayload = '';
 let lastSubmitTime = 0;
 
 async function apiPost(b) {
+  const action = b && b.action ? b.action : 'unknown';
   const currentPayload = JSON.stringify(b);
   const now = Date.now();
   // Bloquear reintentos idénticos accidentales dentro de los primeros 2.5 segundos
   if (isSubmittingGlobal && currentPayload === lastSubmitPayload && (now - lastSubmitTime) < 2500) {
-    console.warn('Envío repetido bloqueado en cliente:', b.action);
+    console.warn('Envío repetido bloqueado en cliente:', action);
     return { success: true, message: 'Su registro ya se está procesando...' };
   }
   isSubmittingGlobal = true;
@@ -245,7 +310,19 @@ async function apiPost(b) {
   lastSubmitTime = now;
 
   try {
-    const r = await fetchWithTimeout(API_URL, {
+    // 1. Si estamos dentro de Google Apps Script iframe, enviar directo vía google.script.run (cero CORS, guardado garantizado)
+    if (canUseGoogleScriptRun()) {
+      try {
+        const res = await callGoogleScriptRun(action, b);
+        if (res !== undefined && res !== null) return res;
+      } catch (rpcErr) {
+        console.warn(`google.script.run POST (${action}) falló, reintentando vía fetch canónico:`, rpcErr);
+      }
+    }
+
+    // 2. Fallback resiliente HTTP POST con URL canónica limpia
+    const cleanUrl = getCanonicalApiUrl(API_URL);
+    const r = await fetchWithTimeout(cleanUrl, {
       method: 'POST',
       redirect: 'follow',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -1303,19 +1380,33 @@ function checkUrlParams(){
   }
 
   if(area){
-    document.getElementById('area-prefill-name').textContent=area;
-    document.getElementById('area-prefill-indicator').style.display='block';
+    const elPrefill = document.getElementById('area-prefill-name'); if(elPrefill) elPrefill.textContent=area;
+    const elInd = document.getElementById('area-prefill-indicator'); if(elInd) elInd.style.display='block';
+    let attempts = 0;
     const w=setInterval(()=>{
+      attempts++;
       const s=document.getElementById('termo-area');
-      if(Array.from(s.options).find(o=>o.value===area)){
-        s.value=area;
-        clearInterval(w);
+      if(s){
+        let opt = Array.from(s.options).find(o=>o.value===area);
+        if(!opt && attempts > 5) {
+          opt = document.createElement('option');
+          opt.value = area;
+          opt.textContent = area;
+          s.appendChild(opt);
+        }
+        if(opt){
+          s.value=area;
+          clearInterval(w);
+        }
       }
-    },300);
+      if(attempts > 30) clearInterval(w);
+    },200);
     navigateTo('termo');
   }
   if(sala){
+    let attempts = 0;
     const w=setInterval(()=>{
+      attempts++;
       const chips=document.querySelectorAll('#meson-chips .chip-item');
       if(chips.length){
         chips.forEach(c=>{
@@ -1324,11 +1415,14 @@ function checkUrlParams(){
         clearInterval(w);
         updateMultiSelectUI('meson-chips');
       }
-    },300);
+      if(attempts > 30) clearInterval(w);
+    },200);
     navigateTo('mesones');
   }
   if(cent){
+    let attempts = 0;
     const w=setInterval(()=>{
+      attempts++;
       const chips=document.querySelectorAll('#cent-chips .chip-item');
       if(chips.length){
         chips.forEach(c=>{
@@ -1337,11 +1431,14 @@ function checkUrlParams(){
         clearInterval(w);
         updateMultiSelectUI('cent-chips');
       }
-    },300);
+      if(attempts > 30) clearInterval(w);
+    },200);
     navigateTo('centrifugas');
   }
   if(grupo==='preanalisis'){
+    let attempts = 0;
     const w=setInterval(()=>{
+      attempts++;
       const chips=document.querySelectorAll('#cent-chips .chip-item');
       if(chips.length){
         document.getElementById('btn-grupo-preanalisis').classList.add('active');
@@ -1351,22 +1448,37 @@ function checkUrlParams(){
         clearInterval(w);
         updateMultiSelectUI('cent-chips');
       }
-    },300);
+      if(attempts > 30) clearInterval(w);
+    },200);
     navigateTo('centrifugas');
   }
   if(refri){
+    let attempts = 0;
     const w=setInterval(()=>{
+      attempts++;
       const s=document.getElementById('refri-equipo');
-      if(Array.from(s.options).find(o=>o.value===refri)){
-        s.value=refri;
-        checkRangoRefri();
-        clearInterval(w);
+      if(s){
+        let opt = Array.from(s.options).find(o=>o.value===refri);
+        if(!opt && attempts > 5) {
+          opt = document.createElement('option');
+          opt.value = refri;
+          opt.textContent = refri;
+          s.appendChild(opt);
+        }
+        if(opt){
+          s.value=refri;
+          checkRangoRefri();
+          clearInterval(w);
+        }
       }
-    },300);
+      if(attempts > 30) clearInterval(w);
+    },200);
     navigateTo('refri-temp');
   }
   if(limprefri){
+    let attempts = 0;
     const w=setInterval(()=>{
+      attempts++;
       const chips=document.querySelectorAll('#limp-refri-chips .chip-item');
       if(chips.length){
         chips.forEach(c=>{
@@ -1375,7 +1487,8 @@ function checkUrlParams(){
         clearInterval(w);
         updateMultiSelectUI('limp-refri-chips');
       }
-    },300);
+      if(attempts > 30) clearInterval(w);
+    },200);
     navigateTo('limp-refri');
   }
   if(modulo==='conductividad'){
@@ -1385,9 +1498,11 @@ function checkUrlParams(){
     navigateTo('dxh900');
   }
   if(etName){
-    document.getElementById('etiquetadora-prefill-name').textContent=etName;
-    document.getElementById('etiquetadora-prefill-indicator').style.display='block';
+    const elPrefill = document.getElementById('etiquetadora-prefill-name'); if(elPrefill) elPrefill.textContent=etName;
+    const elInd = document.getElementById('etiquetadora-prefill-indicator'); if(elInd) elInd.style.display='block';
+    let attempts = 0;
     const w=setInterval(()=>{
+      attempts++;
       if(state.etiquetadoras&&state.etiquetadoras.length){
         const found=state.etiquetadoras.find(o=>o.nombreReal===etName);
         if(found){
@@ -1395,24 +1510,46 @@ function checkUrlParams(){
           document.getElementById('etiquetadora-search-input').value=displayText;
           document.getElementById('btn-clear-et-search').style.display='block';
           const s=document.getElementById('etiquetadora-select');
-          s.value=etName;
+          if (s) {
+            let opt = Array.from(s.options).find(o=>o.value===etName);
+            if (!opt) {
+              opt = document.createElement('option');
+              opt.value = etName;
+              opt.textContent = displayText;
+              s.appendChild(opt);
+            }
+            s.value=etName;
+          }
           onEtiquetadoraChange();
           clearInterval(w);
-        }else{
+        }else if(attempts > 15){
           clearInterval(w);
         }
       }
-    },300);
+      if(attempts > 30) clearInterval(w);
+    },200);
     navigateTo('etiquetadoras');
   }
   if(cobasEq){
+    let attempts = 0;
     const w=setInterval(()=>{
+      attempts++;
       const s=document.getElementById('cobas-equipo');
-      if(Array.from(s.options).find(o=>o.value===cobasEq)){
-        s.value=cobasEq;
-        clearInterval(w);
+      if(s){
+        let opt = Array.from(s.options).find(o=>o.value===cobasEq);
+        if(!opt && attempts > 5) {
+          opt = document.createElement('option');
+          opt.value = cobasEq;
+          opt.textContent = cobasEq;
+          s.appendChild(opt);
+        }
+        if(opt){
+          s.value=cobasEq;
+          clearInterval(w);
+        }
       }
-    },300);
+      if(attempts > 30) clearInterval(w);
+    },200);
     navigateTo('cobas');
   }
   if(modulo==='cobas'){

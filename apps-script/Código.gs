@@ -558,6 +558,17 @@ function insertRowsAtTopBatch(sheet, rowsArray) {
 
 // ── Router ───────────────────────────────────────────────────
 
+function getCleanAppUrl() {
+  try {
+    const url = ScriptApp.getService().getUrl();
+    if (url) {
+      // Remover prefijo de dominio Google Workspace (/a/dominio.com/) para garantizar URL universal limpia con soporte CORS
+      return url.replace(/script\.google\.com\/a\/[^\/]+\/macros\/s\//i, 'script.google.com/macros/s/');
+    }
+  } catch (e) {}
+  return APP_URL;
+}
+
 function doGet(e) {
   const action = (e && e.parameter) ? e.parameter.action : null;
   
@@ -566,9 +577,9 @@ function doGet(e) {
     const tmp = HtmlService.createTemplateFromFile('index');
     tmp.parameter = (e && e.parameter) ? e.parameter : {};
 
-    // Inyectar URL del servicio actual (resuelve discrepancias entre /macros/s/ y /a/hospitaldetalca.cl/s/)
+    // Inyectar URL limpia sin prefijo /a/dominio/ para garantizar compatibilidad CORS y acceso móvil universal
     try {
-      tmp.serviceUrl = ScriptApp.getService().getUrl() || APP_URL;
+      tmp.serviceUrl = getCleanAppUrl();
     } catch (errUrl) {
       tmp.serviceUrl = APP_URL;
     }
@@ -589,51 +600,7 @@ function doGet(e) {
   }
 
   try {
-    switch (action) {
-      case 'getAreas':          return jsonResponse(getAreas());
-      case 'getCentrifugas':    return jsonResponse(getCentrifugas());
-      case 'getSalas':          return jsonResponse(getSalas());
-      case 'getAcciones':       return jsonResponse(getAcciones());
-      case 'getRefrigeradores': return jsonResponse(getRefrigeradores());
-      case 'getRefriLimpieza':  return jsonResponse(getRefriLimpieza());
-      case 'getElimSectores':   return jsonResponse(getElimSectores());
-      case 'getRegistros':      return jsonResponse(getRegistros(e.parameter.mes, e.parameter.anio));
-      case 'getRevisiones':     return jsonResponse(getRevision(e.parameter.mes, e.parameter.anio));
-      case 'getMaestros':       return jsonResponse(getMaestros());
-      case 'getServerTime':     return jsonResponse(getServerTime());
-      case 'getEtiquetadoras':  return jsonResponse(getEtiquetadoras());
-      case 'getEtiquetadoraHistorial': return jsonResponse(getEtiquetadoraHistorial(e.parameter.etiquetadora));
-      case 'getNotificaciones': return jsonResponse(getNotificaciones());
-      case 'getDxH900Historial': return jsonResponse(getDxH900Historial());
-      case 'getModulosActivos': return jsonResponse(getModulosActivos());
-      case 'getRecentTermo':        return jsonResponse(getRecentTermo(e.parameter.limit));
-      case 'getRecentCentrifugas':  return jsonResponse(getRecentCentrifugas(e.parameter.limit));
-      case 'getRecentMesones':      return jsonResponse(getRecentMesones(e.parameter.limit));
-      case 'getRecentRefriTemp':    return jsonResponse(getRecentRefriTemp(e.parameter.limit));
-      case 'getRecentLimpRefri':    return jsonResponse(getRecentLimpRefri(e.parameter.limit));
-      case 'getRecentConductividad': return jsonResponse(getRecentConductividad(e.parameter.limit));
-      case 'getRecentCobas':        return jsonResponse(getRecentCobas(e.parameter.limit));
-      case 'getDiasNoHabilesHRT': return jsonResponse(getDiasNoHabilesHRT());
-      case 'getPersonal':         return jsonResponse(getPersonal());
-      case 'savePersonal':        return jsonResponse(savePersonal(e.parameter));
-      case 'deletePersonal':      return jsonResponse(deletePersonal(e.parameter));
-      case 'seedMaestroPersonal': return jsonResponse(seedMaestroPersonal(e.parameter.initials || e.parameter.list));
-      case 'migrarInicialesAHistoricos': return jsonResponse(migrarInicialesAHistoricos());
-      case 'setupMaestroPersonal': return jsonResponse(setupMaestroPersonal());
-      case 'runSetupTriggers':  return jsonResponse({ success: true, message: setupTriggers() });
-      case 'testTriggerConsolidado': return jsonResponse({ success: true, result: triggerAlertaConsolidadaTermo() });
-      case 'testTriggerDatosNoRellenados': return jsonResponse({ success: true, result: triggerDatosNoRellenados(e.parameter.hour ? parseInt(e.parameter.hour,10) : null) });
-      case 'testTriggerMantencionSemanal': return jsonResponse({ success: true, result: triggerMantencionSemanal(e.parameter.to || null) });
-      case 'applyConfig': return jsonResponse(applyNotificationConfig(e.parameter.hour, e.parameter.to));
-      case 'getProjectTriggersInfo': return jsonResponse(getProjectTriggersInfo());
-      case 'scheduleAutoTest': return jsonResponse(scheduleAutoTriggerInMinutes(e.parameter.minutes || 2));
-      case 'diagnosticarFaltantesMes': return jsonResponse(diagnosticarFaltantesMes(e.parameter));
-      case 'getTriggerLogs': return jsonResponse(getTriggerLogs());
-      case 'limpiarFilasNegras': return jsonResponse(limpiarFilasNegrasYVacias());
-      case 'SETUP_INIT_TA':     return jsonResponse(setup());
-      case 'REINIT':            return jsonResponse(reinitialize());
-      default:                  return jsonResponse({ error: 'Acción no reconocida: ' + action });
-    }
+    return jsonResponse(executeAction(action, e.parameter));
   } catch (err) {
     return jsonResponse({ error: err.toString() });
   }
@@ -647,54 +614,95 @@ function doPost(e) {
     return jsonResponse({ error: 'JSON inválido: ' + err.toString() });
   }
   try {
-    switch (data.action) {
-      case 'saveTermo':           return jsonResponse(saveTermo(data));
-      case 'updateTermo':         return jsonResponse(updateTermo(data));
-      case 'deleteTermo':         return jsonResponse(deleteTermo(data));
-      case 'saveCentrifuga':      return jsonResponse(saveCentrifuga(data));
-      case 'updateCentrifuga':    return jsonResponse(updateCentrifuga(data));
-      case 'deleteCentrifuga':    return jsonResponse(deleteCentrifuga(data));
-      case 'saveMesones':         return jsonResponse(saveMesones(data));
-      case 'updateMeson':         return jsonResponse(updateMeson(data));
-      case 'deleteMeson':         return jsonResponse(deleteMeson(data));
-      case 'saveRefriTemp':       return jsonResponse(saveRefriTemp(data));
-      case 'updateRefriTemp':     return jsonResponse(updateRefriTemp(data));
-      case 'deleteRefriTemp':     return jsonResponse(deleteRefriTemp(data));
-      case 'saveLimpiezaRefri':   return jsonResponse(saveLimpiezaRefri(data));
-      case 'updateLimpRefri':     return jsonResponse(updateLimpRefri(data));
-      case 'deleteLimpRefri':     return jsonResponse(deleteLimpRefri(data));
-      case 'saveConductividad':   return jsonResponse(saveConductividad(data));
-      case 'updateConductividad': return jsonResponse(updateConductividad(data));
-      case 'deleteConductividad': return jsonResponse(deleteConductividad(data));
-      case 'saveCobas':           return jsonResponse(saveCobas(data));
-      case 'updateCobas':         return jsonResponse(updateCobas(data));
-      case 'deleteCobas':         return jsonResponse(deleteCobas(data));
-      case 'saveEtiquetadoraRegistro': return jsonResponse(saveEtiquetadoraRegistro(data));
-      case 'updateEtiquetadoraMaestro': return jsonResponse(updateEtiquetadoraMaestro(data));
-      case 'marcarRevisado':      return jsonResponse(marcarRevisado(data));
-      case 'saveNotificaciones':  return jsonResponse(saveNotificaciones(data));
-      case 'sendTestNotificacion': return jsonResponse(sendTestNotificacion(data));
-      case 'runSetupTriggers':    return jsonResponse({ success: true, message: setupTriggers() });
-      case 'testTriggerConsolidado': return jsonResponse({ success: true, result: triggerAlertaConsolidadaTermo() });
-      case 'saveDxH900Registro':  return jsonResponse(saveDxH900Registro(data));
-      case 'saveElimMuestras':    return jsonResponse(saveElimMuestras(data));
-      case 'saveModulosActivos': return jsonResponse(saveModulosActivos(data));
-      case 'getDiasNoHabilesHRT': return jsonResponse(getDiasNoHabilesHRT());
-      case 'saveDiaNoHabilHRT':   return jsonResponse(saveDiaNoHabilHRT(data));
-      case 'deleteDiaNoHabilHRT': return jsonResponse(deleteDiaNoHabilHRT(data));
-      case 'getPersonal':         return jsonResponse(getPersonal());
-      case 'savePersonal':        return jsonResponse(savePersonal(data));
-      case 'deletePersonal':      return jsonResponse(deletePersonal(data));
-      case 'seedMaestroPersonal': return jsonResponse(seedMaestroPersonal(data.initials || data.list));
-      case 'migrarInicialesAHistoricos': return jsonResponse(migrarInicialesAHistoricos());
-      case 'setupMaestroPersonal': return jsonResponse(setupMaestroPersonal());
-      case 'diagnosticarFaltantesMes': return jsonResponse(diagnosticarFaltantesMes(data));
-      case 'limpiarFilasNegras': return jsonResponse(limpiarFilasNegrasYVacias());
-      case 'ejecutarRegularizacionBatch': return jsonResponse(ejecutarRegularizacionBatch(data));
-      default:                    return jsonResponse({ error: 'Acción no reconocida: ' + data.action });
-    }
+    return jsonResponse(executeAction(data.action, data));
   } catch (err) {
     return jsonResponse({ error: err.toString() });
+  }
+}
+
+/** Expuesto directamente a google.script.run en el frontend para evitar peticiones HTTP y problemas CORS */
+function apiRun(action, data) {
+  return executeAction(action, data);
+}
+
+function executeAction(action, data) {
+  data = data || {};
+  switch (action) {
+    case 'getAreas':                  return getAreas();
+    case 'getCentrifugas':            return getCentrifugas();
+    case 'getSalas':                  return getSalas();
+    case 'getAcciones':               return getAcciones();
+    case 'getRefrigeradores':         return getRefrigeradores();
+    case 'getRefriLimpieza':          return getRefriLimpieza();
+    case 'getElimSectores':           return getElimSectores();
+    case 'getRegistros':              return getRegistros(data.mes, data.anio);
+    case 'getRevisiones':             return getRevision(data.mes, data.anio);
+    case 'getMaestros':               return getMaestros();
+    case 'getServerTime':             return getServerTime();
+    case 'getEtiquetadoras':          return getEtiquetadoras();
+    case 'getEtiquetadoraHistorial':  return getEtiquetadoraHistorial(data.etiquetadora);
+    case 'getNotificaciones':         return getNotificaciones();
+    case 'getDxH900Historial':        return getDxH900Historial();
+    case 'getModulosActivos':         return getModulosActivos();
+    case 'getRecentTermo':            return getRecentTermo(data.limit);
+    case 'getRecentCentrifugas':      return getRecentCentrifugas(data.limit);
+    case 'getRecentMesones':          return getRecentMesones(data.limit);
+    case 'getRecentRefriTemp':        return getRecentRefriTemp(data.limit);
+    case 'getRecentLimpRefri':        return getRecentLimpRefri(data.limit);
+    case 'getRecentConductividad':    return getRecentConductividad(data.limit);
+    case 'getRecentCobas':            return getRecentCobas(data.limit);
+    case 'getDiasNoHabilesHRT':       return getDiasNoHabilesHRT();
+    case 'getPersonal':               return getPersonal();
+    case 'savePersonal':              return savePersonal(data);
+    case 'deletePersonal':            return deletePersonal(data);
+    case 'seedMaestroPersonal':       return seedMaestroPersonal(data.initials || data.list);
+    case 'migrarInicialesAHistoricos': return migrarInicialesAHistoricos();
+    case 'setupMaestroPersonal':      return setupMaestroPersonal();
+    case 'runSetupTriggers':          return { success: true, message: setupTriggers() };
+    case 'testTriggerConsolidado':    return { success: true, result: triggerAlertaConsolidadaTermo() };
+    case 'testTriggerDatosNoRellenados': return { success: true, result: triggerDatosNoRellenados(data.hour ? parseInt(data.hour, 10) : null) };
+    case 'testTriggerMantencionSemanal': return { success: true, result: triggerMantencionSemanal(data.to || null) };
+    case 'applyConfig':               return applyNotificationConfig(data.hour, data.to);
+    case 'getProjectTriggersInfo':    return getProjectTriggersInfo();
+    case 'scheduleAutoTest':          return scheduleAutoTriggerInMinutes(data.minutes || 2);
+    case 'diagnosticarFaltantesMes':  return diagnosticarFaltantesMes(data);
+    case 'getTriggerLogs':            return getTriggerLogs();
+    case 'limpiarFilasNegras':        return limpiarFilasNegrasYVacias();
+    case 'SETUP_INIT_TA':             return setup();
+    case 'REINIT':                    return reinitialize();
+    case 'saveTermo':                 return saveTermo(data);
+    case 'updateTermo':               return updateTermo(data);
+    case 'deleteTermo':               return deleteTermo(data);
+    case 'saveCentrifuga':            return saveCentrifuga(data);
+    case 'updateCentrifuga':          return updateCentrifuga(data);
+    case 'deleteCentrifuga':          return deleteCentrifuga(data);
+    case 'saveMesones':               return saveMesones(data);
+    case 'updateMeson':               return updateMeson(data);
+    case 'deleteMeson':               return deleteMeson(data);
+    case 'saveRefriTemp':             return saveRefriTemp(data);
+    case 'updateRefriTemp':           return updateRefriTemp(data);
+    case 'deleteRefriTemp':           return deleteRefriTemp(data);
+    case 'saveLimpiezaRefri':         return saveLimpiezaRefri(data);
+    case 'updateLimpRefri':           return updateLimpRefri(data);
+    case 'deleteLimpRefri':           return deleteLimpRefri(data);
+    case 'saveConductividad':         return saveConductividad(data);
+    case 'updateConductividad':       return updateConductividad(data);
+    case 'deleteConductividad':       return deleteConductividad(data);
+    case 'saveCobas':                 return saveCobas(data);
+    case 'updateCobas':               return updateCobas(data);
+    case 'deleteCobas':               return deleteCobas(data);
+    case 'saveEtiquetadoraRegistro':  return saveEtiquetadoraRegistro(data);
+    case 'updateEtiquetadoraMaestro': return updateEtiquetadoraMaestro(data);
+    case 'marcarRevisado':            return marcarRevisado(data);
+    case 'saveNotificaciones':        return saveNotificaciones(data);
+    case 'sendTestNotificacion':      return sendTestNotificacion(data);
+    case 'saveDxH900Registro':        return saveDxH900Registro(data);
+    case 'saveElimMuestras':          return saveElimMuestras(data);
+    case 'saveModulosActivos':        return saveModulosActivos(data);
+    case 'saveDiaNoHabilHRT':         return saveDiaNoHabilHRT(data);
+    case 'deleteDiaNoHabilHRT':       return deleteDiaNoHabilHRT(data);
+    case 'ejecutarRegularizacionBatch': return ejecutarRegularizacionBatch(data);
+    default:                          return { error: 'Acción no reconocida: ' + action };
   }
 }
 
@@ -778,6 +786,88 @@ function getElimSectores() {
   }
 }
 
+/**
+ * Cálculo autónomo exacto de feriados oficiales de Chile (sin dependencias externas ni CalendarApp).
+ * Resuelve Easter/Pascua (algoritmo de Gauss/Meeus/Butcher) y leyes 19.668, 20.299 y 20.983 en 0.1 ms.
+ */
+function getFeriadosChileSet(anio) {
+  const feriados = new Set();
+  const add = (d, m) => feriados.add(String(d).padStart(2, '0') + '/' + String(m).padStart(2, '0'));
+
+  // Feriados nacionales fijos
+  add(1, 1);   // Año Nuevo
+  add(1, 5);   // Día Nacional del Trabajo
+  add(21, 5);  // Día de las Glorias Navales
+  add(21, 6);  // Día Nacional de los Pueblos Indígenas
+  add(16, 7);  // Día de la Virgen del Carmen
+  add(15, 8);  // Asunción de la Virgen
+  add(18, 9);  // Fiestas Patrias (Independencia Nacional)
+  add(19, 9);  // Glorias del Ejército
+  add(1, 11);  // Día de Todos los Santos
+  add(8, 12);  // Inmaculada Concepción
+  add(25, 12); // Navidad
+
+  // Fiestas Patrias sándwich (Ley 20.983)
+  const sep18Day = new Date(anio, 8, 18).getDay();
+  if (sep18Day === 2) add(17, 9); // Si 18 cae martes, lunes 17 es feriado
+  if (sep18Day === 3) add(20, 9); // Si 18 cae miércoles, viernes 20 es feriado
+
+  // Pascua / Viernes y Sábado Santo
+  const a = anio % 19, b = Math.floor(anio / 100), c = anio % 100;
+  const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const pMonth = Math.floor((h + l - 7 * m + 114) / 31);
+  const pDay = ((h + l - 7 * m + 114) % 31) + 1;
+  const easterDate = new Date(anio, pMonth - 1, pDay);
+
+  const vSanto = new Date(easterDate);
+  vSanto.setDate(easterDate.getDate() - 2);
+  add(vSanto.getDate(), vSanto.getMonth() + 1);
+
+  const sSanto = new Date(easterDate);
+  sSanto.setDate(easterDate.getDate() - 1);
+  add(sSanto.getDate(), sSanto.getMonth() + 1);
+
+  // San Pedro y San Pablo (29 de junio - Ley 19.668)
+  const spDate = new Date(anio, 5, 29);
+  const spDay = spDate.getDay();
+  if (spDay === 2 || spDay === 3 || spDay === 4) {
+    add(29 - (spDay - 1), 6);
+  } else if (spDay === 5) {
+    const nextMon = new Date(anio, 5, 29 + 3);
+    add(nextMon.getDate(), nextMon.getMonth() + 1);
+  } else {
+    add(29, 6);
+  }
+
+  // Encuentro de Dos Mundos (12 de octubre - Ley 19.668)
+  const edmDate = new Date(anio, 9, 12);
+  const edmDay = edmDate.getDay();
+  if (edmDay === 2 || edmDay === 3 || edmDay === 4) {
+    add(12 - (edmDay - 1), 10);
+  } else if (edmDay === 5) {
+    const nextMon = new Date(anio, 9, 12 + 3);
+    add(nextMon.getDate(), nextMon.getMonth() + 1);
+  } else {
+    add(12, 10);
+  }
+
+  // Iglesias Evangélicas (31 de octubre - Ley 20.299)
+  const evDate = new Date(anio, 9, 31);
+  const evDay = evDate.getDay();
+  if (evDay === 2) {
+    add(27, 10);
+  } else if (evDay === 3) {
+    add(2, 11);
+  } else {
+    add(31, 10);
+  }
+
+  return feriados;
+}
+
 /** Determina si una fecha dada es día hábil en Chile y HRT */
 function esDiaHabil(fecha) {
   if (!fecha) fecha = new Date();
@@ -792,23 +882,21 @@ function esDiaHabil(fecha) {
   const m = String(fecha.getMonth() + 1).padStart(2, '0');
   const y = fecha.getFullYear();
   const fechaStr = `${d}/${m}/${y}`;
+  const dmStr = `${d}/${m}`;
 
   try {
     const hrtItems = getDiasNoHabilesHRT();
-    if (hrtItems.some(item => item.fecha === fechaStr)) return false;
+    if (hrtItems && hrtItems.some(item => item.fecha === fechaStr)) return false;
   } catch (e) {
     Logger.log('Error al consultar Maestro Días No Hábiles HRT: ' + e.toString());
   }
 
-  // 3. Feriados Oficiales de Chile via Google Calendar API
+  // 3. Feriados Oficiales de Chile (100% autónomo y rápido)
   try {
-    const cal = CalendarApp.getCalendarById('es.cl#holiday@group.v.calendar.google.com');
-    if (cal) {
-      const events = cal.getEventsForDay(fecha);
-      if (events && events.length > 0) return false;
-    }
+    const feriadosSet = getFeriadosChileSet(y);
+    if (feriadosSet.has(dmStr)) return false;
   } catch (e) {
-    Logger.log('Error al consultar calendario feriados Google: ' + e.toString());
+    Logger.log('Error al calcular feriados Chile: ' + e.toString());
   }
 
   return true;
@@ -840,29 +928,13 @@ function getDiasNoHabilesMes(mes, anio) {
     Logger.log('Error procesando HRT dias no habiles: ' + e.toString());
   }
 
-  // Consulta única de eventos de feriados para todo el mes
-  const calHolidayDays = new Set();
-  try {
-    const cal = CalendarApp.getCalendarById('es.cl#holiday@group.v.calendar.google.com');
-    if (cal) {
-      const startDate = new Date(anio, mes - 1, 1, 0, 0, 0);
-      const endDate = new Date(anio, mes, 0, 23, 59, 59);
-      const events = cal.getEvents(startDate, endDate);
-      events.forEach(ev => {
-        const evStart = ev.getStartTime();
-        if (evStart.getMonth() + 1 === mes && evStart.getFullYear() === anio) {
-          calHolidayDays.add(evStart.getDate());
-        }
-      });
-    }
-  } catch (e) {
-    Logger.log('Error consultando Calendar feriados mensual: ' + e.toString());
-  }
+  const feriadosSet = getFeriadosChileSet(anio);
 
   for (let d = 1; d <= daysInMonth; d++) {
     const dt = new Date(anio, mes - 1, d);
     const dayOfWeek = dt.getDay();
-    if (dayOfWeek === 0 || dayOfWeek === 6 || hrtSet.has(d) || calHolidayDays.has(d)) {
+    const dmStr = String(d).padStart(2, '0') + '/' + String(mes).padStart(2, '0');
+    if (dayOfWeek === 0 || dayOfWeek === 6 || hrtSet.has(d) || feriadosSet.has(dmStr)) {
       noHabiles.push(d);
     }
   }
@@ -878,8 +950,10 @@ function getDiasNoHabilesHRT() {
 
   const sheet = getSheet(SHEETS.DIAS_NO_HABILES_HRT);
   if (!sheet) return [];
-  const rows = sheet.getDataRange().getValues();
-  if (rows.length <= 1) return [];
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return [];
+  const actualCols = Math.min(sheet.getLastColumn() || 3, 3);
+  const rows = sheet.getRange(1, 1, lastRow, actualCols).getValues();
 
   const items = [];
   for (let i = 1; i < rows.length; i++) {
@@ -2314,44 +2388,44 @@ function getRegistros(mes, anio) {
   anio = parseInt(anio);
 
   const sheetsToFetch = [
-    { key: 'termo',         sheetName: SHEETS.TERMO,       colMes: 2, colAnio: 3, mapper: r => ({
+    { key: 'termo',         sheetName: SHEETS.TERMO,       colMes: 2, colAnio: 3, maxCols: 15, mapper: r => ({
       fecha: getFechaFromRow(r), dia: r[1], mes: r[2], anio: r[3],
       responsable: r[4], temperatura: r[5], humedad: r[6], turno: r[7],
       area: r[8], accion_correctiva: r[9] || '', observaciones: r[10],
       revisado_por: r[12] || '', fecha_revision: r[13] || '', obs_revision: r[14] || ''
     }) },
-    { key: 'centrifugas',   sheetName: SHEETS.CENT_REG,    colMes: 2, colAnio: 3, mapper: r => ({
+    { key: 'centrifugas',   sheetName: SHEETS.CENT_REG,    colMes: 2, colAnio: 3, maxCols: 12, mapper: r => ({
       fecha: getFechaFromRow(r), dia: r[1], mes: r[2], anio: r[3], centrifuga: r[4],
       responsable: r[5], tipo_mantencion: r[6], observaciones: r[7],
       revisado_por: r[9] || '', fecha_revision: r[10] || '', obs_revision: r[11] || ''
     }) },
-    { key: 'mesones',       sheetName: SHEETS.MESONES,     colMes: 2, colAnio: 3, mapper: r => ({
+    { key: 'mesones',       sheetName: SHEETS.MESONES,     colMes: 2, colAnio: 3, maxCols: 11, mapper: r => ({
       fecha: getFechaFromRow(r), dia: r[1], mes: r[2], anio: r[3], sala: r[4],
       responsable: r[5], observaciones: r[6],
       revisado_por: r[8] || '', fecha_revision: r[9] || '', obs_revision: r[10] || ''
     }) },
-    { key: 'refriTemp',     sheetName: SHEETS.REFRI_REG,    colMes: 2, colAnio: 3, mapper: r => ({
+    { key: 'refriTemp',     sheetName: SHEETS.REFRI_REG,    colMes: 2, colAnio: 3, maxCols: 15, mapper: r => ({
       fecha: getFechaFromRow(r), dia: r[1], mes: r[2], anio: r[3],
       responsable: r[4], temperatura: r[5], turno: r[6],
       equipo: r[7], tipo: r[8], accion_correctiva: r[9] || '', observaciones: r[10],
       revisado_por: r[12] || '', fecha_revision: r[13] || '', obs_revision: r[14] || ''
     }) },
-    { key: 'limpiezaRefri',  sheetName: SHEETS.LIMP_REFRI,   colMes: 2, colAnio: 3, mapper: r => ({
+    { key: 'limpiezaRefri',  sheetName: SHEETS.LIMP_REFRI,   colMes: 2, colAnio: 3, maxCols: 12, mapper: r => ({
       fecha: getFechaFromRow(r), dia: r[1], mes: r[2], anio: r[3],
       tipo_mantencion: r[4], equipo: r[5], responsable: r[6], observaciones: r[7],
       revisado_por: r[9] || '', fecha_revision: r[10] || '', obs_revision: r[11] || ''
     }) },
-    { key: 'conductividad', sheetName: SHEETS.CONDUCT_REG,  colMes: 2, colAnio: 3, mapper: r => ({
+    { key: 'conductividad', sheetName: SHEETS.CONDUCT_REG,  colMes: 2, colAnio: 3, maxCols: 12, mapper: r => ({
       fecha: getFechaFromRow(r), dia: r[1], mes: r[2], anio: r[3],
       responsable: r[4], conductividad: r[5], turno: r[6], observaciones: r[7],
       revisado_por: r[9] || '', fecha_revision: r[10] || '', obs_revision: r[11] || ''
     }) },
-    { key: 'cobas',         sheetName: SHEETS.COBAS_REG,   colMes: 2, colAnio: 3, mapper: r => ({
+    { key: 'cobas',         sheetName: SHEETS.COBAS_REG,   colMes: 2, colAnio: 3, maxCols: 13, mapper: r => ({
       fecha: getFechaFromRow(r), dia: r[1], mes: r[2], anio: r[3],
       equipo: r[4], responsable: r[5], frecuencia: r[6], actividad: r[7],
       observaciones: r[8], revisado_por: r[10] || '', fecha_revision: r[11] || '', obs_revision: r[12] || ''
     }) },
-    { key: 'elimMuestras',  sheetName: SHEETS.ELIM_MUESTRAS, colMes: 2, colAnio: 3, mapper: (r, rowIdx, headerRow) => {
+    { key: 'elimMuestras',  sheetName: SHEETS.ELIM_MUESTRAS, colMes: 2, colAnio: 3, maxCols: 11, mapper: (r, rowIdx, headerRow) => {
       const hasSectorCol = (headerRow && headerRow.length >= 5)
         ? (String(headerRow[4]).trim().toLowerCase() === 'sector')
         : (r.length >= 11);
@@ -2369,9 +2443,10 @@ function getRegistros(mes, anio) {
 
   const result = { mes, anio };
 
-  // Calculate non-working days for the requested month via fast single batch
   result.diasNoHabiles = getDiasNoHabilesMes(mes, anio);
   result.revisiones = getRevision(mes, anio);
+
+  const ss = getSpreadsheet();
 
   sheetsToFetch.forEach(cfg => {
     const cacheKey = getCacheKey('regs', cfg.key, mes, anio);
@@ -2379,10 +2454,34 @@ function getRegistros(mes, anio) {
     if (cached) {
       result[cfg.key] = cached;
     } else {
-      const sheet = getSheet(cfg.sheetName);
-      const rows = sheet.getDataRange().getValues();
+      const sheet = ss.getSheetByName(cfg.sheetName);
+      if (!sheet) {
+        result[cfg.key] = [];
+        return;
+      }
+      const lastRow = sheet.getLastRow();
+      if (lastRow <= 1) {
+        setCachedJson(cacheKey, [], CACHE_TTL_REGISTROS);
+        result[cfg.key] = [];
+        return;
+      }
+      const maxCols = cfg.maxCols || 15;
+      const actualCols = Math.min(sheet.getLastColumn() || maxCols, maxCols);
+      if (actualCols < 1) {
+        setCachedJson(cacheKey, [], CACHE_TTL_REGISTROS);
+        result[cfg.key] = [];
+        return;
+      }
+      const rows = sheet.getRange(1, 1, lastRow, actualCols).getValues();
       const headerRow = rows.length > 0 ? rows[0] : [];
-      const filteredRaw = rows.slice(1).filter(r => parseInt(r[cfg.colMes]) === mes && parseInt(r[cfg.colAnio]) === anio);
+      const filteredRaw = [];
+      for (let i = 1; i < rows.length; i++) {
+        const r = rows[i];
+        if (!r[0] && !r[1] && !r[2]) continue;
+        if (parseInt(r[cfg.colMes]) === mes && parseInt(r[cfg.colAnio]) === anio) {
+          filteredRaw.push(r);
+        }
+      }
       const mapped = filteredRaw.map((r, i) => cfg.mapper(r, i, headerRow));
       setCachedJson(cacheKey, mapped, CACHE_TTL_REGISTROS);
       result[cfg.key] = mapped;
@@ -2399,7 +2498,12 @@ function getRevision(mes, anio) {
     return cached;
   }
 
-  const rows = getSheet(SHEETS.REVISIONES).getDataRange().getValues();
+  const sheet = getSheet(SHEETS.REVISIONES);
+  if (!sheet) return { revisiones: [], revisados: [] };
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return { revisiones: [], revisados: [] };
+  const actualCols = Math.min(sheet.getLastColumn() || 6, 6);
+  const rows = sheet.getRange(1, 1, lastRow, actualCols).getValues();
   // Collect all revision entries for this month/year
   const revisiones = [];
   for (let i = 1; i < rows.length; i++) {

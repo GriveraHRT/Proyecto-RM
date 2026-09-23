@@ -12,8 +12,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600&display=swap" media="print" onload="this.media='all'" />
   <script>
-    // URL dinámica del Web App (preserva el dominio hospitaldetalca.cl en Workspace si aplica)
-    var API_URL = '<?!= serviceUrl || "https://script.google.com/macros/s/AKfycbxuqcui0-hjJ721uMWZk3w-4l2fVCaBWQgdMJqVMb5Pno339Jqetq4r62p3-1gGBUvFOg/exec" ?>';
+    // URL dinámica canónica del Web App (previene prefijo de dominio Google Workspace /a/hospitaldetalca.cl/ que rompe CORS)
+    var API_URL = ('<?!= serviceUrl || "https://script.google.com/macros/s/AKfycbxuqcui0-hjJ721uMWZk3w-4l2fVCaBWQgdMJqVMb5Pno339Jqetq4r62p3-1gGBUvFOg/exec" ?>').replace(/script\.google\.com\/a\/[^\/]+\/macros\/s\//i, 'script.google.com/macros/s/');
     // Se reciben los parámetros pasados al doGet desde Apps Script
     window.QR_PARAMS = <?!= JSON.stringify(parameter) ?>;
     // Datos maestros precargados desde el servidor (carga instantánea 0ms sin peticiones de red)
