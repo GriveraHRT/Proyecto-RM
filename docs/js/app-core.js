@@ -228,15 +228,36 @@ async function apiGet(p) {
   return promise;
 }
 
+let isSubmittingGlobal = false;
+let lastSubmitPayload = '';
+let lastSubmitTime = 0;
+
 async function apiPost(b) {
-  const r = await fetchWithTimeout(API_URL, {
-    method: 'POST',
-    redirect: 'follow',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(b)
-  }, 45000, 0);
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  return r.json();
+  const currentPayload = JSON.stringify(b);
+  const now = Date.now();
+  // Bloquear reintentos idénticos accidentales dentro de los primeros 2.5 segundos
+  if (isSubmittingGlobal && currentPayload === lastSubmitPayload && (now - lastSubmitTime) < 2500) {
+    console.warn('Envío repetido bloqueado en cliente:', b.action);
+    return { success: true, message: 'Su registro ya se está procesando...' };
+  }
+  isSubmittingGlobal = true;
+  lastSubmitPayload = currentPayload;
+  lastSubmitTime = now;
+
+  try {
+    const r = await fetchWithTimeout(API_URL, {
+      method: 'POST',
+      redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: currentPayload
+    }, 45000, 0);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return await r.json();
+  } finally {
+    setTimeout(() => {
+      isSubmittingGlobal = false;
+    }, 1500);
+  }
 }
 
 // Clock

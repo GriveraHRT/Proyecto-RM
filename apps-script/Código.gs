@@ -434,33 +434,126 @@ function jsonResponse(obj) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-function insertRowAtTop(sheet, values) {
-  if (sheet.getLastRow() < 1 || sheet.getLastColumn() < 1) {
-    ensureSheetHeadersAndVisibility(sheet);
-  }
-  sheet.insertRowAfter(1);
-  const range = sheet.getRange(2, 1, 1, values.length);
-  range.setValues([values]);
+function checkSubmissionFingerprint(action, data) {
   try {
-    sheet.getRange(2, 1).setNumberFormat('@');
-  } catch (e) {}
-  range.setBackground(null).setFontColor(null).setFontWeight("normal");
+    let keyPayload = '';
+    if (action === 'saveTermo') {
+      keyPayload = [data.fecha, data.ampm, data.area, data.temperatura, data.humedad, data.responsable].join('|');
+    } else if (action === 'saveCentrifuga') {
+      const cens = Array.isArray(data.centrifugas) ? data.centrifugas.slice().sort().join(',') : String(data.centrifugas || '');
+      keyPayload = [data.fecha, cens, data.tipo_mantencion, data.responsable].join('|');
+    } else if (action === 'saveMesones') {
+      const salas = Array.isArray(data.salas) ? data.salas.slice().sort().join(',') : String(data.sala || '');
+      keyPayload = [data.fecha, salas, data.responsable].join('|');
+    } else if (action === 'saveRefriTemp') {
+      keyPayload = [data.fecha, data.ampm, data.equipo, data.temperatura, data.responsable].join('|');
+    } else if (action === 'saveLimpiezaRefri') {
+      const eq = Array.isArray(data.equipos) ? data.equipos.slice().sort().join(',') : String(data.equipo || '');
+      keyPayload = [data.fecha, eq, data.tipo_mantencion, data.responsable].join('|');
+    } else if (action === 'saveConductividad') {
+      keyPayload = [data.fecha, data.ampm, data.conductividad, data.responsable].join('|');
+    } else if (action === 'saveCobas') {
+      keyPayload = [data.fecha, data.equipo, data.responsable, (data.actividades || []).map(a => a.nombre || a).join(',')].join('|');
+    } else if (action === 'saveEtiquetadoraRegistro') {
+      keyPayload = [data.etiquetadora, data.accion, data.responsable].join('|');
+    } else if (action === 'saveDxH900Registro') {
+      keyPayload = [data.descripcion, data.usuario_responsable].join('|');
+    } else if (action === 'saveElimMuestras') {
+      keyPayload = [data.fecha, data.sector, data.muestras_eliminadas, data.responsable].join('|');
+    }
+
+    if (!keyPayload) return null;
+
+    const digest = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, keyPayload);
+    const cleanKey = 'dedupe_' + action + '_' + Utilities.base64EncodeWebSafe(digest).substring(0, 32);
+    const cache = CacheService.getScriptCache();
+    const existing = cache.get(cleanKey);
+    if (existing) {
+      return { isDuplicate: true, key: cleanKey };
+    }
+    // Reservar huella digital por 25 segundos para evitar duplicación por reintentos
+    cache.put(cleanKey, '1', 25);
+    return { isDuplicate: false, key: cleanKey };
+  } catch (e) {
+    Logger.log('Aviso en checkSubmissionFingerprint: ' + e.toString());
+    return null;
+  }
+}
+
+function insertRowAtTop(sheet, values) {
+  if (!sheet) return;
+  const lock = LockService.getScriptLock();
+  let hasLock = false;
+  try {
+    hasLock = lock.tryLock(10000);
+  } catch (e) {
+    Logger.log('Aviso lock en insertRowAtTop: ' + e.toString());
+  }
+
+  try {
+    if (sheet.getLastRow() < 1 || sheet.getLastColumn() < 1) {
+      ensureSheetHeadersAndVisibility(sheet);
+    }
+    sheet.insertRowAfter(1);
+
+    // Inmediatamente limpiar cualquier formato heredado de la fila 1 en todo el ancho de la hoja
+    const totalCols = Math.max(sheet.getMaxColumns(), values.length, 1);
+    try {
+      sheet.getRange(2, 1, 1, totalCols)
+        .setBackground(null)
+        .setFontColor(null)
+        .setFontWeight('normal');
+    } catch (eFmt) {}
+
+    const range = sheet.getRange(2, 1, 1, values.length);
+    range.setValues([values]);
+    try {
+      sheet.getRange(2, 1).setNumberFormat('@');
+    } catch (e) {}
+  } finally {
+    if (hasLock) {
+      try { lock.releaseLock(); } catch (eRel) {}
+    }
+  }
 }
 
 function insertRowsAtTopBatch(sheet, rowsArray) {
-  if (!rowsArray || rowsArray.length === 0) return;
-  if (sheet.getLastRow() < 1 || sheet.getLastColumn() < 1) {
-    ensureSheetHeadersAndVisibility(sheet);
-  }
-  const count = rowsArray.length;
-  const cols = rowsArray[0].length;
-  sheet.insertRowsAfter(1, count);
-  const range = sheet.getRange(2, 1, count, cols);
-  range.setValues(rowsArray);
+  if (!sheet || !rowsArray || rowsArray.length === 0) return;
+  const lock = LockService.getScriptLock();
+  let hasLock = false;
   try {
-    sheet.getRange(2, 1, count, 1).setNumberFormat('@');
-  } catch (e) {}
-  range.setBackground(null).setFontColor(null).setFontWeight("normal");
+    hasLock = lock.tryLock(15000);
+  } catch (e) {
+    Logger.log('Aviso lock en insertRowsAtTopBatch: ' + e.toString());
+  }
+
+  try {
+    if (sheet.getLastRow() < 1 || sheet.getLastColumn() < 1) {
+      ensureSheetHeadersAndVisibility(sheet);
+    }
+    const count = rowsArray.length;
+    const cols = rowsArray[0].length;
+    sheet.insertRowsAfter(1, count);
+
+    // Inmediatamente limpiar formato heredado en todo el bloque insertado
+    const totalCols = Math.max(sheet.getMaxColumns(), cols, 1);
+    try {
+      sheet.getRange(2, 1, count, totalCols)
+        .setBackground(null)
+        .setFontColor(null)
+        .setFontWeight('normal');
+    } catch (eFmt) {}
+
+    const range = sheet.getRange(2, 1, count, cols);
+    range.setValues(rowsArray);
+    try {
+      sheet.getRange(2, 1, count, 1).setNumberFormat('@');
+    } catch (e) {}
+  } finally {
+    if (hasLock) {
+      try { lock.releaseLock(); } catch (eRel) {}
+    }
+  }
 }
 
 // ── Router ───────────────────────────────────────────────────
@@ -536,6 +629,7 @@ function doGet(e) {
       case 'scheduleAutoTest': return jsonResponse(scheduleAutoTriggerInMinutes(e.parameter.minutes || 2));
       case 'diagnosticarFaltantesMes': return jsonResponse(diagnosticarFaltantesMes(e.parameter));
       case 'getTriggerLogs': return jsonResponse(getTriggerLogs());
+      case 'limpiarFilasNegras': return jsonResponse(limpiarFilasNegrasYVacias());
       case 'SETUP_INIT_TA':     return jsonResponse(setup());
       case 'REINIT':            return jsonResponse(reinitialize());
       default:                  return jsonResponse({ error: 'Acción no reconocida: ' + action });
@@ -595,6 +689,7 @@ function doPost(e) {
       case 'migrarInicialesAHistoricos': return jsonResponse(migrarInicialesAHistoricos());
       case 'setupMaestroPersonal': return jsonResponse(setupMaestroPersonal());
       case 'diagnosticarFaltantesMes': return jsonResponse(diagnosticarFaltantesMes(data));
+      case 'limpiarFilasNegras': return jsonResponse(limpiarFilasNegrasYVacias());
       case 'ejecutarRegularizacionBatch': return jsonResponse(ejecutarRegularizacionBatch(data));
       default:                    return jsonResponse({ error: 'Acción no reconocida: ' + data.action });
     }
@@ -1201,11 +1296,19 @@ function saveTermo(data) {
   const turno = ampm === 'AM' ? 'Mañana' : 'Tarde';
   const accion = data.accion_correctiva || '';
 
-  // Check if out of range
   const temp = parseFloat(data.temperatura);
   const hum = parseFloat(data.humedad);
-  const tempOOR = temp < 18 || temp > 24;
-  const humOOR = hum < 20 || hum > 70;
+
+  // Deduplicación contra reintentos por lentitud o corte de red
+  const dedupe = checkSubmissionFingerprint('saveTermo', data);
+  if (dedupe && dedupe.isDuplicate) {
+    return {
+      success: true,
+      message: 'Registro de Temperatura/Humedad guardado (reintento confirmado).',
+      recentRecords: _getRecentRecordsSafely(getRecentTermo, 20),
+      deduplicated: true
+    };
+  }
 
   insertRowAtTop(getSheet(SHEETS.TERMO), [
     formatFechaDDMMYYYY(f),
@@ -1893,6 +1996,16 @@ function saveCentrifuga(data) {
   if (centrifugas.length === 0) {
     return { success: false, error: 'Seleccione al menos una centrífuga.' };
   }
+  const dedupe = checkSubmissionFingerprint('saveCentrifuga', data);
+  if (dedupe && dedupe.isDuplicate) {
+    return {
+      success: true,
+      message: centrifugas.length + ' registro(s) de Centrífuga guardado(s) (reintento confirmado).',
+      recentRecords: _getRecentRecordsSafely(getRecentCentrifugas, 20),
+      deduplicated: true
+    };
+  }
+
   const f = parseFecha(data.fecha);
   const ts = getFechaRegistroFormatted();
   const respName = resolveNombreResponsable(data.responsable);
@@ -1930,6 +2043,17 @@ function saveMesones(data) {
   if (salas.length === 0) {
     return { success: false, error: 'Seleccione al menos una sala.' };
   }
+
+  const dedupe = checkSubmissionFingerprint('saveMesones', data);
+  if (dedupe && dedupe.isDuplicate) {
+    return {
+      success: true,
+      message: salas.length + ' registro(s) de Mesones guardado(s) (reintento confirmado).',
+      recentRecords: _getRecentRecordsSafely(getRecentMesones, 20),
+      deduplicated: true
+    };
+  }
+
   const f = parseFecha(data.fecha);
   const ts = getFechaRegistroFormatted();
   const respName = resolveNombreResponsable(data.responsable);
@@ -1963,6 +2087,17 @@ function saveRefriTemp(data) {
   const ampm = data.ampm || (new Date().getHours() < 12 ? 'AM' : 'PM');
   const errFuture = validarFechaNoFutura(data.fecha, ampm);
   if (errFuture) return { success: false, error: errFuture };
+
+  const dedupe = checkSubmissionFingerprint('saveRefriTemp', data);
+  if (dedupe && dedupe.isDuplicate) {
+    return {
+      success: true,
+      message: 'Registro de Temperatura de ' + (data.equipo || 'Equipo') + ' guardado (reintento confirmado).',
+      recentRecords: _getRecentRecordsSafely(getRecentRefriTemp, 20),
+      deduplicated: true
+    };
+  }
+
   const f = parseFecha(data.fecha);
   const ts = getFechaRegistroFormatted();
   const turno = ampm === 'AM' ? 'Mañana' : 'Tarde';
@@ -2028,6 +2163,17 @@ function saveLimpiezaRefri(data) {
   if (equipos.length === 0) {
     return { success: false, error: 'Seleccione al menos un equipo.' };
   }
+
+  const dedupe = checkSubmissionFingerprint('saveLimpiezaRefri', data);
+  if (dedupe && dedupe.isDuplicate) {
+    return {
+      success: true,
+      message: equipos.length + ' registro(s) de Limpieza Refrigeradores guardado(s) (reintento confirmado).',
+      recentRecords: _getRecentRecordsSafely(getRecentLimpRefri, 20),
+      deduplicated: true
+    };
+  }
+
   const f = parseFecha(data.fecha);
   const ts = getFechaRegistroFormatted();
   const respName = resolveNombreResponsable(data.responsable);
@@ -2062,6 +2208,17 @@ function saveConductividad(data) {
   const ampm = data.ampm || (new Date().getHours() < 12 ? 'AM' : 'PM');
   const errFuture = validarFechaNoFutura(data.fecha, ampm);
   if (errFuture) return { success: false, error: errFuture };
+
+  const dedupe = checkSubmissionFingerprint('saveConductividad', data);
+  if (dedupe && dedupe.isDuplicate) {
+    return {
+      success: true,
+      message: 'Registro de Conductividad guardado (reintento confirmado).',
+      recentRecords: _getRecentRecordsSafely(getRecentConductividad, 20),
+      deduplicated: true
+    };
+  }
+
   const f = parseFecha(data.fecha);
   const ts = getFechaRegistroFormatted();
   const turno = ampm === 'AM' ? 'Mañana' : 'Tarde';
@@ -2112,6 +2269,17 @@ function saveCobas(data) {
   }
   const errFuture = validarFechaNoFutura(data.fecha);
   if (errFuture) return { success: false, error: errFuture };
+
+  const dedupe = checkSubmissionFingerprint('saveCobas', data);
+  if (dedupe && dedupe.isDuplicate) {
+    return {
+      success: true,
+      message: data.actividades.length + ' tarea(s) de Cobas guardada(s) (reintento confirmado).',
+      recentRecords: _getRecentRecordsSafely(getRecentCobas, 20),
+      deduplicated: true
+    };
+  }
+
   const f = parseFecha(data.fecha);
   const ts = getFechaRegistroFormatted();
   const sheet = getSheet(SHEETS.COBAS_REG);
@@ -3511,6 +3679,71 @@ function reinitialize() {
   return { success: true, message: 'Estructura y registros re-inicializados y caché borrada.' };
 }
 
+function limpiarFilasNegrasYVacias() {
+  const ss = getSpreadsheet();
+  const sheetsToCheck = [
+    SHEETS.TERMO,
+    SHEETS.CENT_REG,
+    SHEETS.MESONES,
+    SHEETS.REFRI_REG,
+    SHEETS.LIMP_REFRI,
+    SHEETS.CONDUCT_REG,
+    SHEETS.COBAS_REG,
+    SHEETS.ETIQUETADORAS_REG,
+    SHEETS.DXH900_REG,
+    SHEETS.ELIM_MUESTRAS
+  ];
+
+  let totalDeleted = 0;
+  const details = {};
+
+  sheetsToCheck.forEach(function(name) {
+    const sheet = ss.getSheetByName(name);
+    if (!sheet) return;
+    const lastRow = sheet.getLastRow();
+    if (lastRow <= 1) return;
+
+    const numRows = lastRow - 1;
+    const numCols = Math.min(sheet.getLastColumn(), 5);
+    if (numCols < 1) return;
+
+    // Lectura masiva en lote (1 sola llamada API para toda la hoja en vez de llamadas por fila)
+    const allValues = sheet.getRange(2, 1, numRows, numCols).getValues();
+    const allBgs = sheet.getRange(2, 1, numRows, 1).getBackgrounds();
+
+    let deletedInSheet = 0;
+    // Recorrer de abajo hacia arriba para eliminar sin alterar los índices de filas superiores
+    for (let i = numRows - 1; i >= 0; i--) {
+      const rowVals = allValues[i];
+      const col1 = String(rowVals[0] || '').trim();
+      const col2 = numCols >= 2 ? String(rowVals[1] || '').trim() : '';
+      const col3 = numCols >= 3 ? String(rowVals[2] || '').trim() : '';
+      const col4 = numCols >= 4 ? String(rowVals[3] || '').trim() : '';
+      const col5 = numCols >= 5 ? String(rowVals[4] || '').trim() : '';
+
+      const isBlankRow = (col1 === '' && col2 === '' && col3 === '' && col4 === '' && col5 === '');
+      const bg = String(allBgs[i][0] || '').toLowerCase();
+      const isDarkBg = (bg === '#0f172a' || bg === '#000000' || bg === '#0b1426');
+
+      if (isBlankRow || (col1 === '' && isDarkBg)) {
+        const actualRow = i + 2;
+        sheet.deleteRow(actualRow);
+        deletedInSheet++;
+        totalDeleted++;
+      }
+    }
+    if (deletedInSheet > 0) {
+      details[name] = deletedInSheet;
+    }
+  });
+
+  return {
+    success: true,
+    message: 'Limpieza completada: se eliminaron ' + totalDeleted + ' fila(s) vacía(s)/negra(s).',
+    details: details
+  };
+}
+
 function resetRegistros() {
   const registroSheets = [
     SHEETS.TERMO, SHEETS.CENT_REG, SHEETS.MESONES,
@@ -3987,6 +4220,16 @@ function saveElimMuestras(data) {
   const resp = resolveNombreResponsable(data.responsable);
   const errFuture = validarFechaNoFutura(data.fecha);
   if (errFuture) return { success: false, error: errFuture };
+
+  const dedupe = checkSubmissionFingerprint('saveElimMuestras', data);
+  if (dedupe && dedupe.isDuplicate) {
+    return {
+      success: true,
+      message: 'Registro de eliminación de muestras guardado con éxito (reintento confirmado).',
+      deduplicated: true
+    };
+  }
+
   const f = parseFecha(data.fecha);
   const ts = getFechaRegistroFormatted();
 
