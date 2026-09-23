@@ -266,6 +266,64 @@ function clearSheetCache(keyPrefix, mes, anio) {
   clearCacheKeys(keys);
 }
 
+function updateRecordCacheOnSave(keyPrefix, mes, anio, mappedRecord, recentRecord) {
+  try {
+    if (mappedRecord && mes && anio) {
+      const regKey = getCacheKey('regs', keyPrefix, parseInt(mes), parseInt(anio));
+      const cachedRegs = getCachedJson(regKey);
+      if (cachedRegs && Array.isArray(cachedRegs)) {
+        cachedRegs.unshift(mappedRecord);
+        setCachedJson(regKey, cachedRegs, CACHE_TTL_REGISTROS);
+      }
+    }
+  } catch (e) {
+    clearSheetCache(keyPrefix, mes, anio);
+  }
+
+  try {
+    if (recentRecord) {
+      const recentKey = getCacheKey('recent', keyPrefix);
+      let cachedRecent = getCachedJson(recentKey);
+      if (cachedRecent && Array.isArray(cachedRecent)) {
+        cachedRecent.unshift(recentRecord);
+        if (cachedRecent.length > 25) cachedRecent = cachedRecent.slice(0, 20);
+        setCachedJson(recentKey, cachedRecent, CACHE_TTL_RECENT);
+      }
+    }
+  } catch (e) {
+    Logger.log('Aviso actualizando cache recent ' + keyPrefix + ': ' + e.toString());
+  }
+}
+
+function updateRecordCacheOnSaveBatch(keyPrefix, mes, anio, mappedRecords, recentRecords) {
+  try {
+    if (mappedRecords && mappedRecords.length && mes && anio) {
+      const regKey = getCacheKey('regs', keyPrefix, parseInt(mes), parseInt(anio));
+      const cachedRegs = getCachedJson(regKey);
+      if (cachedRegs && Array.isArray(cachedRegs)) {
+        for (let i = mappedRecords.length - 1; i >= 0; i--) {
+          cachedRegs.unshift(mappedRecords[i]);
+        }
+        setCachedJson(regKey, cachedRegs, CACHE_TTL_REGISTROS);
+      }
+    }
+  } catch (e) {}
+
+  try {
+    if (recentRecords && recentRecords.length) {
+      const recentKey = getCacheKey('recent', keyPrefix);
+      let cachedRecent = getCachedJson(recentKey);
+      if (cachedRecent && Array.isArray(cachedRecent)) {
+        for (let i = recentRecords.length - 1; i >= 0; i--) {
+          cachedRecent.unshift(recentRecords[i]);
+        }
+        if (cachedRecent.length > 25) cachedRecent = cachedRecent.slice(0, 20);
+        setCachedJson(recentKey, cachedRecent, CACHE_TTL_RECENT);
+      }
+    }
+  } catch (e) {}
+}
+
 function _getRecentRecordsSafely(getRecentFn, limit) {
   try {
     const res = getRecentFn(limit || 20);
@@ -622,7 +680,16 @@ function doPost(e) {
 
 /** Expuesto directamente a google.script.run en el frontend para evitar peticiones HTTP y problemas CORS */
 function apiRun(action, data) {
-  return executeAction(action, data);
+  try {
+    if (typeof data === 'string') {
+      try { data = JSON.parse(data); } catch (e) {}
+    }
+    const result = executeAction(action, data);
+    return JSON.stringify(result !== undefined ? result : null);
+  } catch (err) {
+    Logger.log('Error en apiRun (' + action + '): ' + (err.stack || err.toString()));
+    return JSON.stringify({ success: false, error: err.toString() });
+  }
 }
 
 function executeAction(action, data) {
@@ -952,8 +1019,7 @@ function getDiasNoHabilesHRT() {
   if (!sheet) return [];
   const lastRow = sheet.getLastRow();
   if (lastRow <= 1) return [];
-  const actualCols = Math.min(sheet.getLastColumn() || 3, 3);
-  const rows = sheet.getRange(1, 1, lastRow, actualCols).getValues();
+  const rows = sheet.getRange(1, 1, lastRow, 3).getValues();
 
   const items = [];
   for (let i = 1; i < rows.length; i++) {
@@ -1400,7 +1466,23 @@ function saveTermo(data) {
     ''   // Obs._Revisión
   ]);
 
-  clearSheetCache('termo', f.mes, f.anio);
+  const mappedReg = {
+    fecha: formatFechaDDMMYYYY(f), dia: f.dia, mes: f.mes, anio: f.anio,
+    responsable: resolveNombreResponsable(data.responsable),
+    temperatura: temp, humedad: hum, turno: turno,
+    area: data.area, accion_correctiva: accion, observaciones: data.observaciones || '',
+    revisado_por: '', fecha_revision: '', obs_revision: ''
+  };
+  const recentReg = {
+    rowIndex: 2,
+    fecha: formatFechaDDMMYYYY(f), dia: f.dia, mes: f.mes, anio: f.anio,
+    responsable: resolveNombreResponsable(data.responsable),
+    temperatura: temp, humedad: hum, turno: turno,
+    area: data.area, accion_correctiva: accion, observaciones: data.observaciones || '',
+    fecha_registro: ts,
+    revisado_por: '', fecha_revision: '', obs_revision: ''
+  };
+  updateRecordCacheOnSave('termo', f.mes, f.anio, mappedReg, recentReg);
 
   // Las alertas de temperatura/humedad fuera de rango ahora se envían consolidadas a las 08:30 mediante triggerAlertaConsolidadaTermo.
 
@@ -2097,8 +2179,18 @@ function saveCentrifuga(data) {
     ''   // Obs._Revisión
   ]);
   insertRowsAtTopBatch(sheet, rows);
-
-  clearSheetCache('centrifugas', f.mes, f.anio);
+  const mappedList = centrifugas.map(cent => ({
+    fecha: formatFechaDDMMYYYY(f), dia: f.dia, mes: f.mes, anio: f.anio,
+    centrifuga: cent, responsable: respName, tipo_mantencion: data.tipo_mantencion || 'Diaria',
+    observaciones: data.observaciones || '', revisado_por: '', fecha_revision: '', obs_revision: ''
+  }));
+  const recentList = centrifugas.map((cent, idx) => ({
+    rowIndex: 2 + idx,
+    fecha: formatFechaDDMMYYYY(f), dia: f.dia, mes: f.mes, anio: f.anio,
+    centrifuga: cent, responsable: respName, tipo_mantencion: data.tipo_mantencion || 'Diaria',
+    observaciones: data.observaciones || '', fecha_registro: ts, revisado_por: '', fecha_revision: '', obs_revision: ''
+  }));
+  updateRecordCacheOnSaveBatch('centrifugas', f.mes, f.anio, mappedList, recentList);
   return {
     success: true,
     message: centrifugas.length + ' registro(s) de Centrífuga guardado(s).',
@@ -2145,7 +2237,18 @@ function saveMesones(data) {
   ]);
   insertRowsAtTopBatch(sheet, rows);
 
-  clearSheetCache('mesones', f.mes, f.anio);
+  const mappedList = salas.map(sala => ({
+    fecha: formatFechaDDMMYYYY(f), dia: f.dia, mes: f.mes, anio: f.anio,
+    sala: sala, responsable: respName, observaciones: data.observaciones || '',
+    revisado_por: '', fecha_revision: '', obs_revision: ''
+  }));
+  const recentList = salas.map((sala, idx) => ({
+    rowIndex: 2 + idx,
+    fecha: formatFechaDDMMYYYY(f), dia: f.dia, mes: f.mes, anio: f.anio,
+    sala: sala, responsable: respName, observaciones: data.observaciones || '',
+    fecha_registro: ts, revisado_por: '', fecha_revision: '', obs_revision: ''
+  }));
+  updateRecordCacheOnSaveBatch('mesones', f.mes, f.anio, mappedList, recentList);
   return {
     success: true,
     message: salas.length + ' registro(s) de Mesones guardado(s).',
@@ -2204,7 +2307,20 @@ function saveRefriTemp(data) {
     ''   // Obs._Revisión
   ]);
 
-  clearSheetCache('refriTemp', f.mes, f.anio);
+  const mappedReg = {
+    fecha: formatFechaDDMMYYYY(f), dia: f.dia, mes: f.mes, anio: f.anio,
+    responsable: nombreResp, temperatura: temp, turno: turno,
+    equipo: data.equipo, tipo: tipo, accion_correctiva: accion, observaciones: data.observaciones || '',
+    revisado_por: '', fecha_revision: '', obs_revision: ''
+  };
+  const recentReg = {
+    rowIndex: 2,
+    fecha: formatFechaDDMMYYYY(f), dia: f.dia, mes: f.mes, anio: f.anio,
+    responsable: nombreResp, temperatura: temp, turno: turno,
+    equipo: data.equipo, tipo: tipo, accion_correctiva: accion, observaciones: data.observaciones || '',
+    fecha_registro: ts, revisado_por: '', fecha_revision: '', obs_revision: ''
+  };
+  updateRecordCacheOnSave('refriTemp', f.mes, f.anio, mappedReg, recentReg);
 
   if (tempOOR) {
     try {
@@ -2266,7 +2382,18 @@ function saveLimpiezaRefri(data) {
   ]);
   insertRowsAtTopBatch(sheet, rows);
 
-  clearSheetCache('limpiezaRefri', f.mes, f.anio);
+  const mappedList = equipos.map(eq => ({
+    fecha: formatFechaDDMMYYYY(f), dia: f.dia, mes: f.mes, anio: f.anio,
+    tipo_mantencion: data.tipo_mantencion, equipo: eq, responsable: respName,
+    observaciones: data.observaciones || '', revisado_por: '', fecha_revision: '', obs_revision: ''
+  }));
+  const recentList = equipos.map((eq, idx) => ({
+    rowIndex: 2 + idx,
+    fecha: formatFechaDDMMYYYY(f), dia: f.dia, mes: f.mes, anio: f.anio,
+    tipo_mantencion: data.tipo_mantencion, equipo: eq, responsable: respName,
+    observaciones: data.observaciones || '', fecha_registro: ts, revisado_por: '', fecha_revision: '', obs_revision: ''
+  }));
+  updateRecordCacheOnSaveBatch('limpiezaRefri', f.mes, f.anio, mappedList, recentList);
   return {
     success: true,
     message: equipos.length + ' registro(s) de Limpieza Refrigeradores guardado(s).',
@@ -2313,7 +2440,18 @@ function saveConductividad(data) {
     ''   // Obs._Revisión
   ]);
 
-  clearSheetCache('conductividad', f.mes, f.anio);
+  const mappedReg = {
+    fecha: formatFechaDDMMYYYY(f), dia: f.dia, mes: f.mes, anio: f.anio,
+    responsable: nombreResp, conductividad: cond, turno: turno,
+    observaciones: data.observaciones || '', revisado_por: '', fecha_revision: '', obs_revision: ''
+  };
+  const recentReg = {
+    rowIndex: 2,
+    fecha: formatFechaDDMMYYYY(f), dia: f.dia, mes: f.mes, anio: f.anio,
+    responsable: nombreResp, conductividad: cond, turno: turno,
+    observaciones: data.observaciones || '', fecha_registro: ts, revisado_por: '', fecha_revision: '', obs_revision: ''
+  };
+  updateRecordCacheOnSave('conductividad', f.mes, f.anio, mappedReg, recentReg);
 
   // Alert if > 0.5 (warning to encargado)
   if (cond > 0.5) {
@@ -2373,7 +2511,18 @@ function saveCobas(data) {
   ]);
   insertRowsAtTopBatch(sheet, rows);
   
-  clearSheetCache('cobas', f.mes, f.anio);
+  const mappedList = data.actividades.map(act => ({
+    fecha: formatFechaDDMMYYYY(f), dia: f.dia, mes: f.mes, anio: f.anio,
+    equipo: data.equipo, responsable: respName, frecuencia: act.frecuencia, actividad: act.nombre,
+    observaciones: data.observaciones || '', revisado_por: '', fecha_revision: '', obs_revision: ''
+  }));
+  const recentList = data.actividades.map((act, idx) => ({
+    rowIndex: 2 + idx,
+    fecha: formatFechaDDMMYYYY(f), dia: f.dia, mes: f.mes, anio: f.anio,
+    equipo: data.equipo, responsable: respName, frecuencia: act.frecuencia, actividad: act.nombre,
+    observaciones: data.observaciones || '', fecha_registro: ts, revisado_por: '', fecha_revision: '', obs_revision: ''
+  }));
+  updateRecordCacheOnSaveBatch('cobas', f.mes, f.anio, mappedList, recentList);
   return {
     success: true,
     message: data.actividades.length + ' tarea(s) de Cobas guardada(s).',
@@ -2466,13 +2615,7 @@ function getRegistros(mes, anio) {
         return;
       }
       const maxCols = cfg.maxCols || 15;
-      const actualCols = Math.min(sheet.getLastColumn() || maxCols, maxCols);
-      if (actualCols < 1) {
-        setCachedJson(cacheKey, [], CACHE_TTL_REGISTROS);
-        result[cfg.key] = [];
-        return;
-      }
-      const rows = sheet.getRange(1, 1, lastRow, actualCols).getValues();
+      const rows = sheet.getRange(1, 1, lastRow, maxCols).getValues();
       const headerRow = rows.length > 0 ? rows[0] : [];
       const filteredRaw = [];
       for (let i = 1; i < rows.length; i++) {
@@ -2502,8 +2645,7 @@ function getRevision(mes, anio) {
   if (!sheet) return { revisiones: [], revisados: [] };
   const lastRow = sheet.getLastRow();
   if (lastRow <= 1) return { revisiones: [], revisados: [] };
-  const actualCols = Math.min(sheet.getLastColumn() || 6, 6);
-  const rows = sheet.getRange(1, 1, lastRow, actualCols).getValues();
+  const rows = sheet.getRange(1, 1, lastRow, 6).getValues();
   // Collect all revision entries for this month/year
   const revisiones = [];
   for (let i = 1; i < rows.length; i++) {
@@ -4355,7 +4497,14 @@ function saveElimMuestras(data) {
     sheet.hideColumns(8); // Ocultar columna Fecha de registro
   } catch (e) {}
 
-  clearSheetCache('elimMuestras', f.mes, f.anio);
+  const mappedReg = {
+    fecha: formatFechaDDMMYYYY(f), dia: f.dia, mes: f.mes, anio: f.anio,
+    sector: sector,
+    responsable: resp,
+    muestras_eliminadas: data.muestras_eliminadas,
+    revisado_por: '', fecha_revision: '', obs_revision: ''
+  };
+  updateRecordCacheOnSave('elimMuestras', f.mes, f.anio, mappedReg, null);
   return { success: true, message: 'Registro de eliminación de muestras guardado con éxito.' };
 }
 

@@ -232,6 +232,13 @@ function callGoogleScriptRun(action, payload) {
           if (!settled) {
             settled = true;
             clearTimeout(timer);
+            if (typeof res === 'string') {
+              try {
+                return resolve(JSON.parse(res));
+              } catch (e) {
+                return resolve(res);
+              }
+            }
             resolve(res);
           }
         })
@@ -271,7 +278,10 @@ async function apiGet(p) {
           const res = await callGoogleScriptRun(action, p);
           if (res !== undefined && res !== null) return res;
         } catch (rpcErr) {
-          console.warn(`google.script.run (${action}) falló, reintentando vía fetch canónico:`, rpcErr);
+          console.warn(`google.script.run (${action}) falló:`, rpcErr);
+          if (window.location.hostname.includes('googleusercontent.com') || window.location.hostname.includes('script.google.com')) {
+            throw rpcErr;
+          }
         }
       }
 
@@ -301,8 +311,8 @@ async function apiPost(b) {
   const action = b && b.action ? b.action : 'unknown';
   const currentPayload = JSON.stringify(b);
   const now = Date.now();
-  // Bloquear reintentos idénticos accidentales dentro de los primeros 2.5 segundos
-  if (isSubmittingGlobal && currentPayload === lastSubmitPayload && (now - lastSubmitTime) < 2500) {
+  // Bloquear reintentos idénticos accidentales mientras haya un envío en curso o dentro de los primeros 5 segundos
+  if (isSubmittingGlobal && currentPayload === lastSubmitPayload && (now - lastSubmitTime) < 5000) {
     console.warn('Envío repetido bloqueado en cliente:', action);
     return { success: true, message: 'Su registro ya se está procesando...' };
   }
@@ -317,7 +327,10 @@ async function apiPost(b) {
         const res = await callGoogleScriptRun(action, b);
         if (res !== undefined && res !== null) return res;
       } catch (rpcErr) {
-        console.warn(`google.script.run POST (${action}) falló, reintentando vía fetch canónico:`, rpcErr);
+        console.warn(`google.script.run POST (${action}) falló:`, rpcErr);
+        if (window.location.hostname.includes('googleusercontent.com') || window.location.hostname.includes('script.google.com')) {
+          throw rpcErr;
+        }
       }
     }
 
@@ -680,6 +693,7 @@ function applyMaestrosData(data) {
     populateDatalist('list-cobas-obs', data.sugerencias.cobasObs || []);
   }
   setTimeout(bindResponsableLiveFeedback, 50);
+  try { if (typeof checkUrlParams === 'function') checkUrlParams(); } catch (e) {}
 }
 
 // Load masters with instant server injection, sessionStorage hydration or resilient API fetch
@@ -737,7 +751,30 @@ async function loadMaestros() {
   return state.maestrosPromise;
 }
 
-function populateSelect(id,items,ph){const s=document.getElementById(id);s.innerHTML=`<option value="">${ph}</option>`+items.map(i=>`<option value="${i}">${i}</option>`).join('')}
+function populateSelect(id, items, ph) {
+  const s = (typeof id === 'string') ? document.getElementById(id) : id;
+  if (!s) return;
+  const currentVal = s.value;
+  const list = items || [];
+  let html = `<option value="">${ph}</option>` + list.map(i => {
+    const v = (typeof i === 'object' && i !== null) ? (i.value !== undefined ? i.value : (i.nombre || '')) : i;
+    const l = (typeof i === 'object' && i !== null) ? (i.label !== undefined ? i.label : (i.nombre || i.value || '')) : i;
+    return `<option value="${escapeHtml(String(v))}">${escapeHtml(String(l))}</option>`;
+  }).join('');
+  s.innerHTML = html;
+  if (currentVal) {
+    const exists = Array.from(s.options).some(o => o.value === currentVal);
+    if (exists) {
+      s.value = currentVal;
+    } else {
+      const opt = document.createElement('option');
+      opt.value = currentVal;
+      opt.textContent = currentVal;
+      s.appendChild(opt);
+      s.value = currentVal;
+    }
+  }
+}
 function populateDatalist(id,items){const el=document.getElementById(id);if(el){el.innerHTML=items.map(i=>`<option value="${i}">`).join('')}}
 // ── Helpers ───────────────────────────────────────────────────
 function escapeHtml(str) {
