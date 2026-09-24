@@ -731,6 +731,7 @@ function executeAction(action, data) {
     case 'testTriggerMantencionSemanal': return { success: true, result: triggerMantencionSemanal(data.to || null) };
     case 'applyConfig':               return applyNotificationConfig(data.hour, data.to);
     case 'getProjectTriggersInfo':    return getProjectTriggersInfo();
+    case 'deleteTriggersForCurrentUser': return deleteTriggersForCurrentUser();
     case 'scheduleAutoTest':          return scheduleAutoTriggerInMinutes(data.minutes || 2);
     case 'diagnosticarFaltantesMes':  return diagnosticarFaltantesMes(data);
     case 'getTriggerLogs':            return getTriggerLogs();
@@ -4315,12 +4316,10 @@ function saveNotificaciones(data) {
   }
 
   clearCacheKeys(['notificaciones_all']);
-
-  try {
-    setupTriggers();
-  } catch (e) {
-    Logger.log('Error reconfigurando triggers tras guardar notificaciones: ' + e.toString());
-  }
+  
+  // Nota: setupTriggers() no se ejecuta automáticamente aquí para evitar recrear
+  // activadores duplicados bajo la cuenta que realiza el despliegue. Los activadores
+  // institucionales se gestionan desde la cuenta de laboratorio o vía runSetupTriggers.
   
   return { success: true, message: 'Configuración de notificaciones guardada con éxito.' };
 }
@@ -4596,12 +4595,45 @@ function applyNotificationConfig(targetHourStr, recipientsStr) {
 
 function getProjectTriggersInfo() {
   const triggers = ScriptApp.getProjectTriggers();
-  return triggers.map(t => ({
-    handlerFunction: t.getHandlerFunction(),
-    triggerSource: t.getTriggerSource().toString(),
-    eventType: t.getEventType().toString(),
-    uniqueId: t.getUniqueId()
-  }));
+  let effectiveUser = '';
+  try {
+    effectiveUser = Session.getEffectiveUser().getEmail();
+  } catch (e) {
+    effectiveUser = 'error: ' + e.toString();
+  }
+  return {
+    effectiveUser: effectiveUser,
+    triggers: triggers.map(t => ({
+      handlerFunction: t.getHandlerFunction(),
+      triggerSource: t.getTriggerSource().toString(),
+      eventType: t.getEventType().toString(),
+      uniqueId: t.getUniqueId()
+    }))
+  };
+}
+
+function deleteTriggersForCurrentUser() {
+  let effectiveUser = '';
+  try {
+    effectiveUser = Session.getEffectiveUser().getEmail();
+  } catch (e) {
+    effectiveUser = 'desconocido';
+  }
+  const triggers = ScriptApp.getProjectTriggers();
+  const deleted = [];
+  triggers.forEach(t => {
+    deleted.push({
+      handler: t.getHandlerFunction(),
+      id: t.getUniqueId()
+    });
+    ScriptApp.deleteTrigger(t);
+  });
+  return {
+    success: true,
+    user: effectiveUser,
+    deletedCount: deleted.length,
+    deleted: deleted
+  };
 }
 
 function logTriggerExecution(fnName, eventObj, resultOrErr) {
