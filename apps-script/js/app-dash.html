@@ -381,28 +381,148 @@ if (formCobas) {
 }
 
 // Dashboard
-function initDashSelectors(){const ms=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];const opts=ms.map((m,i)=>`<option value="${i+1}"${i+1===state.dashMes?' selected':''}>${m}</option>`).join('');document.getElementById('dash-mes').innerHTML=opts;const y=new Date().getFullYear();const yOpts=[y-1,y,y+1].map(a=>`<option value="${a}"${a===state.dashAnio?' selected':''}>${a}</option>`).join('');document.getElementById('dash-anio').innerHTML=yOpts}
-function cambiarMes(d){state.dashMes+=d;if(state.dashMes>12){state.dashMes=1;state.dashAnio++}if(state.dashMes<1){state.dashMes=12;state.dashAnio--}initDashSelectors();loadDashboard(true)}
-function switchDashTab(t){state.dashTab=t;document.getElementById('tab-diario').classList.toggle('active',t==='diario');document.getElementById('tab-mensual').classList.toggle('active',t==='mensual');document.getElementById('dash-daily-view').style.display=t==='diario'?'':'none';document.getElementById('dash-monthly-view').style.display=t==='mensual'?'':'none';if(state.dashData)renderDashContent(state.dashData)}
-function getDiasHasta(m,a){const h=new Date();const d=new Date(a,m,0).getDate();return(a===h.getFullYear()&&m===(h.getMonth()+1))?h.getDate():d}
+function initDashSelectors(){
+  const ms=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const elMes=document.getElementById('dash-mes');
+  const elAnio=document.getElementById('dash-anio');
+  if(!elMes||!elAnio)return;
+  elMes.innerHTML=ms.map((m,i)=>`<option value="${i+1}"${i+1===state.dashMes?' selected':''}>${m}</option>`).join('');
+  elMes.value=String(state.dashMes);
+  const currentY=new Date().getFullYear();
+  const yearsSet=new Set([currentY-2,currentY-1,currentY,currentY+1,currentY+2,state.dashAnio]);
+  elAnio.innerHTML=Array.from(yearsSet).sort((a,b)=>a-b).map(a=>`<option value="${a}"${a===state.dashAnio?' selected':''}>${a}</option>`).join('');
+  elAnio.value=String(state.dashAnio);
+}
+
+async function cambiarMes(d){
+  const elMes=document.getElementById('dash-mes');
+  const elAnio=document.getElementById('dash-anio');
+  if(elMes&&elMes.value) state.dashMes=parseInt(elMes.value,10);
+  if(elAnio&&elAnio.value) state.dashAnio=parseInt(elAnio.value,10);
+  state.dashMes+=d;
+  if(state.dashMes>12){state.dashMes=1;state.dashAnio++}
+  if(state.dashMes<1){state.dashMes=12;state.dashAnio--}
+  initDashSelectors();
+  return await loadDashboard(true);
+}
+
+function switchDashTab(t){
+  state.dashTab=t;
+  const tabDiario=document.getElementById('tab-diario');
+  const tabMensual=document.getElementById('tab-mensual');
+  if(tabDiario)tabDiario.classList.toggle('active',t==='diario');
+  if(tabMensual)tabMensual.classList.toggle('active',t==='mensual');
+  const ddv=document.getElementById('dash-daily-view');
+  const dmv=document.getElementById('dash-monthly-view');
+  if(ddv)ddv.style.display=t==='diario'?'':'none';
+  if(dmv)dmv.style.display=t==='mensual'?'':'none';
+  if(state.dashData)renderDashContent(state.dashData);
+}
+
+function getDiasHasta(m,a){
+  const h=new Date();
+  const d=new Date(a,m,0).getDate();
+  return(a===h.getFullYear()&&m===(h.getMonth()+1))?h.getDate():d;
+}
+
+function ensureDashMaestrosFallback(){
+  if(!state.dashMaestros || !state.dashMaestros.areas || !state.dashMaestros.areas.length){
+    try{
+      if(window.INITIAL_MAESTROS && window.INITIAL_MAESTROS.areas && window.INITIAL_MAESTROS.areas.length){
+        applyMaestrosData(window.INITIAL_MAESTROS);
+      } else {
+        const cachedStr = sessionStorage.getItem('dashMaestros');
+        if(cachedStr){
+          const cached = JSON.parse(cachedStr);
+          if(cached && cached.areas && cached.areas.length){
+            applyMaestrosData(cached);
+          }
+        }
+      }
+    }catch(e){}
+  }
+  if(!state.dashMaestros) state.dashMaestros={};
+  if(!state.dashMaestros.areas || !state.dashMaestros.areas.length) state.dashMaestros.areas=state.areas||[];
+  if(!state.dashMaestros.areasDetailed || !state.dashMaestros.areasDetailed.length){
+    state.dashMaestros.areasDetailed=(state.dashMaestros.areas||[]).map(a=>(typeof a==='string'?{nombre:a,horarioTurno:'si'}:a));
+  }
+  if(!state.dashMaestros.centrifugas || !state.dashMaestros.centrifugas.length) state.dashMaestros.centrifugas=state.centrifugas||[];
+  if(!state.dashMaestros.centrifugasDetailed || !state.dashMaestros.centrifugasDetailed.length){
+    state.dashMaestros.centrifugasDetailed=(state.dashMaestros.centrifugas||[]).map(c=>(typeof c==='string'?{nombre:c,horarioTurno:'si'}:c));
+  }
+  if(!state.dashMaestros.salas || !state.dashMaestros.salas.length) state.dashMaestros.salas=state.salas||[];
+  if(!state.dashMaestros.salasDetailed || !state.dashMaestros.salasDetailed.length){
+    state.dashMaestros.salasDetailed=(state.dashMaestros.salas||[]).map(s=>(typeof s==='string'?{nombre:s,horarioTurno:'si'}:s));
+  }
+  if(!state.dashMaestros.refrigeradores || !state.dashMaestros.refrigeradores.length) state.dashMaestros.refrigeradores=state.refrigeradores||[];
+  if(!state.dashMaestros.refriLimpieza || !state.dashMaestros.refriLimpieza.length) state.dashMaestros.refriLimpieza=state.refriLimpieza||[];
+
+  // Fallbacks de catálogo estándar si aún faltan datos de maestros
+  if(!state.dashMaestros.areas || !state.dashMaestros.areas.length){
+    const defaultAreas = ['Microbiología', 'Hematología', 'Química'];
+    state.dashMaestros.areas = defaultAreas;
+    state.dashMaestros.areasDetailed = defaultAreas.map(a => ({ nombre: a, horarioTurno: 'si' }));
+    if(!state.areas || !state.areas.length) state.areas = defaultAreas;
+  }
+  if(!state.dashMaestros.centrifugas || !state.dashMaestros.centrifugas.length){
+    const defaultCent = ['Centrífuga 1','Centrífuga 2','Centrífuga 3','Centrífuga 4','Centrífuga 5','Centrífuga 18','Centrífuga 19'];
+    state.dashMaestros.centrifugas = defaultCent;
+    state.dashMaestros.centrifugasDetailed = defaultCent.map(c => ({ nombre: c, horarioTurno: 'si' }));
+    if(!state.centrifugas || !state.centrifugas.length) state.centrifugas = defaultCent;
+  }
+  if(!state.dashMaestros.salas || !state.dashMaestros.salas.length){
+    const defaultSalas = ['Microbiología', 'Hematología', 'Química'];
+    state.dashMaestros.salas = defaultSalas;
+    state.dashMaestros.salasDetailed = defaultSalas.map(s => ({ nombre: s, horarioTurno: 'si' }));
+    if(!state.salas || !state.salas.length) state.salas = defaultSalas;
+  }
+  if(!state.dashMaestros.refrigeradores || !state.dashMaestros.refrigeradores.length){
+    const defaultRefris = [{equipo:'R1'},{equipo:'R2'},{equipo:'R3'},{equipo:'C1'},{equipo:'C2'},{equipo:'C3'}];
+    state.dashMaestros.refrigeradores = defaultRefris;
+    if(!state.refrigeradores || !state.refrigeradores.length) state.refrigeradores = defaultRefris;
+  }
+}
 
 async function loadDashboard(forceReload){
-  if(forceReload){ state.dashMaestros = null; state.maestrosPromise = null; }
-  const elMes = document.getElementById('dash-mes');
-  const elAnio = document.getElementById('dash-anio');
-  state.dashMes = elMes ? parseInt(elMes.value, 10) : (new Date().getMonth() + 1);
-  state.dashAnio = elAnio ? parseInt(elAnio.value, 10) : new Date().getFullYear();
-  const cacheKey = state.dashMes + '-' + state.dashAnio;
+  const elMes=document.getElementById('dash-mes');
+  const elAnio=document.getElementById('dash-anio');
+  if(elMes&&elMes.value) state.dashMes=parseInt(elMes.value,10);
+  if(elAnio&&elAnio.value) state.dashAnio=parseInt(elAnio.value,10);
+  if(!state.dashMes || isNaN(state.dashMes) || state.dashMes < 1 || state.dashMes > 12){
+    state.dashMes=new Date().getMonth()+1;
+  }
+  if(!state.dashAnio || isNaN(state.dashAnio) || state.dashAnio < 2000){
+    state.dashAnio=new Date().getFullYear();
+  }
+  initDashSelectors();
+  const cacheKey=state.dashMes+'-'+state.dashAnio;
+
+  // 1. Asegurar maestros antes de cualquier renderizado (NUNCA anularlos al recargar)
+  if(!state.dashMaestros || !state.dashMaestros.areas || !state.dashMaestros.areas.length){
+    if(state.maestrosPromise){
+      try{ await state.maestrosPromise; }catch(e){}
+    } else if(typeof loadMaestros==='function'){
+      try{ await loadMaestros(); }catch(e){}
+    }
+  }
+  ensureDashMaestrosFallback();
+
+  if(forceReload){
+    state.dashCache=null;
+    try{
+      sessionStorage.removeItem('dashCache_'+cacheKey);
+    }catch(e){}
+  }
 
   // Stale-While-Revalidate: Hidratación instantánea desde sessionStorage
-  if(!forceReload && !state.dashCache){
+  if(!forceReload && (!state.dashCache || state.dashCache.key !== cacheKey)){
     try{
-      const sessStr = sessionStorage.getItem('dashCache_' + cacheKey);
+      const sessStr=sessionStorage.getItem('dashCache_'+cacheKey);
       if(sessStr){
-        const parsed = JSON.parse(sessStr);
+        const parsed=JSON.parse(sessStr);
         if(parsed && parsed.data){
-          state.dashCache = parsed;
-          state.dashData = parsed.data;
+          state.dashCache=parsed;
+          state.dashData=parsed.data;
           applyDashData(parsed.data);
         }
       }
@@ -410,59 +530,84 @@ async function loadDashboard(forceReload){
   }
 
   // Usar caché en memoria si tiene menos de 5 minutos y no se forzó recarga
-  if(!forceReload && state.dashCache && state.dashCache.key === cacheKey && getCacheAge() < 5){
-    const reg = state.dashCache.data;
-    state.dashData = reg;
-    if(!state.dashMaestros) state.dashMaestros = {areas:state.areas,centrifugas:state.centrifugas,salas:state.salas,refrigeradores:state.refrigeradores,refriLimpieza:state.refriLimpieza};
+  if(!forceReload && state.dashCache && state.dashCache.key===cacheKey && getCacheAge()<5){
+    const reg=state.dashCache.data;
+    state.dashData=reg;
     applyDashData(reg);
     updateCacheIndicator();
     return;
   }
 
-  const hasExistingData = !!state.dashData;
-  const dl = document.getElementById('dash-loading');
-  if(dl && !hasExistingData) dl.style.display = 'block';
-  const dt = document.getElementById('dash-tables'); if(dt) dt.innerHTML = '';
-  const dac = document.getElementById('dash-alerts-container'); if(dac && !hasExistingData) dac.innerHTML = '';
-  const ddv = document.getElementById('dash-daily-view'); if(ddv && !hasExistingData) ddv.innerHTML = '';
-  const dmv = document.getElementById('dash-monthly-view'); if(dmv && !hasExistingData) dmv.innerHTML = '';
+  const hasExistingCurrentData = !forceReload && !!state.dashData && state.dashCache && state.dashCache.key === cacheKey;
+  const dl=document.getElementById('dash-loading');
+  if(dl) dl.style.display='block';
+  const ddv=document.getElementById('dash-daily-view');
+  const dmv=document.getElementById('dash-monthly-view');
+  const dt=document.getElementById('dash-tables'); if(dt) dt.innerHTML='';
+  const dac=document.getElementById('dash-alerts-container');
+  if(!hasExistingCurrentData){
+    if(ddv) ddv.style.opacity='0.35';
+    if(dmv) dmv.style.opacity='0.35';
+    if(dac) dac.innerHTML='';
+  }
+  const cacheInd=document.getElementById('dash-cache-indicator');
+  if(cacheInd){
+    cacheInd.style.display='inline-block';
+    cacheInd.textContent='⏳ Cargando…';
+    cacheInd.className='cache-indicator cache-stale';
+  }
+
+  const requestMes=state.dashMes;
+  const requestAnio=state.dashAnio;
 
   try{
-    const reg = await apiGet({action:'getRegistros',mes:state.dashMes,anio:state.dashAnio});
-    let rev = reg.revisiones;
-    if (!rev) {
-      try {
-        rev = await apiGet({action:'getRevisiones',mes:state.dashMes,anio:state.dashAnio});
-      } catch(e) {}
+    const reg=await apiGet({action:'getRegistros',mes:requestMes,anio:requestAnio});
+    let rev=reg ? reg.revisiones : null;
+    if(!rev){
+      try{
+        rev=await apiGet({action:'getRevisiones',mes:requestMes,anio:requestAnio});
+      }catch(e){}
     }
-    if(!state.dashMaestros || !state.dashMaestros.centrifugasDetailed){
-      if(state.maestrosPromise){
-        try { await state.maestrosPromise; } catch(e){}
-      }
+
+    ensureDashMaestrosFallback();
+
+    // Protección de condición de carrera: aplicar solo si el usuario no cambió de mes/año mientras cargaba
+    if(state.dashMes===requestMes && state.dashAnio===requestAnio){
+      state.dashData=reg;
+      state.dashCache={key:cacheKey,data:reg,rev:rev,timestamp:Date.now()};
+      try{
+        sessionStorage.setItem('dashCache_'+cacheKey, JSON.stringify(state.dashCache));
+      }catch(e){}
+      applyDashData(reg);
     }
-    state.dashData = reg;
-    state.dashCache = {key:cacheKey,data:reg,rev:rev,timestamp:Date.now()};
-    try {
-      sessionStorage.setItem('dashCache_' + cacheKey, JSON.stringify(state.dashCache));
-    } catch(e) {}
-    applyDashData(reg);
   }catch(err){
-    console.warn('Error cargando dashboard, cargando mock local...', err);
-    if (!state.dashData) {
-      const mockReg={termo:[],centrifugas:[],mesones:[],refriTemp:[],limpiezaRefri:[],conductividad:[],cobas:[]};
-      state.dashData=mockReg;
-      applyDashData(mockReg);
+    console.warn('Error cargando dashboard:', err);
+    ensureDashMaestrosFallback();
+    if(state.dashMes===requestMes && state.dashAnio===requestAnio){
+      if(!state.dashData || (state.dashCache && state.dashCache.key !== cacheKey)){
+        const mockReg={termo:[],centrifugas:[],mesones:[],refriTemp:[],limpiezaRefri:[],conductividad:[],cobas:[],elimMuestras:[]};
+        state.dashData=mockReg;
+        applyDashData(mockReg);
+      }
+      if(typeof showToast==='function') showToast('⚠️ La red demoró en responder. Presione 🔄 para reintentar.', 'warning');
     }
-    if(typeof showToast === 'function') showToast('⚠️ La red demoró en responder. Presione 🔄 para reintentar.', 'warning');
   }finally{
-    const dlFin = document.getElementById('dash-loading');
-    if(dlFin) dlFin.style.display = 'none';
-    updateCacheIndicator();
+    if(state.dashMes===requestMes && state.dashAnio===requestAnio){
+      const dlFin=document.getElementById('dash-loading');
+      if(dlFin) dlFin.style.display='none';
+      const ddvFin=document.getElementById('dash-daily-view');
+      const dmvFin=document.getElementById('dash-monthly-view');
+      if(ddvFin) ddvFin.style.opacity='1';
+      if(dmvFin) dmvFin.style.opacity='1';
+      updateCacheIndicator();
+    }
   }
 }
+
 function applyDashData(reg){
   if(!reg) return;
   try {
+    ensureDashMaestrosFallback();
     if(document.getElementById('stat-termo')) document.getElementById('stat-termo').textContent=(reg.termo||[]).length;
     if(document.getElementById('stat-cent')) document.getElementById('stat-cent').textContent=(reg.centrifugas||[]).length;
     if(document.getElementById('stat-limp')) document.getElementById('stat-limp').textContent=(reg.mesones||[]).length;
@@ -477,79 +622,109 @@ function applyDashData(reg){
   }
 }
 
-function renderDashContent(reg){if(state.dashTab==='diario')renderDailyView(reg);else renderMonthlyView(reg)}
+
+function renderDashContent(reg){
+  renderDailyView(reg);
+  renderMonthlyView(reg);
+}
 
 function renderDailyView(reg){
   if(!reg) return;
+  ensureDashMaestrosFallback();
   const hoy=new Date().getDate();
-  const m=state.dashMaestros||{areas:[],centrifugas:[],salas:[],refrigeradores:[],refriLimpieza:[],isTodayHabit:true};
+  const m=state.dashMaestros||{};
   const isHabit = m.isTodayHabit !== false;
-  let html=`<div class="card card-sm" style="margin-bottom:12px;"><strong style="font-size:14px;">📅 Estado del Día ${hoy} ${!isHabit ? '<span style="font-size:12px; font-weight:normal; color:#fbbf24; margin-left:8px;">(Día no hábil / Feriado)</span>' : ''}</strong></div>`;
+  const isCurrentMonth = (state.dashMes === (new Date().getMonth()+1) && state.dashAnio === new Date().getFullYear());
+  const ms=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const monthName = ms[(state.dashMes||1)-1];
+  const dateTitle = isCurrentMonth
+    ? `📅 Estado de Hoy (Día ${hoy} de ${monthName})`
+    : `📅 Estado del Día ${hoy} (${monthName} ${state.dashAnio})`;
+  let html=`<div class="card card-sm" style="margin-bottom:12px;"><strong style="font-size:14px;">${dateTitle} ${!isHabit ? '<span style="font-size:12px; font-weight:normal; color:#fbbf24; margin-left:8px;">(Día no hábil / Feriado)</span>' : ''}</strong></div>`;
 
   if(isModuloActivo('termo')){
     const termoHoy=(reg.termo||[]).filter(r=>parseInt(r.dia)===hoy);
     html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🌡️ Temp. Ambiental</div>';
-    const list = m.areasDetailed || (m.areas||[]).map(a=>({nombre:a, horarioTurno:'si'}));
-    ['Mañana','Tarde'].forEach(turno=>{
-      html+=`<div style="font-size:11px;font-weight:600;color:var(--text-dim);margin:6px 0 4px;text-transform:uppercase;">${turno}</div><div class="status-grid">`;
-      list.forEach(item=>{
-        const a = item.nombre;
-        const isNoHabit = !isHabit && item.horarioTurno === 'no';
-        const done = termoHoy.some(r=>r.area===a&&r.turno===turno);
-        if (isNoHabit && !done) {
-          html+=`<div class="status-item opt" style="opacity:0.55;" title="No exigido en días no hábiles"><span class="status-dot gray" style="background:#64748b;"></span>${a} (N/A)</div>`;
-        } else {
-          html+=`<div class="status-item ${done?'done':'miss'}"><span class="status-dot ${done?'green':'red'}"></span>${a}</div>`;
-        }
+    const list = (m.areasDetailed && m.areasDetailed.length > 0)
+      ? m.areasDetailed
+      : ((m.areas && m.areas.length > 0 ? m.areas : (state.areas || []))).map(a => (typeof a === 'string' ? { nombre: a, horarioTurno: 'si' } : a));
+    if(!list.length){
+      html+='<div style="font-size:12px;color:var(--text-dim);padding:4px 0;">Sin áreas configuradas.</div>';
+    } else {
+      ['Mañana','Tarde'].forEach(turno=>{
+        html+=`<div style="font-size:11px;font-weight:600;color:var(--text-dim);margin:6px 0 4px;text-transform:uppercase;">${turno}</div><div class="status-grid">`;
+        list.forEach(item=>{
+          const a = item.nombre;
+          const isNoHabit = !isHabit && item.horarioTurno === 'no';
+          const done = termoHoy.some(r=>r.area===a&&r.turno===turno);
+          if (isNoHabit && !done) {
+            html+=`<div class="status-item opt" style="opacity:0.55;" title="No exigido en días no hábiles"><span class="status-dot gray" style="background:#64748b;"></span>${a} (N/A)</div>`;
+          } else {
+            html+=`<div class="status-item ${done?'done':'miss'}"><span class="status-dot ${done?'green':'red'}"></span>${a}</div>`;
+          }
+        });
+        html+='</div>';
       });
-      html+='</div>';
-    });
+    }
     html+='</div>';
   }
 
   if(isModuloActivo('centrifugas')){
     const centHoy=(reg.centrifugas||[]).filter(r=>parseInt(r.dia)===hoy&&(r.tipo_mantencion==='Diaria'||r.tipo_mantencion==='Semanal'));
     html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">⚙️ Centrífugas (Diaria / Semanal)</div><div class="status-grid">';
-    const list = m.centrifugasDetailed || (m.centrifugas||[]).map(c=>({nombre:c, horarioTurno:'si'}));
-    list.forEach(item=>{
-      const c = item.nombre;
-      const isNoHabit = !isHabit && item.horarioTurno === 'no';
-      const regFound = centHoy.find(r=>r.centrifuga===c && r.tipo_mantencion==='Semanal') || centHoy.find(r=>r.centrifuga===c);
-      const done = !!regFound;
-      const isSemanal = regFound && regFound.tipo_mantencion === 'Semanal';
-      if (isNoHabit && !done) {
-        html+=`<div class="status-item opt" style="opacity:0.55;" title="No exigido en días no hábiles"><span class="status-dot gray" style="background:#64748b;"></span>${c.replace('Centrífuga ','C')} (N/A)</div>`;
-      } else {
-        const shortName = c.replace('Centrífuga ','C') + (isSemanal ? ' (Sem)' : '');
-        const tooltip = isSemanal 
-          ? `${c}: Mantención Semanal realizada (${getInicialesResponsable(regFound.responsable)})` 
-          : (done ? `${c}: Mantención Diaria realizada (${getInicialesResponsable(regFound.responsable)})` : `${c}: Pendiente`);
-        html+=`<div class="status-item ${done?'done':'miss'}" title="${tooltip}"><span class="status-dot ${done?'green':'red'}"></span>${shortName}</div>`;
-      }
-    });
+    const list = (m.centrifugasDetailed && m.centrifugasDetailed.length > 0)
+      ? m.centrifugasDetailed
+      : ((m.centrifugas && m.centrifugas.length > 0 ? m.centrifugas : (state.centrifugas || []))).map(c => (typeof c === 'string' ? { nombre: c, horarioTurno: 'si' } : c));
+    if(!list.length){
+      html+='<div style="font-size:12px;color:var(--text-dim);padding:4px 0;">Sin centrífugas configuradas.</div>';
+    } else {
+      list.forEach(item=>{
+        const c = item.nombre;
+        const isNoHabit = !isHabit && item.horarioTurno === 'no';
+        const regFound = centHoy.find(r=>r.centrifuga===c && r.tipo_mantencion==='Semanal') || centHoy.find(r=>r.centrifuga===c);
+        const done = !!regFound;
+        const isSemanal = regFound && regFound.tipo_mantencion === 'Semanal';
+        if (isNoHabit && !done) {
+          html+=`<div class="status-item opt" style="opacity:0.55;" title="No exigido en días no hábiles"><span class="status-dot gray" style="background:#64748b;"></span>${c.replace('Centrífuga ','C')} (N/A)</div>`;
+        } else {
+          const shortName = c.replace('Centrífuga ','C') + (isSemanal ? ' (Sem)' : '');
+          const tooltip = isSemanal 
+            ? `${c}: Mantención Semanal realizada (${getInicialesResponsable(regFound.responsable)})` 
+            : (done ? `${c}: Mantención Diaria realizada (${getInicialesResponsable(regFound.responsable)})` : `${c}: Pendiente`);
+          html+=`<div class="status-item ${done?'done':'miss'}" title="${tooltip}"><span class="status-dot ${done?'green':'red'}"></span>${shortName}</div>`;
+        }
+      });
+    }
     html+='</div></div>';
   }
 
   if(isModuloActivo('mesones')){
     const mesoHoy=(reg.mesones||[]).filter(r=>parseInt(r.dia)===hoy);
     html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🧽 Mesones</div><div class="status-grid">';
-    const list = m.salasDetailed || (m.salas||[]).map(s=>({nombre:s, horarioTurno:'si'}));
-    list.forEach(item=>{
-      const s = item.nombre;
-      const isNoHabit = !isHabit && item.horarioTurno === 'no';
-      const done = mesoHoy.some(r=>r.sala===s);
-      if (isNoHabit && !done) {
-        html+=`<div class="status-item opt" style="opacity:0.55;" title="No exigido en días no hábiles"><span class="status-dot gray" style="background:#64748b;"></span>${s} (N/A)</div>`;
-      } else {
-        html+=`<div class="status-item ${done?'done':'miss'}"><span class="status-dot ${done?'green':'red'}"></span>${s}</div>`;
-      }
-    });
+    const list = (m.salasDetailed && m.salasDetailed.length > 0)
+      ? m.salasDetailed
+      : ((m.salas && m.salas.length > 0 ? m.salas : (state.salas || []))).map(s => (typeof s === 'string' ? { nombre: s, horarioTurno: 'si' } : s));
+    if(!list.length){
+      html+='<div style="font-size:12px;color:var(--text-dim);padding:4px 0;">Sin mesones configurados.</div>';
+    } else {
+      list.forEach(item=>{
+        const s = item.nombre;
+        const esSoloHabil = (item.horarioTurno || '').toString().trim().toLowerCase() === 'no';
+        const isNoHabit = !isHabit && esSoloHabil;
+        const done = mesoHoy.some(r=>r.sala===s);
+        if (isNoHabit && !done) {
+          html+=`<div class="status-item opt" style="opacity:0.55;" title="No exigido en días no hábiles"><span class="status-dot gray" style="background:#64748b;"></span>${s} (N/A)</div>`;
+        } else {
+          html+=`<div class="status-item ${done?'done':'miss'}"><span class="status-dot ${done?'green':'red'}"></span>${s}</div>`;
+        }
+      });
+    }
     html+='</div></div>';
   }
 
   if(isModuloActivo('refri-temp')){
     const refriHoy=(reg.refriTemp||[]).filter(r=>parseInt(r.dia)===hoy);
-    const refris=m.refrigeradores||[];
+    const refris = (m.refrigeradores && m.refrigeradores.length > 0) ? m.refrigeradores : (state.refrigeradores || []);
     if(refris.length){
       html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🧊 Temp. Refrigeradores</div>';
       ['Mañana','Tarde'].forEach(turno=>{
@@ -598,20 +773,101 @@ function isNonWorkingDay(d, mes, anio, diasNoHabilesSet) {
 
 function renderMonthlyView(reg){
   if(!reg) return;
+  ensureDashMaestrosFallback();
   const dh=getDiasHasta(state.dashMes,state.dashAnio);
-  const m=state.dashMaestros||{areas:[],centrifugas:[],salas:[],refrigeradores:[]};
+  const m=state.dashMaestros||{};
   const diasNoHabilesSet = new Set(reg.diasNoHabiles || []);
   let html='';
 
   if(isModuloActivo('termo')){
     html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🌡️ Temp. Ambiental</div>';
-    const list = m.areasDetailed || (m.areas||[]).map(a=>({nombre:a, horarioTurno:'si'}));
-    list.forEach(item => {
-      const a = item.nombre;
-      const esSoloHabil = (item.horarioTurno || '').toString().trim().toLowerCase() === 'no';
-      html+=`<div style="font-size:12px;font-weight:600;margin:8px 0 4px;">${a} ${esSoloHabil ? '<span style="font-weight:normal; font-size:11px; color:var(--text-dim);">(Solo días hábiles)</span>' : ''}</div>`;
-      ['Mañana','Tarde'].forEach(turno=>{
-        const diasDone = new Set((reg.termo||[]).filter(r=>r.area===a&&r.turno===turno).map(r=>parseInt(r.dia)));
+    const list = (m.areasDetailed && m.areasDetailed.length > 0)
+      ? m.areasDetailed
+      : ((m.areas && m.areas.length > 0 ? m.areas : (state.areas || []))).map(a => (typeof a === 'string' ? { nombre: a, horarioTurno: 'si' } : a));
+    if(!list.length){
+      html+='<div style="font-size:12px;color:var(--text-dim);padding:4px 0;">Sin áreas configuradas.</div>';
+    } else {
+      list.forEach(item => {
+        const a = item.nombre;
+        const esSoloHabil = (item.horarioTurno || '').toString().trim().toLowerCase() === 'no';
+        html+=`<div style="font-size:12px;font-weight:600;margin:8px 0 4px;">${a} ${esSoloHabil ? '<span style="font-weight:normal; font-size:11px; color:var(--text-dim);">(Solo días hábiles)</span>' : ''}</div>`;
+        ['Mañana','Tarde'].forEach(turno=>{
+          const diasDone = new Set((reg.termo||[]).filter(r=>r.area===a&&r.turno===turno).map(r=>parseInt(r.dia)));
+          let miss=0;
+          let chips='';
+          for(let d=1; d<=dh; d++){
+            const ok = diasDone.has(d);
+            const isNonWorking = esSoloHabil && isNonWorkingDay(d, state.dashMes, state.dashAnio, diasNoHabilesSet);
+            if (ok) {
+              chips += `<span class="day-chip chip-ok">${d}</span>`;
+            } else if (isNonWorking) {
+              chips += `<span class="day-chip chip-na" title="Día no hábil / No exigido">${d}</span>`;
+            } else {
+              miss++;
+              chips += `<span class="day-chip chip-missing">${d}</span>`;
+            }
+          }
+          html+=`<div style="font-size:11px;color:var(--text-dim);margin:4px 0 2px;">${turno} ${miss?'('+miss+' faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`;
+        });
+      });
+    }
+    html+='</div>';
+  }
+
+  if(isModuloActivo('centrifugas')){
+    html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">⚙️ Centrífugas</div>';
+    const list = (m.centrifugasDetailed && m.centrifugasDetailed.length > 0)
+      ? m.centrifugasDetailed
+      : ((m.centrifugas && m.centrifugas.length > 0 ? m.centrifugas : (state.centrifugas || []))).map(c => (typeof c === 'string' ? { nombre: c, horarioTurno: 'si' } : c));
+    if(!list.length){
+      html+='<div style="font-size:12px;color:var(--text-dim);padding:4px 0;">Sin centrífugas configuradas.</div>';
+    } else {
+      list.forEach(item => {
+        const c = item.nombre;
+        const esSoloHabil = (item.horarioTurno || '').toString().trim().toLowerCase() === 'no';
+        const mantPorDia = {};
+        (reg.centrifugas||[]).filter(r=>r.centrifuga===c).forEach(r => {
+          const d = parseInt(r.dia);
+          if (!mantPorDia[d] || r.tipo_mantencion === 'Semanal') {
+            mantPorDia[d] = r;
+          }
+        });
+        let miss=0;
+        let chips='';
+        for(let d=1; d<=dh; d++){
+          const rObj = mantPorDia[d];
+          const isNonWorking = esSoloHabil && isNonWorkingDay(d, state.dashMes, state.dashAnio, diasNoHabilesSet);
+          if (rObj && rObj.tipo_mantencion === 'Semanal') {
+            const resp = getInicialesResponsable(rObj.responsable);
+            chips += `<span class="day-chip chip-ok chip-semanal" title="Día ${d}: Mantención Semanal (${resp})">${d}<span class="chip-badge-s">S</span></span>`;
+          } else if (rObj && rObj.tipo_mantencion === 'Diaria') {
+            const resp = getInicialesResponsable(rObj.responsable);
+            chips += `<span class="day-chip chip-ok" title="Día ${d}: Mantención Diaria (${resp})">${d}</span>`;
+          } else if (isNonWorking) {
+            chips += `<span class="day-chip chip-na" title="Día no hábil / No exigido">${d}</span>`;
+          } else {
+            miss++;
+            chips += `<span class="day-chip chip-missing" title="Día ${d}: Sin registro">${d}</span>`;
+          }
+        }
+        html+=`<div style="font-size:12px;font-weight:600;margin:8px 0 4px;">${c} ${esSoloHabil ? '<span style="font-weight:normal; font-size:11px; color:var(--text-dim);">(Solo días hábiles)</span>' : ''} ${miss?'('+miss+' faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`;
+      });
+    }
+    html+='</div>';
+  }
+
+  if(isModuloActivo('mesones')){
+    html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🧽 Mesones</div>';
+    const list = (m.salasDetailed && m.salasDetailed.length > 0)
+      ? m.salasDetailed
+      : ((m.salas && m.salas.length > 0 ? m.salas : (state.salas || []))).map(s => (typeof s === 'string' ? { nombre: s, horarioTurno: 'si' } : s));
+    if(!list.length){
+      html+='<div style="font-size:12px;color:var(--text-dim);padding:4px 0;">Sin mesones configurados.</div>';
+    } else {
+      list.forEach(item => {
+        const s = item.nombre;
+        const esSoloHabil = (item.horarioTurno || '').toString().trim().toLowerCase() === 'no';
+        const diasDone = new Set((reg.mesones||[]).filter(r=>r.sala===s).map(r=>parseInt(r.dia)));
         let miss=0;
         let chips='';
         for(let d=1; d<=dh; d++){
@@ -626,92 +882,85 @@ function renderMonthlyView(reg){
             chips += `<span class="day-chip chip-missing">${d}</span>`;
           }
         }
-        html+=`<div style="font-size:11px;color:var(--text-dim);margin:4px 0 2px;">${turno} ${miss?'('+miss+' faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`;
+        html+=`<div style="font-size:12px;font-weight:600;margin:8px 0 4px;">${s} ${esSoloHabil ? '<span style="font-weight:normal; font-size:11px; color:var(--text-dim);">(Solo días hábiles)</span>' : ''} ${miss?'('+miss+' faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`;
       });
-    });
-    html+='</div>';
-  }
-
-  if(isModuloActivo('centrifugas')){
-    html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">⚙️ Centrífugas</div>';
-    const list = m.centrifugasDetailed || (m.centrifugas||[]).map(c=>({nombre:c, horarioTurno:'si'}));
-    list.forEach(item => {
-      const c = item.nombre;
-      const esSoloHabil = (item.horarioTurno || '').toString().trim().toLowerCase() === 'no';
-      const mantPorDia = {};
-      (reg.centrifugas||[]).filter(r=>r.centrifuga===c).forEach(r => {
-        const d = parseInt(r.dia);
-        if (!mantPorDia[d] || r.tipo_mantencion === 'Semanal') {
-          mantPorDia[d] = r;
-        }
-      });
-      let miss=0;
-      let chips='';
-      for(let d=1; d<=dh; d++){
-        const rObj = mantPorDia[d];
-        const isNonWorking = esSoloHabil && isNonWorkingDay(d, state.dashMes, state.dashAnio, diasNoHabilesSet);
-        if (rObj && rObj.tipo_mantencion === 'Semanal') {
-          const resp = getInicialesResponsable(rObj.responsable);
-          chips += `<span class="day-chip chip-ok chip-semanal" title="Día ${d}: Mantención Semanal (${resp})">${d}<span class="chip-badge-s">S</span></span>`;
-        } else if (rObj && rObj.tipo_mantencion === 'Diaria') {
-          const resp = getInicialesResponsable(rObj.responsable);
-          chips += `<span class="day-chip chip-ok" title="Día ${d}: Mantención Diaria (${resp})">${d}</span>`;
-        } else if (isNonWorking) {
-          chips += `<span class="day-chip chip-na" title="Día no hábil / No exigido">${d}</span>`;
-        } else {
-          miss++;
-          chips += `<span class="day-chip chip-missing" title="Día ${d}: Sin registro">${d}</span>`;
-        }
-      }
-      html+=`<div style="font-size:12px;font-weight:600;margin:8px 0 4px;">${c} ${esSoloHabil ? '<span style="font-weight:normal; font-size:11px; color:var(--text-dim);">(Solo días hábiles)</span>' : ''} ${miss?'('+miss+' faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`;
-    });
-    html+='</div>';
-  }
-
-  if(isModuloActivo('mesones')){
-    html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🧽 Mesones</div>';
-    const list = m.salasDetailed || (m.salas||[]).map(s=>({nombre:s, horarioTurno:'si'}));
-    list.forEach(item => {
-      const s = item.nombre;
-      const esSoloHabil = (item.horarioTurno || '').toString().trim().toLowerCase() === 'no';
-      const diasDone = new Set((reg.mesones||[]).filter(r=>r.sala===s).map(r=>parseInt(r.dia)));
-      let miss=0;
-      let chips='';
-      for(let d=1; d<=dh; d++){
-        const ok = diasDone.has(d);
-        const isNonWorking = esSoloHabil && isNonWorkingDay(d, state.dashMes, state.dashAnio, diasNoHabilesSet);
-        if (ok) {
-          chips += `<span class="day-chip chip-ok">${d}</span>`;
-        } else if (isNonWorking) {
-          chips += `<span class="day-chip chip-na" title="Día no hábil / No exigido">${d}</span>`;
-        } else {
-          miss++;
-          chips += `<span class="day-chip chip-missing">${d}</span>`;
-        }
-      }
-      html+=`<div style="font-size:12px;font-weight:600;margin:8px 0 4px;">${s} ${esSoloHabil ? '<span style="font-weight:normal; font-size:11px; color:var(--text-dim);">(Solo días hábiles)</span>' : ''} ${miss?'('+miss+' faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`;
-    });
+    }
     html+='</div>';
   }
 
   if(isModuloActivo('refri-temp')){
-    const refris=m.refrigeradores||[];
+    const refris = (m.refrigeradores && m.refrigeradores.length > 0) ? m.refrigeradores : (state.refrigeradores || []);
     if(refris.length){
       html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🧊 Temp. Refrigeradores</div>';
-      refris.forEach(r=>{const name=r.equipo||r;html+=`<div style="font-size:12px;font-weight:600;margin:8px 0 4px;">${name}</div>`;['Mañana','Tarde'].forEach(turno=>{const dias=new Set((reg.refriTemp||[]).filter(rt=>rt.equipo===name&&rt.turno===turno).map(rt=>parseInt(rt.dia)));let miss=0;let chips='';for(let d=1;d<=dh;d++){const ok=dias.has(d);if(!ok)miss++;chips+=`<span class="day-chip ${ok?'chip-ok':'chip-missing'}">${d}</span>`}html+=`<div style="font-size:11px;color:var(--text-dim);margin:4px 0 2px;">${turno} ${miss?'('+miss+' faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`})});
+      refris.forEach(r=>{
+        const name=r.equipo||r;
+        html+=`<div style="font-size:12px;font-weight:600;margin:8px 0 4px;">${name}</div>`;
+        ['Mañana','Tarde'].forEach(turno=>{
+          const dias=new Set((reg.refriTemp||[]).filter(rt=>rt.equipo===name&&rt.turno===turno).map(rt=>parseInt(rt.dia)));
+          let miss=0;
+          let chips='';
+          for(let d=1;d<=dh;d++){
+            const ok=dias.has(d);
+            if(!ok)miss++;
+            chips+=`<span class="day-chip ${ok?'chip-ok':'chip-missing'}">${d}</span>`;
+          }
+          html+=`<div style="font-size:11px;color:var(--text-dim);margin:4px 0 2px;">${turno} ${miss?'('+miss+' faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`;
+        });
+      });
       html+='</div>';
     }
   }
 
   if(isModuloActivo('conductividad')){
     html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">💧 Conductividad</div>';
-    ['Mañana','Tarde'].forEach(turno=>{const dias=new Set((reg.conductividad||[]).filter(r=>r.turno===turno).map(r=>parseInt(r.dia)));let miss=0;let chips='';for(let d=1;d<=dh;d++){const ok=dias.has(d);if(!ok)miss++;chips+=`<span class="day-chip ${ok?'chip-ok':'chip-missing'}">${d}</span>`}html+=`<div style="font-size:11px;color:var(--text-dim);margin:4px 0 2px;">${turno} ${miss?'('+miss+' faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`});
+    ['Mañana','Tarde'].forEach(turno=>{
+      const dias=new Set((reg.conductividad||[]).filter(r=>r.turno===turno).map(r=>parseInt(r.dia)));
+      let miss=0;
+      let chips='';
+      for(let d=1;d<=dh;d++){
+        const ok=dias.has(d);
+        if(!ok)miss++;
+        chips+=`<span class="day-chip ${ok?'chip-ok':'chip-missing'}">${d}</span>`;
+      }
+      html+=`<div style="font-size:11px;color:var(--text-dim);margin:4px 0 2px;">${turno} ${miss?'('+miss+' faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`;
+    });
     html+='</div>';
   }
 
   if(isModuloActivo('cobas')){
     html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🔬 Cobas (Días Completos)</div>';
-    ['Cobas 1','Cobas 2'].forEach(eq=>{let miss=0;let chips='';for(let d=1;d<=dh;d++){const completedToday=(reg.cobas||[]).filter(r=>r.equipo===eq&&parseInt(r.dia)===d&&r.frecuencia==='Diaria');const ok=completedToday.length>=1;if(!ok)miss++;chips+=`<span class="day-chip ${ok?'chip-ok':'chip-missing'}">${d}</span>`}html+=`<div style="font-size:12px;font-weight:600;margin:8px 0 4px;">${eq} ${miss?'('+miss+' días con faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`});
+    ['Cobas 1','Cobas 2'].forEach(eq=>{
+      let miss=0;
+      let chips='';
+      for(let d=1;d<=dh;d++){
+        const completedToday=(reg.cobas||[]).filter(r=>r.equipo===eq&&parseInt(r.dia)===d&&r.frecuencia==='Diaria');
+        const ok=completedToday.length>=1;
+        if(!ok)miss++;
+        chips+=`<span class="day-chip ${ok?'chip-ok':'chip-missing'}">${d}</span>`;
+      }
+      html+=`<div style="font-size:12px;font-weight:600;margin:8px 0 4px;">${eq} ${miss?'('+miss+' días con faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`;
+    });
+    html+='</div>';
+  }
+
+  if(isModuloActivo('elim-muestras')){
+    html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🗑️ Eliminación de Muestras</div>';
+    const diasDone = new Set((reg.elimMuestras||[]).map(r=>parseInt(r.dia)));
+    let miss=0;
+    let chips='';
+    for(let d=1; d<=dh; d++){
+      const ok = diasDone.has(d);
+      const isNonWorking = isNonWorkingDay(d, state.dashMes, state.dashAnio, diasNoHabilesSet);
+      if (ok) {
+        chips += `<span class="day-chip chip-ok">${d}</span>`;
+      } else if (isNonWorking) {
+        chips += `<span class="day-chip chip-na" title="Día no hábil / No exigido">${d}</span>`;
+      } else {
+        miss++;
+        chips += `<span class="day-chip chip-missing">${d}</span>`;
+      }
+    }
+    html+=`<div style="font-size:12px;font-weight:600;margin:8px 0 4px;">Registro Diario ${miss?'('+miss+' faltantes)':'✓'}</div><div class="missing-grid">${chips}</div>`;
     html+='</div>';
   }
 
