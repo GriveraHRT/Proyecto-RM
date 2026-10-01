@@ -549,6 +549,9 @@ async function loadDashboard(forceReload){
     if(ddv) ddv.style.opacity='0.35';
     if(dmv) dmv.style.opacity='0.35';
     if(dac) dac.innerHTML='';
+    if(state.dashData && (!state.dashCache || state.dashCache.key !== cacheKey)){
+      state.dashData = null;
+    }
   }
   const cacheInd=document.getElementById('dash-cache-indicator');
   if(cacheInd){
@@ -584,9 +587,10 @@ async function loadDashboard(forceReload){
     console.warn('Error cargando dashboard:', err);
     ensureDashMaestrosFallback();
     if(state.dashMes===requestMes && state.dashAnio===requestAnio){
-      if(!state.dashData || (state.dashCache && state.dashCache.key !== cacheKey)){
-        const mockReg={termo:[],centrifugas:[],mesones:[],refriTemp:[],limpiezaRefri:[],conductividad:[],cobas:[],elimMuestras:[]};
+      if(!state.dashData || !state.dashCache || state.dashCache.key !== cacheKey){
+        const mockReg={mes:requestMes,anio:requestAnio,termo:[],centrifugas:[],mesones:[],refriTemp:[],limpiezaRefri:[],conductividad:[],cobas:[],elimMuestras:[],diasNoHabiles:[]};
         state.dashData=mockReg;
+        state.dashCache={key:cacheKey,data:mockReg,rev:null,timestamp:Date.now()};
         applyDashData(mockReg);
       }
       if(typeof showToast==='function') showToast('⚠️ La red demoró en responder. Presione 🔄 para reintentar.', 'warning');
@@ -631,19 +635,22 @@ function renderDashContent(reg){
 function renderDailyView(reg){
   if(!reg) return;
   ensureDashMaestrosFallback();
-  const hoy=new Date().getDate();
-  const m=state.dashMaestros||{};
-  const isHabit = m.isTodayHabit !== false;
-  const isCurrentMonth = (state.dashMes === (new Date().getMonth()+1) && state.dashAnio === new Date().getFullYear());
+  const now = new Date();
+  const isCurrentMonth = (state.dashMes === (now.getMonth()+1) && state.dashAnio === now.getFullYear());
+  const maxDayInMonth = new Date(state.dashAnio, state.dashMes, 0).getDate();
+  const targetDay = isCurrentMonth ? now.getDate() : Math.min(now.getDate(), maxDayInMonth);
+  const m = state.dashMaestros || {};
+  const diasNoHabilesSet = new Set((reg.diasNoHabiles || []).map(Number));
+  const isHabit = isCurrentMonth ? (m.isTodayHabit !== false) : !isNonWorkingDay(targetDay, state.dashMes, state.dashAnio, diasNoHabilesSet);
   const ms=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
   const monthName = ms[(state.dashMes||1)-1];
   const dateTitle = isCurrentMonth
-    ? `📅 Estado de Hoy (Día ${hoy} de ${monthName})`
-    : `📅 Estado del Día ${hoy} (${monthName} ${state.dashAnio})`;
+    ? `📅 Estado de Hoy (Día ${targetDay} de ${monthName})`
+    : `📅 Estado del Día ${targetDay} (${monthName} ${state.dashAnio})`;
   let html=`<div class="card card-sm" style="margin-bottom:12px;"><strong style="font-size:14px;">${dateTitle} ${!isHabit ? '<span style="font-size:12px; font-weight:normal; color:#fbbf24; margin-left:8px;">(Día no hábil / Feriado)</span>' : ''}</strong></div>`;
 
   if(isModuloActivo('termo')){
-    const termoHoy=(reg.termo||[]).filter(r=>parseInt(r.dia)===hoy);
+    const termoHoy=(reg.termo||[]).filter(r=>parseInt(r.dia)===targetDay);
     html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🌡️ Temp. Ambiental</div>';
     const list = (m.areasDetailed && m.areasDetailed.length > 0)
       ? m.areasDetailed
@@ -670,7 +677,7 @@ function renderDailyView(reg){
   }
 
   if(isModuloActivo('centrifugas')){
-    const centHoy=(reg.centrifugas||[]).filter(r=>parseInt(r.dia)===hoy&&(r.tipo_mantencion==='Diaria'||r.tipo_mantencion==='Semanal'));
+    const centHoy=(reg.centrifugas||[]).filter(r=>parseInt(r.dia)===targetDay&&(r.tipo_mantencion==='Diaria'||r.tipo_mantencion==='Semanal'));
     html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">⚙️ Centrífugas (Diaria / Semanal)</div><div class="status-grid">';
     const list = (m.centrifugasDetailed && m.centrifugasDetailed.length > 0)
       ? m.centrifugasDetailed
@@ -699,7 +706,7 @@ function renderDailyView(reg){
   }
 
   if(isModuloActivo('mesones')){
-    const mesoHoy=(reg.mesones||[]).filter(r=>parseInt(r.dia)===hoy);
+    const mesoHoy=(reg.mesones||[]).filter(r=>parseInt(r.dia)===targetDay);
     html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🧽 Mesones</div><div class="status-grid">';
     const list = (m.salasDetailed && m.salasDetailed.length > 0)
       ? m.salasDetailed
@@ -723,7 +730,7 @@ function renderDailyView(reg){
   }
 
   if(isModuloActivo('refri-temp')){
-    const refriHoy=(reg.refriTemp||[]).filter(r=>parseInt(r.dia)===hoy);
+    const refriHoy=(reg.refriTemp||[]).filter(r=>parseInt(r.dia)===targetDay);
     const refris = (m.refrigeradores && m.refrigeradores.length > 0) ? m.refrigeradores : (state.refrigeradores || []);
     if(refris.length){
       html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🧊 Temp. Refrigeradores</div>';
@@ -737,21 +744,21 @@ function renderDailyView(reg){
   }
 
   if(isModuloActivo('conductividad')){
-    const condHoy=(reg.conductividad||[]).filter(r=>parseInt(r.dia)===hoy);
+    const condHoy=(reg.conductividad||[]).filter(r=>parseInt(r.dia)===targetDay);
     html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">💧 Conductividad</div><div class="status-grid">';
     ['Mañana','Tarde'].forEach(turno=>{const done=condHoy.some(r=>r.turno===turno);html+=`<div class="status-item ${done?'done':'miss'}"><span class="status-dot ${done?'green':'red'}"></span>${turno}</div>`});
     html+='</div></div>';
   }
 
   if(isModuloActivo('cobas')){
-    const cobasHoy=(reg.cobas||[]).filter(r=>parseInt(r.dia)===hoy&&r.frecuencia==='Diaria');
+    const cobasHoy=(reg.cobas||[]).filter(r=>parseInt(r.dia)===targetDay&&r.frecuencia==='Diaria');
     html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🔬 Mantención Cobas (Diaria)</div><div class="status-grid">';
     ['Cobas 1','Cobas 2'].forEach(eq=>{const done=cobasHoy.some(r=>r.equipo===eq);html+=`<div class="status-item ${done?'done':'miss'}"><span class="status-dot ${done?'green':'red'}"></span>${eq}</div>`});
     html+='</div></div>';
   }
 
   if(isModuloActivo('elim-muestras')){
-    const elimHoy=(reg.elimMuestras||[]).filter(r=>parseInt(r.dia)===hoy);
+    const elimHoy=(reg.elimMuestras||[]).filter(r=>parseInt(r.dia)===targetDay);
     html+='<div class="card card-sm" style="margin-bottom:12px;"><div class="status-section-title">🗑️ Eliminación de Muestras</div><div class="status-grid">';
     const doneElim=elimHoy.length>0;
     const countText = elimHoy.length === 1 
@@ -776,7 +783,7 @@ function renderMonthlyView(reg){
   ensureDashMaestrosFallback();
   const dh=getDiasHasta(state.dashMes,state.dashAnio);
   const m=state.dashMaestros||{};
-  const diasNoHabilesSet = new Set(reg.diasNoHabiles || []);
+  const diasNoHabilesSet = new Set((reg.diasNoHabiles || []).map(Number));
   let html='';
 
   if(isModuloActivo('termo')){
@@ -5424,4 +5431,5 @@ function finalizarAsistente() {
   }
   navigateTo('dashboard');
 }
+
 </script>
