@@ -702,8 +702,8 @@
       <div class="form-group" style="position: relative; margin-bottom: 0;">
         <label class="form-label" for="etiquetadora-search-input">Selecciona Etiquetadora</label>
         <div style="position: relative;">
-          <input type="text" id="etiquetadora-search-input" class="form-control" placeholder="🔍 Buscar por nombre, piso o ubicación..." onfocus="showEtiquetadoraDropdown()" oninput="filterEtiquetadoras()" autocomplete="off" style="padding-right: 32px;" />
-          <span id="btn-clear-et-search" onclick="clearEtiquetadoraSearch()" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text-dim); display: none; font-size: 14px;">✕</span>
+          <input type="text" id="etiquetadora-search-input" class="form-control" placeholder="🔍 Buscar por nombre, piso o ubicación..." onfocus="showEtiquetadoraDropdown()" onclick="if(this.value){this.select();}" oninput="filterEtiquetadoras()" autocomplete="off" style="padding-right: 38px;" />
+          <button type="button" id="btn-clear-et-search" onclick="clearEtiquetadoraSearch(event)" onmousedown="event.preventDefault()" ontouchstart="clearEtiquetadoraSearch(event)" style="position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; display: none; align-items: center; justify-content: center; background: transparent; border: none; cursor: pointer; color: var(--text-dim); font-size: 16px; padding: 0; z-index: 10; touch-action: manipulation; -webkit-tap-highlight-color: transparent;" title="Limpiar búsqueda" aria-label="Limpiar búsqueda">✕</button>
         </div>
         <!-- Input oculto para compatibilidad con código existente -->
         <input type="hidden" id="etiquetadora-select" onchange="onEtiquetadoraChange()" />
@@ -2126,7 +2126,7 @@
 
 <!-- ══ SCRIPTS ══════════════════════════════════════════════ -->
 <script src="js/qrcode.min.js"></script>
-<script src="js/app-core.js?v=2.0.5"></script>
-<script src="js/app-dash.js?v=2.0.5"></script>
+<script src="js/app-core.js?v=2.0.9"></script>
+<script src="js/app-dash.js?v=2.0.9"></script>
 </body>
 </html>

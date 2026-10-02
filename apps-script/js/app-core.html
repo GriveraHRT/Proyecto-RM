@@ -1536,36 +1536,116 @@ function checkUrlParams(){
     navigateTo('dxh900');
   }
   if(etName){
+    if (window._qrEtInterval) {
+      clearInterval(window._qrEtInterval);
+      window._qrEtInterval = null;
+    }
     const elPrefill = document.getElementById('etiquetadora-prefill-name'); if(elPrefill) elPrefill.textContent=etName;
     const elInd = document.getElementById('etiquetadora-prefill-indicator'); if(elInd) elInd.style.display='block';
+    
+    const norm = s => String(s || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+
     let attempts = 0;
-    const w=setInterval(()=>{
+    const checkEt = () => {
       attempts++;
-      if(state.etiquetadoras&&state.etiquetadoras.length){
-        const found=state.etiquetadoras.find(o=>o.nombreReal===etName);
-        if(found){
-          const displayText=`${found.nombreReal} - ${found.piso} - ${found.ubicacion}`;
-          document.getElementById('etiquetadora-search-input').value=displayText;
-          document.getElementById('btn-clear-et-search').style.display='block';
-          const s=document.getElementById('etiquetadora-select');
-          if (s) {
-            let opt = Array.from(s.options).find(o=>o.value===etName);
-            if (!opt) {
-              opt = document.createElement('option');
-              opt.value = etName;
-              opt.textContent = displayText;
-              s.appendChild(opt);
+      try {
+        if(state.etiquetadoras && state.etiquetadoras.length){
+          const raw = String(etName).trim();
+          let decoded = raw;
+          try { decoded = decodeURIComponent(raw).trim(); } catch(e){}
+          const normRaw = norm(decoded);
+          const stripped = normRaw.replace(/^(etiquetadora|rotuladora)\s*[-:]*\s*/i, '').trim();
+
+          const found = state.etiquetadoras.find(o => {
+            const nReal = norm(o.nombreReal);
+            const nPract = norm(o.nombrePractico);
+            const nId = norm(o.id);
+            const strippedReal = nReal.replace(/^(etiquetadora|rotuladora)\s*[-:]*\s*/i, '').trim();
+            const strippedPract = nPract.replace(/^(etiquetadora|rotuladora)\s*[-:]*\s*/i, '').trim();
+
+            return nReal === normRaw ||
+                   nReal === stripped ||
+                   strippedReal === stripped ||
+                   nPract === normRaw ||
+                   nPract === stripped ||
+                   strippedPract === stripped ||
+                   nId === normRaw ||
+                   nId === stripped ||
+                   (nId.replace(/[^0-9]/g, '') !== '' && normRaw.replace(/[^0-9]/g, '') !== '' && Number(nId.replace(/[^0-9]/g, '')) === Number(normRaw.replace(/[^0-9]/g, '')));
+          });
+
+          if(found){
+            if (elPrefill) elPrefill.textContent = found.nombreReal;
+
+            const curSel = document.getElementById('etiquetadora-select');
+            if (!curSel || curSel.value !== found.nombreReal) {
+              if (typeof selectEtiquetadora === 'function') {
+                selectEtiquetadora(found.nombreReal);
+              } else {
+                const displayText = `${found.nombreReal} - ${found.piso || ''} - ${found.ubicacion || ''}`;
+                const inp = document.getElementById('etiquetadora-search-input');
+                if (inp) inp.value = displayText;
+                const clearBtn = document.getElementById('btn-clear-et-search');
+                if (clearBtn) clearBtn.style.display = 'flex';
+                if (curSel) curSel.value = found.nombreReal;
+                if (typeof onEtiquetadoraChange === 'function') {
+                  onEtiquetadoraChange();
+                }
+              }
             }
-            s.value=etName;
+
+            if (window.QR_PARAMS && window.QR_PARAMS.etiquetadora) {
+              delete window.QR_PARAMS.etiquetadora;
+            }
+            try {
+              if (window.history && window.history.replaceState) {
+                const url = new URL(window.location.href);
+                if (url.searchParams.has('etiquetadora')) {
+                  url.searchParams.delete('etiquetadora');
+                  window.history.replaceState({}, '', url.pathname + (url.searchParams.toString() ? '?' + url.searchParams.toString() : '') + url.hash);
+                }
+              }
+            } catch(e){}
+
+            if (window._qrEtInterval) {
+              clearInterval(window._qrEtInterval);
+              window._qrEtInterval = null;
+            }
+            return true;
+          } else if(attempts > 15){
+            const inp = document.getElementById('etiquetadora-search-input');
+            if (inp && !inp.value) {
+              inp.value = decoded;
+              if (typeof filterEtiquetadoras === 'function') filterEtiquetadoras();
+            }
+            if (window._qrEtInterval) {
+              clearInterval(window._qrEtInterval);
+              window._qrEtInterval = null;
+            }
+            return true;
           }
-          onEtiquetadoraChange();
-          clearInterval(w);
-        }else if(attempts > 15){
-          clearInterval(w);
         }
+      } catch(err) {
+        console.error('Error al pre-rellenar etiquetadora por QR:', err);
+        if (window._qrEtInterval) {
+          clearInterval(window._qrEtInterval);
+          window._qrEtInterval = null;
+        }
+        return true;
       }
-      if(attempts > 30) clearInterval(w);
-    },200);
+      if(attempts > 30) {
+        if (window._qrEtInterval) {
+          clearInterval(window._qrEtInterval);
+          window._qrEtInterval = null;
+        }
+        return true;
+      }
+      return false;
+    };
+
+    if (!checkEt()) {
+      window._qrEtInterval = setInterval(checkEt, 200);
+    }
     navigateTo('etiquetadoras');
   }
   if(cobasEq){
